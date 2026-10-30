@@ -30,7 +30,8 @@ Updated: 2026-10-31. No Antigravity agent has been started or connected by this 
 - Quaternius-derived hit/death/air animations baked to native Brute curves.
 
 ## Evidence and limits
-- TerrainPolishBuildResult.txt is now the latest build. TerrainPolishResult.txt has 36 new edit-mode geometry/facing/render checks, alongside 63 passing mount/demo/equipment regressions. No gameplay/Play Mode tests were run. TerrainSurvey.txt records slopes (all authored routes below 34 degrees) and root clearances.
+Current validation is recorded in Docs/VALIDATION.md. The notes below describe earlier individual passes.
+- TerrainPolishBuildResult.txt records the terrain pass build. TerrainPolishResult.txt has 36 edit-mode geometry/facing/render checks, alongside 63 passing mount/demo/equipment regressions. No gameplay/Play Mode tests were run for that pass. TerrainSurvey.txt records slopes (all authored routes below 34 degrees) and root clearances.
 - Terrain-*.png and Enemy-Fixed-*.png are edit-mode previews. TerrainPolishSetup.cs generates terrain, texture layers, road ribbons, lighting and checks. TerrainLayout.cs defines heights/platforms/routes. MountExpansionSetup avoids resetting the world geometry after terrain exists.
 - Generated terrain diffuse/normal textures are produced by project code; existing village/nature/character source licenses remain unchanged. New asset search priorities are in ASSET_REQUESTS.md.
 - MountExpansionBuildResult.txt records the earlier mount build. MountExpansionResult.txt contains its data/rig/scene/progression checks; existing DemoPassResult.txt and EquipmentResult.txt are rerun as regressions. No Play Mode gameplay tests were run.
@@ -81,8 +82,8 @@ Updated: 2026-10-31. No Antigravity agent has been started or connected by this 
 ## Suggested next task
 Use the main quest route in the GitHubPreview build as the next stability target: character selection, Abe's quest, combat, reward, mount, save/reload. GitHub is private and synced; teammate clone/import instructions are in README.md. See Docs/VALIDATION.md for the successful Windows build (0 errors, 680 warnings) and 17 passing headless startup/movement assertions. Actual animation/rendering quality and a full quest/mount playthrough still need manual testing.
 
-Test enemy orientation/tracking during combat, hills/roads, grounding, mounted travel and the new rendering preset in Builds/Windows/Riftbound.exe. Profile actual frame rate before increasing graphics further. Preserve terrain edits; do not run the original whole-scene rebuild.
-Get the user's riding/Greenhollow feedback using Builds/Windows/Riftbound.exe: Z summon/cancel/dismount, C slow travel, movement/jumps/collisions, combat dismount, three markers, V zebra selection, save/load. On-foot animation feedback remains relevant.
+Test enemy orientation/tracking during combat, hills/roads, grounding, mounted travel and the rendering preset in Builds/GitHubPreview/Riftbound.exe. Profile actual frame rate before increasing graphics further. Preserve terrain edits; do not run the original whole-scene rebuild.
+Get the user's riding/Greenhollow feedback using Builds/GitHubPreview/Riftbound.exe: Z summon/cancel/dismount, C slow travel, movement/jumps/collisions, combat dismount, three markers, V zebra selection, save/load. On-foot animation feedback remains relevant.
 Inspect the relevant runtime behavior before adding more animation workarounds. For independent
 work, improve a bounded UI or content task without touching movement/controller/scene files owned
 by another agent. Do not start concurrent editing until ownership is agreed.
