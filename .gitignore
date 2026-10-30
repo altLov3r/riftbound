@@ -49,3 +49,5 @@
 **/*.p12
 /Assets/StreamingAssets/aa/
 /Assets/StreamingAssets/aa.meta
+/Assets/Resources/PerformanceTestRun*.json
+/Assets/Resources/PerformanceTestRun*.json.meta

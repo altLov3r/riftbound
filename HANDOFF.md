@@ -1,12 +1,12 @@
 # Riftbound — agent handoff
 
-Updated: 2026-10-29. No Antigravity agent has been started or connected by this file.
+Updated: 2026-10-31. No Antigravity agent has been started or connected by this file.
 
 ## Project
 - Unity 6000.6.2f1, URP, C#, Input System.
 - Open this directory as the Unity project; Assets/, Packages/ and ProjectSettings/ are here.
 - Current scene: Assets/RPG/Scenes/Outpost-Updated.unity.
-- Latest executable: Builds/Windows/Riftbound.exe. Older build folders are older snapshots.
+- Latest validated executable: Builds/GitHubPreview/Riftbound.exe. Builds/Windows is the previous output; the normal build menu writes future builds there.
 - Legacy Outpost.unity still contains the old rig. PrototypeEntry routes Play from it to Outpost-Updated.
 - GitHub repository: https://github.com/altLov3r/riftbound (private). Use Git with Git LFS; preserve .meta GUIDs. The original .plastic metadata remains local as a fallback.
 
@@ -79,6 +79,8 @@ Updated: 2026-10-29. No Antigravity agent has been started or connected by this 
 - Verified C# compilation of Assembly-CSharp and Assembly-CSharp-Editor with 0 errors.
 
 ## Suggested next task
+Use the main quest route in the GitHubPreview build as the next stability target: character selection, Abe's quest, combat, reward, mount, save/reload. GitHub is private and synced; teammate clone/import instructions are in README.md. See Docs/VALIDATION.md for the successful Windows build (0 errors, 680 warnings) and 17 passing headless startup/movement assertions. Actual animation/rendering quality and a full quest/mount playthrough still need manual testing.
+
 Test enemy orientation/tracking during combat, hills/roads, grounding, mounted travel and the new rendering preset in Builds/Windows/Riftbound.exe. Profile actual frame rate before increasing graphics further. Preserve terrain edits; do not run the original whole-scene rebuild.
 Get the user's riding/Greenhollow feedback using Builds/Windows/Riftbound.exe: Z summon/cancel/dismount, C slow travel, movement/jumps/collisions, combat dismount, three markers, V zebra selection, save/load. On-foot animation feedback remains relevant.
 Inspect the relevant runtime behavior before adding more animation workarounds. For independent

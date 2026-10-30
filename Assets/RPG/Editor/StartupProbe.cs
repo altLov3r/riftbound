@@ -14,6 +14,11 @@ namespace Riftbound.Editor
                 Debug.LogWarning("Enter Play Mode before validating startup.");
                 return;
             }
+            if (EditorApplication.isPaused)
+            {
+                Debug.LogWarning("Unity is paused. Press Pause again to resume gameplay.");
+                return;
+            }
 
             var player = Object.FindFirstObjectByType<PlayerController>();
             var camera = Object.FindFirstObjectByType<OrbitCamera>();

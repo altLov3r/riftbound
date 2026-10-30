@@ -11,6 +11,7 @@ A small 3D fantasy RPG built in Unity for a diploma project and competition.
 5. Open `Assets/RPG/Scenes/Outpost-Updated.unity`, press Play, select a character and choose **Enter World**.
 
 Use the Game tab for playing. `Riftbound > Direct Play in Editor` bypasses character selection for quick testing.
+While playing, `Riftbound > Validate Play Mode startup` checks the player, camera, HUD and keyboard connections.
 
 ## Controls
 
