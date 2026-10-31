@@ -1,5 +1,7 @@
 # GitHub migration and playable build — 2026-10-31
 
+For the newer QuestUpdate build and 57 quest/loot/navigation checks, see `Docs/QUEST_ROUTE_PASS.md`. This document preserves the migration pass results.
+
 ## Repository
 
 - Private repository: https://github.com/altLov3r/riftbound

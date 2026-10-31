@@ -30,7 +30,7 @@ Updated: 2026-10-31. No Antigravity agent has been started or connected by this 
 - Quaternius-derived hit/death/air animations baked to native Brute curves.
 
 ## Evidence and limits
-Current validation is recorded in Docs/VALIDATION.md. The notes below describe earlier individual passes.
+Current validation is recorded in Docs/QUEST_ROUTE_PASS.md; Docs/VALIDATION.md records the earlier GitHub migration build. The notes below describe earlier individual passes.
 - TerrainPolishBuildResult.txt records the terrain pass build. TerrainPolishResult.txt has 36 edit-mode geometry/facing/render checks, alongside 63 passing mount/demo/equipment regressions. No gameplay/Play Mode tests were run for that pass. TerrainSurvey.txt records slopes (all authored routes below 34 degrees) and root clearances.
 - Terrain-*.png and Enemy-Fixed-*.png are edit-mode previews. TerrainPolishSetup.cs generates terrain, texture layers, road ribbons, lighting and checks. TerrainLayout.cs defines heights/platforms/routes. MountExpansionSetup avoids resetting the world geometry after terrain exists.
 - Generated terrain diffuse/normal textures are produced by project code; existing village/nature/character source licenses remain unchanged. New asset search priorities are in ASSET_REQUESTS.md.
