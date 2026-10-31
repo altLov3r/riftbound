@@ -46,7 +46,7 @@ namespace Riftbound
                         { result = supply.transform.position; nearest = Vector3.Distance(transform.position, result); }
                 }
                 else foreach (var enemy in FindObjectsByType<EnemyController>(FindObjectsSortMode.None))
-                    if (enemy.isBoss == (QuestIndex == 2) && (QuestIndex != 0 || !enemy.campGuard) && enemy.GetComponent<Combatant>().Alive && Vector3.Distance(transform.position, enemy.transform.position) < nearest)
+                    if ((QuestIndex == 2 ? enemy.IsMainQuestCaptain : enemy.IsRoadRaider) && enemy.GetComponent<Combatant>().Alive && Vector3.Distance(transform.position, enemy.transform.position) < nearest)
                     { result = enemy.transform.position; nearest = Vector3.Distance(transform.position, result); }
                 return result;
             }
@@ -77,21 +77,17 @@ namespace Riftbound
         public void RecordEnemyDefeat(EnemyController enemy)
         {
             if (!enemy || enemy.trainingDummy || string.IsNullOrEmpty(enemy.enemyId) || !defeatedEnemies.Add(enemy.enemyId)) return;
-            if (enemy.isBoss) BossDefeated = true;
-            else if (!enemy.campGuard) Kills++;
+            if (enemy.IsMainQuestCaptain) BossDefeated = true;
+            else if (enemy.IsRoadRaider) Kills++;
             int goldGain = enemy.isBoss ? 20 : enemy.campGuard ? 5 : 3;
-            if (CharacterRace == "Human") goldGain = Mathf.RoundToInt(goldGain * 1.25f);
-            Gold += goldGain;
-            AudioEffects.PlayLootCoin();
             int expGain = enemy.isBoss ? 120 : enemy.campGuard ? 40 : 30;
             string enemyName = enemy.GetComponent<Combatant>()?.displayName ?? "enemy";
             ChatSystem.LogCombat($"Defeated {enemyName}! +{expGain} XP.");
             string item = EnemyItem(enemy);
-            int boneCount = enemy.isBoss ? 4 : enemy.campGuard ? 2 : 1;
+            int boneCount = enemy.isBoss ? 5 : enemy.campGuard ? 2 : 1;
             LootDropSystem.SpawnLoot(enemy.transform.position, enemyName, goldGain, boneCount, item);
             AddExperience(expGain);
-            Message = enemy.isBoss ? "Captain defeated! Return to Abe." : "+XP and gold. " + QuestObjective;
-            if (item.Length > 0) Message += " New item: " + item + " [I]";
+            Message = enemy.IsMainQuestCaptain ? "Captain defeated! Return to Abe. [E] Loot the remains." : "+XP. [E] Loot the remains. " + QuestObjective;
             SaveAdventure(false);
         }
         public void AddExperience(int amount)
@@ -120,7 +116,7 @@ namespace Riftbound
             CharacterVisualFactory.ApplyToPlayer(this, CharacterRace, CharacterClass);
             foreach (var enemy in FindObjectsByType<EnemyController>(FindObjectsInactive.Include, FindObjectsSortMode.None))
             {
-                bool active = !defeatedEnemies.Contains(enemy.enemyId) && (!enemy.isBoss || (QuestIndex == 2 && QuestAccepted)) && (!enemy.requiresRunes || RunesFound >= 3);
+                bool active = !defeatedEnemies.Contains(enemy.enemyId) && (!enemy.IsMainQuestCaptain || (QuestIndex == 2 && QuestAccepted)) && (!enemy.requiresRunes || RunesFound >= 3);
                 // Preserve an enemy's death animation until the next load.
                 if (active || enemy.GetComponent<Combatant>().Alive || !Application.isPlaying) enemy.gameObject.SetActive(active);
             }
@@ -140,6 +136,8 @@ namespace Riftbound
             public int boneShards;
             public string characterRace;
             public string characterClass;
+            public bool lootOnCorpses;
+            public LootDropSystem.SavedCorpse[] corpses;
             public int[] talentRanksA;
             public int[] talentRanksB;
             public bool hasPosition;
@@ -153,6 +151,8 @@ namespace Riftbound
                 var (tA, tB) = TalentSystem.ExportRanks(CharacterClass);
                 data.talentRanksA = tA;
                 data.talentRanksB = tB;
+                data.lootOnCorpses = true;
+                data.corpses = LootDropSystem.Instance ? LootDropSystem.Instance.ExportCorpses() : null;
                 data.items = ownedItems.ToArray(); data.weapon = EquippedWeaponId; data.armor = EquippedArmorId; data.trinket = EquippedTrinketId; data.boneShards = BoneShards;
                 data.runes = new List<string>(discoveredRunes).ToArray();
                 data.landmarks = new List<string>(landmarks).ToArray(); data.mount = SelectedMountId;
@@ -260,6 +260,14 @@ namespace Riftbound
                 if (data.chests != null) foreach (string id in data.chests) openedChests.Add(id);
                 defeatedEnemies.Clear(); collectedSupplies.Clear();
                 if (data.enemies != null) foreach (string id in data.enemies) defeatedEnemies.Add(id);
+                if (data.enemies != null)
+                {
+                    Kills = 0;
+                    foreach (var id in defeatedEnemies)
+                        if (id != null && id.StartsWith("road-raider-", StringComparison.Ordinal)) Kills++;
+                    BossDefeated = defeatedEnemies.Contains("ashwood-captain");
+                    data.bossDefeated = BossDefeated;
+                }
                 if (data.supplies != null) foreach (string id in data.supplies) collectedSupplies.Add(id);
                 discoveredRunes.Clear(); if (data.runes != null) foreach (string id in data.runes) discoveredRunes.Add(id);
                 landmarks.Clear(); if (data.landmarks != null) foreach (string id in data.landmarks) if (ValidLandmark(id)) landmarks.Add(id);
@@ -296,6 +304,7 @@ namespace Riftbound
                 TalentSystem.ImportRanks(this, data.talentRanksA, data.talentRanksB);
                 RestoreMountSelection(data.mount);
                 RestoreEquipment(data); Stats.Restore(); RefreshAdventureWorld();
+                if (LootDropSystem.Instance) LootDropSystem.Instance.RestoreCorpses(data.corpses);
                 string activeZone = ZoneManager.GetZoneName(transform.position);
                 Message = $"Welcome back to {activeZone}. " + QuestObjective;
             }

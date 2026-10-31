@@ -72,9 +72,16 @@ namespace Riftbound
 
             GUI.Label(new Rect(x + 338, y + 312, 450, 105), objective, label);
 
-            if (GUI.Button(new Rect(x + 24, y + 432, 220, 36), "WORLD MAP [M]", questButton)) { player.JournalOpen = false; player.MapOpen = true; }
-            if (GUI.Button(new Rect(x + 252, y + 432, 250, 36), "📖 ENCOUNTERS [Shift+J]", questButton)) { player.JournalOpen = false; player.EncounterJournalOpen = true; }
-            if (GUI.Button(new Rect(x + 610, y + 432, 185, 36), "CLOSE [J / ESC]", questButton)) player.JournalOpen = false;
+            if (GUI.Button(new Rect(x + 24, y + 432, 170, 36), "WORLD MAP [M]", questButton)) { player.JournalOpen = false; player.MapOpen = true; }
+            GUI.enabled = !player.QuestComplete && MinimapRadar.Instance;
+            if (GUI.Button(new Rect(x + 202, y + 432, 194, 36), "TRACK MAIN QUEST", questButton))
+            {
+                MinimapRadar.Instance.TrackMainQuest();
+                player.JournalOpen = false;
+            }
+            GUI.enabled = true;
+            if (GUI.Button(new Rect(x + 404, y + 432, 206, 36), "ENCOUNTERS [Shift+J]", questButton)) { player.JournalOpen = false; player.EncounterJournalOpen = true; }
+            if (GUI.Button(new Rect(x + 618, y + 432, 177, 36), "CLOSE [J / ESC]", questButton)) player.JournalOpen = false;
         }
     }
 }

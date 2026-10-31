@@ -142,6 +142,7 @@ namespace Riftbound
                 if (player)
                 {
                     player.GrantItem(entry.id);
+                    player.SaveAdventure(false);
                 }
             }
             else

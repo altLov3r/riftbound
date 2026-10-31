@@ -78,3 +78,16 @@ Subclasses and multiplayer are outside the competition milestone.
 - [x] Grass/dirt/rock layers, contact shading, soft shadows and color grading.
 - [x] Geometry, grounding, route-grade and facing checks.
 - [ ] User combat/riding acceptance test and frame-rate profiling.
+
+## Quest-route stability and navigation — 2026-10-31
+
+- [x] Restrict main-quest targets/credit to road raiders and the Ashwood Captain.
+- [x] Keep optional bosses independent of Abe's quest gate.
+- [x] Correct completion messages and completed quest count.
+- [x] Collect enemy loot once, with a single Human gold bonus and valid item IDs.
+- [x] Save unclaimed/partially claimed loot and retain legacy earned gear.
+- [x] Add live main-quest navigation to the journal/minimap.
+- [x] Add 57 passing headless startup, quest, loot and save/navigation assertions.
+- [x] Build QuestUpdate for Windows: 0 errors, 653 existing shader/plugin warnings.
+- [ ] Manual quest/combat/mount acceptance test.
+- [ ] Safe malformed-save/backup recovery and cross-character talent reset.

@@ -77,26 +77,15 @@ namespace Riftbound
         }
         string EnemyItem(EnemyController enemy)
         {
-            BoneShards += enemy.isBoss ? 5 : enemy.campGuard ? 2 : 1;
             string id = enemy.enemyId == "boss-vermithrax" ? "wyrmtooth-edge" :
                         enemy.enemyId == "boss-abbot-vael" ? "scarlet-aegis" :
                         enemy.enemyId == "boss-malakar" ? "scarlet-blade" :
                         enemy.enemyId == "crypt-warden" ? "warden-axe" :
-                        enemy.isBoss ? "captain-axe" :
+                        enemy.IsMainQuestCaptain ? "captain-axe" :
                         enemy.enemyId == "road-raider-2" ? "raider-cleaver" :
                         enemy.enemyId == "camp-guard-1" ? "boneplate" : "";
 
-            if (!string.IsNullOrEmpty(id))
-            {
-                var gear = ItemCatalog.Get(id);
-                if (gear != null && (gear.rarity == "Epic" || gear.rarity == "Legendary"))
-                {
-                    LootRollSystem.PromptRoll(gear.id, gear.name, gear.rarity, gear.Stats);
-                    return gear.name;
-                }
-            }
-
-            return GrantItem(id) ? ItemCatalog.Get(id).name : "";
+            return id;
         }
         string ChestItem(string chestId)
         {
@@ -114,10 +103,13 @@ namespace Riftbound
             ownedItems.Clear(); ownedItems.Add("starter-axe");
             if (data.items != null) foreach (string id in data.items) if (!string.IsNullOrEmpty(id) && !ownedItems.Contains(id)) ownedItems.Add(id);
             // Migration grants earned rewards without changing existing enemy/quest progress.
-            if (data.enemies != null && System.Array.IndexOf(data.enemies, "road-raider-2") >= 0) GrantItem("raider-cleaver");
-            if (data.enemies != null && System.Array.IndexOf(data.enemies, "camp-guard-1") >= 0) GrantItem("boneplate");
-            if (data.bossDefeated) GrantItem("captain-axe");
-            if (data.enemies != null && System.Array.IndexOf(data.enemies, "crypt-warden") >= 0) GrantItem("warden-axe");
+            if (!data.lootOnCorpses)
+            {
+                if (data.enemies != null && System.Array.IndexOf(data.enemies, "road-raider-2") >= 0) GrantItem("raider-cleaver");
+                if (data.enemies != null && System.Array.IndexOf(data.enemies, "camp-guard-1") >= 0) GrantItem("boneplate");
+                if (data.bossDefeated) GrantItem("captain-axe");
+                if (data.enemies != null && System.Array.IndexOf(data.enemies, "crypt-warden") >= 0) GrantItem("warden-axe");
+            }
             if (data.chests != null) foreach (string id in data.chests) ChestItem(id);
             if (data.weaponUpgraded) { GrantItem("emberwatch-axe"); GrantItem("emberwatch-sigil"); }
             EquippedWeaponId = ValidEquipment(data.weapon, GearSlot.Weapon) ? data.weapon : data.weaponUpgraded ? "emberwatch-axe" : "starter-axe";

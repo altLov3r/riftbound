@@ -6,7 +6,7 @@ Updated: 2026-10-31. No Antigravity agent has been started or connected by this 
 - Unity 6000.6.2f1, URP, C#, Input System.
 - Open this directory as the Unity project; Assets/, Packages/ and ProjectSettings/ are here.
 - Current scene: Assets/RPG/Scenes/Outpost-Updated.unity.
-- Latest validated executable: Builds/GitHubPreview/Riftbound.exe. Builds/Windows is the previous output; the normal build menu writes future builds there.
+- Latest validated executable: Builds/QuestUpdate/Riftbound.exe. Builds/GitHubPreview and Builds/Windows are earlier outputs; the normal build menu writes future builds to Builds/Windows.
 - Legacy Outpost.unity still contains the old rig. PrototypeEntry routes Play from it to Outpost-Updated.
 - GitHub repository: https://github.com/altLov3r/riftbound (private). Use Git with Git LFS; preserve .meta GUIDs. The original .plastic metadata remains local as a fallback.
 
@@ -80,10 +80,12 @@ Current validation is recorded in Docs/VALIDATION.md. The notes below describe e
 - Verified C# compilation of Assembly-CSharp and Assembly-CSharp-Editor with 0 errors.
 
 ## Suggested next task
-Use the main quest route in the GitHubPreview build as the next stability target: character selection, Abe's quest, combat, reward, mount, save/reload. GitHub is private and synced; teammate clone/import instructions are in README.md. See Docs/VALIDATION.md for the successful Windows build (0 errors, 680 warnings) and 17 passing headless startup/movement assertions. Actual animation/rendering quality and a full quest/mount playthrough still need manual testing.
+Current pass: quest eligibility, captain-only gating, reward messages and duplicate loot were fixed. Unclaimed loot now survives reloads, and J > Track Main Quest creates a live waypoint. See Docs/QUEST_ROUTE_PASS.md: 57 passing startup/quest/loot/save/navigation assertions and a Windows build with 0 errors, 653 warnings. Runtime progression was exercised with simulated defeats; animations, combat balance, terrain and mounts still need manual acceptance in Builds/QuestUpdate/Riftbound.exe.
 
-Test enemy orientation/tracking during combat, hills/roads, grounding, mounted travel and the rendering preset in Builds/GitHubPreview/Riftbound.exe. Profile actual frame rate before increasing graphics further. Preserve terrain edits; do not run the original whole-scene rebuild.
-Get the user's riding/Greenhollow feedback using Builds/GitHubPreview/Riftbound.exe: Z summon/cancel/dismount, C slow travel, movement/jumps/collisions, combat dismount, three markers, V zebra selection, save/load. On-foot animation feedback remains relevant.
+Next bounded fixes: recover malformed saves safely from `.bak` without overwriting the failed slot, then reset/import static talent ranks correctly across character selection. Audit pending party-roll persistence separately. Preserve existing saves and use isolated test slots. GitHub is private; clone/import instructions are in README.md.
+
+Test enemy orientation/tracking during combat, hills/roads, grounding, mounted travel and the rendering preset in Builds/QuestUpdate/Riftbound.exe. Profile actual frame rate before increasing graphics further. Preserve terrain edits; do not run the original whole-scene rebuild.
+Get the user's riding/Greenhollow feedback using Builds/QuestUpdate/Riftbound.exe: Z summon/cancel/dismount, C slow travel, movement/jumps/collisions, combat dismount, three markers, V zebra selection, save/load. On-foot animation feedback remains relevant.
 Inspect the relevant runtime behavior before adding more animation workarounds. For independent
 work, improve a bounded UI or content task without touching movement/controller/scene files owned
 by another agent. Do not start concurrent editing until ownership is agreed.

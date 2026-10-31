@@ -23,6 +23,15 @@ namespace Riftbound
 
         // Custom Waypoint
         [NonSerialized] public Vector3? customWaypoint = null;
+        public bool TrackingMainQuest { get; private set; }
+        float nextQuestUpdate;
+
+        public void TrackMainQuest()
+        {
+            if (!player || player.QuestComplete) return;
+            SetWaypoint(player.ObjectivePosition, player.QuestName);
+            TrackingMainQuest = true;
+        }
 
         public static void SetWaypoint(Vector3 pos, string label = null)
         {
@@ -30,6 +39,7 @@ namespace Riftbound
             if (radar)
             {
                 radar.customWaypoint = pos;
+                radar.TrackingMainQuest = false;
                 if (!string.IsNullOrEmpty(label))
                     ChatSystem.LogSystem($"<color=#00e5ff>★ Waypoint Set: {label} ({pos.x:0.0}, {pos.z:0.0})</color>");
                 AudioEffects.PlayClick();
@@ -42,6 +52,7 @@ namespace Riftbound
             if (radar && radar.customWaypoint.HasValue)
             {
                 radar.customWaypoint = null;
+                radar.TrackingMainQuest = false;
                 ChatSystem.LogSystem("<color=#aaa>Waypoint Cleared.</color>");
                 AudioEffects.PlayClick();
             }
@@ -82,6 +93,18 @@ namespace Riftbound
         {
             if (!player) player = FindFirstObjectByType<PlayerController>();
             orbitCam = FindFirstObjectByType<OrbitCamera>();
+        }
+
+        void Update()
+        {
+            if (!TrackingMainQuest || !player || FrontendMenu.IsOpen || Time.unscaledTime < nextQuestUpdate) return;
+            nextQuestUpdate = Time.unscaledTime + .5f;
+            if (player.QuestComplete)
+            {
+                TrackingMainQuest = false;
+                customWaypoint = null;
+            }
+            else customWaypoint = player.ObjectivePosition;
         }
 
         public void DrawRadarGUI(float screenW, float screenH)
@@ -679,6 +702,7 @@ namespace Riftbound
 
                     Vector3 targetPos = player.transform.position + new Vector3(worldDir.x * ratio, 0f, -worldDir.y * ratio);
                     customWaypoint = targetPos;
+                    TrackingMainQuest = false;
                     AudioEffects.PlayClick();
                     ChatSystem.LogSystem($"<color=#00e5ff>★ Waypoint Set: ({targetPos.x:0.0}, {targetPos.z:0.0})</color>");
                     e.Use();
@@ -689,6 +713,7 @@ namespace Riftbound
                     if (customWaypoint.HasValue)
                     {
                         customWaypoint = null;
+                        TrackingMainQuest = false;
                         AudioEffects.PlayClick();
                         ChatSystem.LogSystem("<color=#aaa>Waypoint Cleared.</color>");
                         e.Use();

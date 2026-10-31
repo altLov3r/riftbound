@@ -438,13 +438,15 @@ namespace Riftbound
         {
             if (!DialogueOpen || !CanTalk() || !QuestReady || QuestComplete || !ActiveQuestGiver) return;
             int goldGain = QuestGold;
+            int questExperience = QuestExperience;
+            string completedQuest = QuestName;
             if (CharacterRace == "Human") goldGain = Mathf.RoundToInt(goldGain * 1.25f);
-            Gold += goldGain; AddExperience(QuestExperience); Potions = Mathf.Min(10, Potions + 1);
+            Gold += goldGain; AddExperience(questExperience); Potions = Mathf.Min(10, Potions + 1);
             QuestIndex++; QuestAccepted = false; QuestComplete = QuestIndex >= 3;
             if (QuestComplete) { WeaponUpgraded = true; GrantItem("emberwatch-axe", true); GrantItem("emberwatch-sigil", true); }
             Stats.Heal(Stats.maxHealth);
             AudioEffects.PlayQuestComplete();
-            ChatSystem.LogQuest($"Quest Completed: {QuestName}! Rewards: {goldGain} Gold, {QuestExperience} XP.");
+            ChatSystem.LogQuest($"Quest Completed: {completedQuest}! Rewards: {goldGain} Gold, {questExperience} XP.");
             Message = QuestComplete ? "Emberwatch is safe! Rewards: Emberwatch Axe and Sigil. [I]" : "Quest complete! Speak to Abe for your next mission.";
             CloseDialogue();
             RefreshAdventureWorld(); SaveAdventure(false);

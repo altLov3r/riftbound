@@ -20,6 +20,10 @@ While playing, `Riftbound > Validate Play Mode startup` checks the player, camer
 - Z: summon/dismiss mount; V: cycle unlocked mounts.
 - I: inventory; J: quests; M: map; Escape: settings/pause.
 
+In the quest journal, **Track Main Quest** creates a live minimap waypoint. It follows the next raider or supply crate and returns to Abe when the objective is ready. Placing a manual waypoint stops automatic tracking.
+
+Enemies award XP on defeat. Press **E** near their remains to collect gold, bone shards and equipment. Unclaimed loot survives save/reload with its remaining two-minute gameplay timer; claimed rewards stay claimed.
+
 More controls and project notes are in `CHARACTER_UPDATE.md`, `TASKS.md` and `HANDOFF.md`.
 
 ## Work with a teammate
@@ -40,3 +44,9 @@ Exit Play Mode and choose **Riftbound > Build Windows demo**. The executable is 
 ## Assets
 
 Keep the repository private while the source/license records for all imported character and prop assets are completed. Existing attribution and license files are preserved under `Assets/RPG/`; see `Assets/RPG/CHARACTER_ASSETS.md`.
+
+## Quest regression check
+
+Use an isolated Unity project copy containing `Assets/`, `Packages/` and `ProjectSettings/`. Start Unity in batch mode with `-executeMethod Riftbound.Editor.QuestRouteSmokeTest.Run` and without `-quit`; the check exits when finished. It creates a fresh test save under `.code-check/` and writes `QuestRouteSmokeResult.txt`.
+
+The check covers startup, movement, Abe's three quests, enemy eligibility, loot collection, legacy save compatibility and live quest navigation. Defeats are simulated through the combat damage API; visual quality and combat balance still need manual testing.

@@ -11,6 +11,8 @@ namespace Riftbound
         public string enemyId;
         public bool campGuard, isBoss;
         public bool trainingDummy;
+        public bool IsMainQuestCaptain => enemyId == "ashwood-captain";
+        public bool IsRoadRaider => !trainingDummy && enemyId != null && enemyId.StartsWith("road-raider-", System.StringComparison.Ordinal);
         public bool heavyAttacker, requiresRunes;
         public float attackDamage = 10;
         public float movementMultiplier = 1;

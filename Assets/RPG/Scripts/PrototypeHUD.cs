@@ -226,7 +226,7 @@ namespace Riftbound
                 questTrackerCollapsed = !questTrackerCollapsed;
                 AudioEffects.PlayClick();
             }
-            GUI.Label(new Rect(qtx + 26f, qty + 1f, qtw - 30f, 18f), $"QUESTS ({player.QuestIndex + 1}/3)", small);
+            GUI.Label(new Rect(qtx + 26f, qty + 1f, qtw - 30f, 18f), $"QUESTS ({Mathf.Min(player.QuestIndex + 1, 3)}/3)", small);
 
             if (!questTrackerCollapsed)
             {

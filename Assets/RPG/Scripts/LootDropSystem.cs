@@ -20,6 +20,46 @@ namespace Riftbound
             public GameObject markerObject;
         }
 
+        [System.Serializable]
+        public class SavedCorpse
+        {
+            public string name;
+            public Vector3 position;
+            public int gold, boneShards;
+            public string[] items;
+            public float remainingSeconds;
+        }
+
+        public SavedCorpse[] ExportCorpses()
+        {
+            var saved = new List<SavedCorpse>();
+            foreach (var corpse in activeCorpses)
+            {
+                float remaining = 120f - (Time.time - corpse.spawnTime);
+                if (remaining <= 0 || (corpse.gold <= 0 && corpse.boneShards <= 0 && corpse.items.Count == 0)) continue;
+                saved.Add(new SavedCorpse { name = corpse.name, position = corpse.position, gold = corpse.gold,
+                    boneShards = corpse.boneShards, items = corpse.items.ToArray(), remainingSeconds = remaining });
+            }
+            return saved.ToArray();
+        }
+
+        public void RestoreCorpses(SavedCorpse[] saved)
+        {
+            foreach (var corpse in activeCorpses) if (corpse.markerObject) Destroy(corpse.markerObject);
+            activeCorpses.Clear();
+            CurrentLooting = null;
+            if (saved == null) return;
+            foreach (var corpse in saved)
+            {
+                if (corpse == null || corpse.remainingSeconds <= 0) continue;
+                SpawnLoot(corpse.position, corpse.name, Mathf.Max(0, corpse.gold), Mathf.Max(0, corpse.boneShards), "");
+                var restored = activeCorpses[activeCorpses.Count - 1];
+                restored.spawnTime = Time.time - (120f - Mathf.Min(120f, corpse.remainingSeconds));
+                if (corpse.items != null) foreach (string item in corpse.items)
+                    if (ItemCatalog.Get(item) != null) restored.items.Add(item);
+            }
+        }
+
         List<LootCorpse> activeCorpses = new List<LootCorpse>();
         public List<LootCorpse> ActiveCorpses => activeCorpses;
         public LootCorpse CurrentLooting { get; private set; }
@@ -94,10 +134,11 @@ namespace Riftbound
 
         void Update()
         {
-            if (!player) player = GetComponent<PlayerController>();
+            if (!player) player = GetComponent<PlayerController>() ?? FindFirstObjectByType<PlayerController>();
             if (!player || FrontendMenu.IsOpen) return;
 
             // Despawn old unlooted corpses after 120s
+            bool expired = false;
             for (int i = activeCorpses.Count - 1; i >= 0; i--)
             {
                 var c = activeCorpses[i];
@@ -105,8 +146,10 @@ namespace Riftbound
                 {
                     if (c.markerObject) Destroy(c.markerObject);
                     activeCorpses.RemoveAt(i);
+                    expired = true;
                 }
             }
+            if (expired) player.SaveAdventure(false);
 
             // Close looting if moved away
             if (CurrentLooting != null)
@@ -151,31 +194,30 @@ namespace Riftbound
 
         public void LootAll(LootCorpse corpse)
         {
-            if (corpse == null || !player) return;
+            if (corpse == null || !player || !activeCorpses.Contains(corpse)) return;
 
             if (corpse.gold > 0)
             {
                 int g = corpse.gold;
                 if (player.CharacterRace == "Human") g = Mathf.RoundToInt(g * 1.25f);
+                corpse.gold = 0;
                 player.AddGoldDirect(g);
                 ChatSystem.LogLoot($"{g} Gold", "common");
-                corpse.gold = 0;
             }
 
             if (corpse.boneShards > 0)
             {
-                player.AddBoneShardsDirect(corpse.boneShards);
-                ChatSystem.LogLoot($"{corpse.boneShards} Bone Shards", "common");
+                int shards = corpse.boneShards;
                 corpse.boneShards = 0;
+                player.AddBoneShardsDirect(shards);
+                ChatSystem.LogLoot($"{shards} Bone Shards", "common");
             }
 
             for (int i = corpse.items.Count - 1; i >= 0; i--)
             {
                 string id = corpse.items[i];
-                var gear = ItemCatalog.Get(id);
-                player.GrantItem(id);
-                ChatSystem.LogLoot(gear != null ? gear.name : id, gear != null ? gear.rarity.ToLowerInvariant() : "rare");
                 corpse.items.RemoveAt(i);
+                AwardItem(id);
             }
 
             AudioEffects.PlayLootCoin();
@@ -184,15 +226,28 @@ namespace Riftbound
             if (corpse.markerObject) Destroy(corpse.markerObject);
             activeCorpses.Remove(corpse);
             CurrentLooting = null;
+            player.SaveAdventure(false);
+        }
+
+        void AwardItem(string id)
+        {
+            var gear = ItemCatalog.Get(id);
+            if (gear == null) return;
+            if ((gear.rarity == "Epic" || gear.rarity == "Legendary") && PartySystem.Instance && PartySystem.Instance.Members.Count > 1)
+                LootRollSystem.PromptRoll(gear.id, gear.name, gear.rarity, gear.Stats);
+            else
+            {
+                player.GrantItem(id);
+                ChatSystem.LogLoot(gear.name, gear.rarity.ToLowerInvariant());
+            }
         }
 
         public void LootItem(LootCorpse corpse, string itemId)
         {
-            if (corpse == null || !player) return;
-            var gear = ItemCatalog.Get(itemId);
-            player.GrantItem(itemId);
-            ChatSystem.LogLoot(gear != null ? gear.name : itemId, gear != null ? gear.rarity.ToLowerInvariant() : "rare");
+            if (corpse == null || !player || !activeCorpses.Contains(corpse) || !corpse.items.Contains(itemId)) return;
             corpse.items.Remove(itemId);
+            AwardItem(itemId);
+            player.SaveAdventure(false);
             AudioEffects.PlayLootCoin();
 
             if (corpse.gold <= 0 && corpse.boneShards <= 0 && corpse.items.Count == 0)
@@ -205,12 +260,12 @@ namespace Riftbound
 
         public void LootCoins(LootCorpse corpse)
         {
-            if (corpse == null || !player || corpse.gold <= 0) return;
+            if (corpse == null || !player || !activeCorpses.Contains(corpse) || corpse.gold <= 0) return;
             int g = corpse.gold;
             if (player.CharacterRace == "Human") g = Mathf.RoundToInt(g * 1.25f);
+            corpse.gold = 0;
             player.AddGoldDirect(g);
             ChatSystem.LogLoot($"{g} Gold", "common");
-            corpse.gold = 0;
             AudioEffects.PlayLootCoin();
 
             if (corpse.boneShards <= 0 && corpse.items.Count == 0)
