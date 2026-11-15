@@ -41,8 +41,9 @@ namespace Riftbound.Editor
                 Directory.CreateDirectory(PropResourcesDir);
                 AssetDatabase.Refresh();
 
-                // 1. Repair shared NPC / Village / Props materials first
+                // 1. Repair shared NPC / Village / Props materials & ensure stylized textures/meshes exist
                 RepairSharedMaterials();
+                StylizedRacialModelSystem.EnsureUnifiedAssetsReady(false);
 
                 // 2. Build rig-matched Player AnimatorControllers (Humanoid + Undead KayKit)
                 var ctrlMelee = BuildHumanoidPlayerController("Player Humanoid Melee", "Melee");
@@ -53,7 +54,7 @@ namespace Riftbound.Editor
                 var ctrlUndeadMage = BuildUndeadPlayerController("Player Undead Mage", "Skeleton Mage");
                 var ctrlUndeadRogue = BuildUndeadPlayerController("Player Undead Rogue", "Skeleton Rogue");
 
-                // 3. Build all 24 Race × Class character prefabs with real textured URP materials
+                // 3. Build all 24 Race × Class character prefabs with unified stylized textures & 3D racial features
                 int count = 0;
                 string[] races = { "Human", "Dwarf", "Elf", "Orc", "Undead", "Goblin" };
                 string[] classes = { "Warrior", "Paladin", "Mage", "Rogue" };
@@ -63,7 +64,7 @@ namespace Riftbound.Editor
                     foreach (string characterClass in classes)
                     {
                         RuntimeAnimatorController ctrl;
-                        if (race == "Undead" && characterClass != "Paladin")
+                        if (race == "Undead")
                         {
                             ctrl = characterClass == "Mage" ? ctrlUndeadMage
                                  : characterClass == "Rogue" ? ctrlUndeadRogue
@@ -81,8 +82,10 @@ namespace Riftbound.Editor
                     }
                 }
 
-                // 4. Build normalized companion pet & prop prefabs in Resources/
+                // 4. Build normalized companion pet & prop prefabs in Resources/ and unify mount/animal fur textures
                 BuildCompanionPetsAndProps();
+                StylizedRacialModelSystem.UnifyAllAnimalMountAndPetMaterials();
+                StylizedRacialModelSystem.MarkTextureStampComplete();
 
                 AssetDatabase.SaveAssets();
                 AssetDatabase.Refresh();
@@ -539,68 +542,23 @@ namespace Riftbound.Editor
 
         static void BuildPrefab(string race, string characterClass, RuntimeAnimatorController controller)
         {
-            var profile = CharacterVisualFactory.GetProfile(race);
-            string fbxFile = SelectSourceFbx(race, characterClass);
-            var source = AssetDatabase.LoadAssetAtPath<GameObject>(fbxFile);
-            if (!source)
-            {
-                Debug.LogWarning($"[CharacterModelBuilder] Missing source FBX {fbxFile} for {race} {characterClass}");
-                return;
-            }
+            var spec = StylizedRacialModelSystem.GetPlayableSpec(race, characterClass);
 
             var root = new GameObject($"{race}_{characterClass}");
             root.transform.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
             root.transform.localScale = Vector3.one;
 
-            var visual = (GameObject)PrefabUtility.InstantiatePrefab(source);
-            visual.name = $"{race}_{characterClass}_Model";
-            visual.transform.SetParent(root.transform, false);
-            visual.transform.localPosition = Vector3.zero;
-            visual.transform.localRotation = Quaternion.identity;
-            visual.transform.localScale = profile.bodyScale;
+            var visual = StylizedRacialModelSystem.BuildStyledRacialVisual(
+                spec,
+                controller,
+                root.transform,
+                $"{race}_{characterClass}_Model");
 
-            bool isUndeadSkeleton = fbxFile.StartsWith(SkeletonsDir, StringComparison.OrdinalIgnoreCase);
-            if (isUndeadSkeleton)
+            if (!visual)
             {
-                ApplyUndeadSkeletonMaterialsAndWeapon(visual, characterClass);
+                UnityEngine.Object.DestroyImmediate(root);
+                return;
             }
-            else
-            {
-                string modelKey = Path.GetFileNameWithoutExtension(fbxFile);
-                Color tint = GetSubtleRacialMaterialTint(race, modelKey);
-                ApplySavedCharacterMaterials(visual, modelKey, race, tint);
-            }
-
-            // Apply rig-matched animator and sample Idle pose BEFORE measuring height & foot grounding
-            var anim = visual.GetComponentInChildren<Animator>();
-            if (!anim) anim = visual.AddComponent<Animator>();
-            if (controller) anim.runtimeAnimatorController = controller;
-            anim.applyRootMotion = false;
-            anim.cullingMode = AnimatorCullingMode.AlwaysAnimate;
-            anim.Rebind();
-            anim.Play("Idle", 0, 0f);
-            anim.Update(0f);
-
-            var bounds = ComputeWorldBounds(visual);
-            if (bounds.size.y > 0.05f)
-            {
-                float factor = profile.height / bounds.size.y;
-                visual.transform.localScale *= factor;
-                anim.Rebind();
-                anim.Play("Idle", 0, 0f);
-                anim.Update(0f);
-                Physics.SyncTransforms();
-
-                bounds = ComputeWorldBounds(visual);
-                float footOffset = root.transform.position.y - bounds.min.y;
-                visual.transform.localPosition = new Vector3(0f, footOffset, 0f);
-                anim.Update(0f);
-            }
-
-            foreach (var r in visual.GetComponentsInChildren<SkinnedMeshRenderer>(true))
-                r.updateWhenOffscreen = true;
-            foreach (var col in visual.GetComponentsInChildren<Collider>(true))
-                col.enabled = false;
 
             PrefabUtility.SaveAsPrefabAsset(root, $"{TargetDir}{race}_{characterClass}.prefab");
             PrefabUtility.SaveAsPrefabAsset(root, $"{ResourcesDir}{race}_{characterClass}.prefab");
@@ -846,13 +804,22 @@ namespace Riftbound.Editor
                     if (!orig) return null;
                     string matPath = $"Assets/RPG/Materials/Animal {animalType} {orig.name}.mat";
                     var mat = AssetDatabase.LoadAssetAtPath<Material>(matPath);
+                    var furTex = AssetDatabase.LoadAssetAtPath<Texture2D>(StylizedRacialModelSystem.StylizedTexDir + "Tex_Stylized_Fur.png");
                     if (!mat)
                     {
                         mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
                         mat.SetColor("_BaseColor", orig.HasProperty("_BaseColor") ? orig.GetColor("_BaseColor") : orig.color);
-                        mat.SetFloat("_Smoothness", 0.08f);
+                        mat.SetFloat("_Smoothness", 0.12f);
                         mat.SetFloat("_Metallic", 0f);
+                        if (furTex) { mat.SetTexture("_BaseMap", furTex); mat.SetTextureScale("_BaseMap", new Vector2(3f, 3f)); }
                         AssetDatabase.CreateAsset(mat, matPath);
+                    }
+                    else if (furTex)
+                    {
+                        mat.SetTexture("_BaseMap", furTex);
+                        mat.SetTextureScale("_BaseMap", new Vector2(3f, 3f));
+                        mat.SetFloat("_Smoothness", 0.12f);
+                        EditorUtility.SetDirty(mat);
                     }
                     return mat;
                 }).ToArray();

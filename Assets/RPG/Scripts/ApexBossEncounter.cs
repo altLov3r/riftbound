@@ -34,6 +34,7 @@ namespace Riftbound
             }
             Instance = this;
             player = GetComponent<PlayerController>();
+            if (WorldRegions.Expanded) summitCenter = WorldRegions.Summit;
         }
 
         void Start()
@@ -95,7 +96,7 @@ namespace Riftbound
             if (!player) return;
 
             float dist = Vector3.Distance(player.transform.position, bossCombatant.transform.position);
-            bool inRoost = dist < 42f && player.transform.position.y > 38f;
+            bool inRoost = dist < 42f && player.transform.position.y > (summitCenter.y - 10f);
 
             if (!EncounterStarted)
             {

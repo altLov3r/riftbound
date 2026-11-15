@@ -430,7 +430,7 @@ namespace Riftbound
             float by = 60f;
 
             // Outer gold border
-            GUI.DrawTexture(new Rect(bx - 3f, by - 3f, bannerW + 6f, bannerH + 6f), goldBorderTex);
+            GUI.DrawTexture(new Rect(bx - 1f, by - 1f, bannerW + 2f, bannerH + 2f), goldBorderTex);
             // Dark gothic panel
             GUI.DrawTexture(new Rect(bx, by, bannerW, bannerH), darkBgTex);
 
@@ -442,7 +442,7 @@ namespace Riftbound
             // Header line
             var tStyle = new GUIStyle(headerStyle) { fontSize = 11 };
             tStyle.normal.textColor = new Color(1f, 0.85f, 0.25f);
-            GUI.Label(new Rect(bx + 54f, by + 6f, bannerW - 60f, 16f), $"★ ACHIEVEMENT UNLOCKED! (+{bannerAch.points} PTS) ★", tStyle);
+            GUI.Label(new Rect(bx + 54f, by + 6f, bannerW - 60f, 16f), $"Achievement unlocked  +{bannerAch.points}", tStyle);
 
             // Title
             GUI.Label(new Rect(bx + 54f, by + 22f, bannerW - 60f, 18f), bannerAch.title, achTitleStyle);

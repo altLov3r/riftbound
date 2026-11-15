@@ -8,7 +8,7 @@ namespace Riftbound.Editor
     [InitializeOnLoad]
     public static class SceneQuickOpener
     {
-        const string OutpostScenePath = "Assets/RPG/Scenes/Outpost-Updated.unity";
+        static string OutpostScenePath => System.IO.File.Exists(WorldRegions.ScenePath) ? WorldRegions.ScenePath : "Assets/RPG/Scenes/Outpost-Updated.unity";
         const string DirectPlayPrefKey = "Riftbound.DirectPlayInEditor";
 
         static SceneQuickOpener()

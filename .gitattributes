@@ -34,3 +34,5 @@
 *.dylib filter=lfs diff=lfs merge=lfs -text
 *.a filter=lfs diff=lfs merge=lfs -text
 "Assets/RPG/Terrain/Frontier Terrain.asset" filter=lfs diff=lfs merge=lfs -text
+Assets/RPG/Terrain/WorldExpansion/*.asset filter=lfs diff=lfs merge=lfs -text
+Assets/RPG/Terrain/ReaverCamp/*.asset filter=lfs diff=lfs merge=lfs -text

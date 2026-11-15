@@ -42,11 +42,6 @@ namespace Riftbound
             player = GetComponent<PlayerController>() ?? FindFirstObjectByType<PlayerController>();
         }
 
-        void Start()
-        {
-            SpawnPetCompanion();
-        }
-
         void OnDestroy()
         {
             if (Instance == this) Instance = null;

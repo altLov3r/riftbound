@@ -8,12 +8,19 @@ namespace Riftbound
         {
             if (!player.MapOpen && !player.InventoryOpen && !player.DialogueOpen && !player.ShopOpen && !player.JournalOpen)
             {
-                Panel(new Rect(width - 290, 314, 268, 62));
-                GUI.Label(new Rect(width - 278, 319, 248, 52), player.CryptObjective, small);
-                GUI.Label(new Rect(24, height - 158, 480, 28), $"[Q] Guard: {(player.Blocking ? "ACTIVE" : Cooldown(player.GuardReady))}    [H] Hearthstone: {Cooldown(player.HearthReady)}", small);
-                string mountPrompt = player.IsFlying ? "[Z] Dismount    [Space] Fly Ascend    [X] Descend    [Shift] Fast Flight" :
-                                     $"[Z] {(player.Mounted ? "Dismount" : "Summon")} / {(player.SelectedMount ? player.SelectedMount.displayName : "Mount")}    [V] Change mount    Greenhollow: {player.LandmarksFound}/3";
-                GUI.Label(new Rect(24, height - 184, 750, 26), mountPrompt, small);
+                bool nearCrypt = Vector3.Distance(player.transform.position, new Vector3(-34, player.transform.position.y, 70)) < 55f;
+                if (nearCrypt && player.RunesFound > 0 && !player.HasOpenedChest("crypt-reliquary"))
+                {
+                    Panel(new Rect(width - 256, 356, 236, 52));
+                    GUI.Label(new Rect(width - 244, 364, 212, 38), player.CryptObjective, small);
+                }
+                if (player.Blocking)
+                    GUI.Label(new Rect(width / 2 - 120, height - 104, 240, 24), "Guarding", small);
+                if (player.Mounted)
+                {
+                    string travelHint = player.IsFlying ? "Z Dismount   Space Ascend   X Descend" : "Z Dismount   C Walk / run";
+                    GUI.Label(new Rect(24, height - 54, 370, 24), travelHint, small);
+                }
             }
             if (player.Mounting)
             {
@@ -60,11 +67,17 @@ namespace Riftbound
 
             var area = new Rect(width / 2 - 430, height / 2 - 265, 860, 520);
             Fill(new Rect(area.x - 14, area.y - 58, area.width + 28, area.height + 104), new Color(.02f, .035f, .05f, .97f));
-            GUI.Label(new Rect(area.x + 8, area.y - 48, 600, 36), "WORLD ATLAS OF AZEBOTH — 6 CONTINENTAL REALMS", title);
+            GUI.Label(new Rect(area.x + 8, area.y - 48, 600, 36), WorldRegions.Expanded ? "RIFTBOUND — THE CONNECTED FRONTIER" : "WORLD ATLAS OF AZEBOTH", title);
             GUI.Label(new Rect(area.xMax - 240, area.y - 42, 230, 24), $"Coords: ({Mathf.RoundToInt(player.transform.position.x)}, {Mathf.RoundToInt(player.transform.position.z)})  Alt: {Mathf.RoundToInt(player.transform.position.y)}m", small);
 
             // Ocean / Map Base
             Fill(area, new Color(.08f, .14f, .18f));
+            if (WorldRegions.Expanded)
+            {
+                DrawExpandedAtlas(area);
+                if (GUI.Button(new Rect(area.xMax - 130, area.yMax + 8, 130, 32), "CLOSE [M]", questButton)) player.MapOpen = false;
+                return;
+            }
 
             // --- 6 Distinct Styled Zones ---
             // 1. Highspire Keep (Alliance Capital)
@@ -185,7 +198,60 @@ namespace Riftbound
             Fill(new Rect(a.x, a.y - 1, Vector2.Distance(a, b), 2), new Color(1f, 0.82f, 0.25f, 0.85f));
             GUI.matrix = matrix;
         }
-        Vector2 MapPoint(Rect area, Vector3 position) => new Vector2(area.x + Mathf.InverseLerp(-85, 90, position.x) * area.width, area.yMax - Mathf.InverseLerp(-40, 255, position.z) * area.height);
+        void DrawExpandedAtlas(Rect panel)
+        {
+            var area = new Rect(panel.x, panel.y, panel.height, panel.height);
+            Fill(area, new Color(.17f, .23f, .16f));
+            PlotZone(area, new Vector3(-320,0,125),new Vector3(-140,0,365),new Color(.14f,.16f,.20f));
+            PlotZone(area, new Vector3(-145,0,325),new Vector3(100,0,510),new Color(.16f,.30f,.22f));
+            PlotZone(area, new Vector3(105,0,95),new Vector3(448,0,365),new Color(.34f,.25f,.15f));
+            PlotZone(area, new Vector3(95,0,420),new Vector3(448,0,608),new Color(.40f,.46f,.48f));
+            PlotZone(area, new Vector3(-320,0,-160),new Vector3(-135,0,125),new Color(.15f,.25f,.23f));
+            var network = FindFirstObjectByType<WorldMapRoutes>();
+            if (network && network.routes != null)
+                foreach (var route in network.routes)
+                    for (int i=1;i<route.points.Length;i++) MapLine(area,route.points[i-1],route.points[i]);
+            MapLine(area,new Vector3(0,0,3),new Vector3(0,0,100));
+            MapLine(area,new Vector3(0,0,51),new Vector3(25,0,64));
+            MapLine(area,new Vector3(25,0,64),new Vector3(35,0,91));
+            MapLine(area,new Vector3(0,0,50),new Vector3(-34,0,70));
+            for(int i=1;i<=26;i++)
+            {
+                float z=-130+i*10;
+                Vector2 from=MapPoint(area,new Vector3(-264+9*Mathf.Sin((z-10)*.025f),0,z-10));
+                Vector2 to=MapPoint(area,new Vector3(-264+9*Mathf.Sin(z*.025f),0,z));
+                var matrix=GUI.matrix;
+                GUIUtility.RotateAroundPivot(Mathf.Atan2(to.y-from.y,to.x-from.x)*Mathf.Rad2Deg,from);
+                Fill(new Rect(from.x,from.y-1,Vector2.Distance(from,to),2),new Color(.22f,.55f,.78f));
+                GUI.matrix=matrix;
+            }
+            MarkZoneTitle(area,new Vector3(5,0,28),"EMBERWATCH\nAlliance starting lands",new Color(.70f,.85f,.60f));
+            MarkZoneTitle(area,WorldRegions.Cathedral,"DUSKWOOD\nCathedral & haunted forest",new Color(.75f,.70f,.85f));
+            MarkZoneTitle(area,WorldRegions.Bloodrock,"BLOODROCK\nHorde frontier",new Color(1,.75f,.45f));
+            MarkZoneTitle(area,WorldRegions.Greenhollow,"GREENHOLLOW\nNorthern valley",new Color(.55f,.90f,.70f));
+            MarkZoneTitle(area,WorldRegions.Summit,"WYRMCREST\nMountain pass & summit",new Color(.85f,.93f,1));
+            MarkZoneTitle(area,new Vector3(-245,0,40),"WILLOWMERE\nRiver & western woods",new Color(.65f,.85f,.8f));
+            foreach(var node in FlightMaster.WorldFlightNodes) Mark(area,node.targetPos,"",new Color(1,.8f,.25f),5);
+            foreach (var landmark in FindObjectsByType<Landmark>(FindObjectsSortMode.None))
+                Mark(area, landmark.transform.position, player.HasLandmark(landmark.landmarkId) ? "" : "Scout", new Color(.55f, 1, .8f), 4);
+            if(player.questGiver) Mark(area,player.questGiver.position,"",new Color(.4f,1,.5f),6);
+            if(!player.QuestComplete) Mark(area,player.ObjectivePosition,"",new Color(1,.9f,.2f),9);
+            Mark(area,player.transform.position,"YOU",new Color(.2f,.95f,1),8);
+            float x=panel.x+panel.height+20, y=panel.y+12, w=panel.width-panel.height-36;
+            GUI.Label(new Rect(x,y,w,26),"768 × 768 m",title);
+            GUI.Label(new Rect(x,y+36,w,42),"Choose a region to place a travel waypoint.",label);
+            string[] names={"Emberwatch Outpost","Duskwood Cathedral","Camp Bloodrock","Greenhollow Valley","Wyrmcrest Summit","Willowmere Wilds","Highspire Keep","Gor'Kresh Stronghold"};
+            Vector3[] positions={new Vector3(0,0,10),WorldRegions.Cathedral,WorldRegions.Bloodrock,WorldRegions.Greenhollow,WorldRegions.Summit,new Vector3(-285,6,50),WorldRegions.Highspire,WorldRegions.Stronghold};
+            for(int i=0;i<names.Length;i++)
+                if(GUI.Button(new Rect(x,y+92+i*39,w,33),names[i],questButton)) MinimapRadar.SetWaypoint(positions[i],names[i]);
+            GUI.Label(new Rect(x,y+422,w,80),"Gold: roads / flight stops\nCyan: your position\nYellow: quest objective\nTravel along roads or call a flight taxi.",small);
+        }
+
+        Vector2 MapPoint(Rect area, Vector3 position)
+        {
+            var bounds = WorldRegions.Expanded ? WorldRegions.Bounds : new Rect(-85,-40,175,295);
+            return new Vector2(area.x+Mathf.InverseLerp(bounds.xMin,bounds.xMax,position.x)*area.width,area.yMax-Mathf.InverseLerp(bounds.yMin,bounds.yMax,position.z)*area.height);
+        }
         void PlotZone(Rect area, Vector3 from, Vector3 to, Color color)
         {
             Vector2 a = MapPoint(area, from), b = MapPoint(area, to); Fill(new Rect(a.x, b.y, b.x - a.x, a.y - b.y), color);

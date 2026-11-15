@@ -11,6 +11,8 @@ namespace Riftbound
 
         public float radarRange = 60f;
         public bool rotateWithCamera = false;
+        public bool showCompass = false; // Disabled by default: removes cardinal indicators (N, S, E, W) and compass button from HUD
+        public bool showMinimap = false; // Master toggle for minimap radar on HUD (disabled by default: removes circle radar/compass)
 
         // Tracking Filter Toggles
         public bool trackQuests = true;
@@ -109,15 +111,15 @@ namespace Riftbound
 
         public void DrawRadarGUI(float screenW, float screenH)
         {
-            if (!player || FrontendMenu.IsOpen) return;
+            if (!showMinimap || !player || FrontendMenu.IsOpen) return;
             if (!orbitCam) orbitCam = FindFirstObjectByType<OrbitCamera>();
 
             InitTextures();
 
-            float radarDiameter = 146f;
+            float radarDiameter = 132f;
             float radarRadius = radarDiameter / 2f;
             float cx = screenW - 88f;
-            float cy = 88f;
+            float cy = 92f;
 
             activeTooltip = "";
 
@@ -159,7 +161,7 @@ namespace Riftbound
                 {
                     float pulse = 8f + Mathf.PingPong(Time.time * 6f, 3f);
                     GUI.DrawTexture(new Rect(wpPos.x - pulse / 2f, wpPos.y - pulse / 2f, pulse, pulse), blipCyanTex);
-                    GUI.Label(new Rect(wpPos.x - 7f, wpPos.y - 8f, 16f, 16f), "📍", blipLabelStyle);
+                    GUI.Label(new Rect(wpPos.x - 7f, wpPos.y - 8f, 16f, 16f), "", blipLabelStyle);
                 }
             }
 
@@ -176,21 +178,16 @@ namespace Riftbound
             DrawOrnateBezel(cx, cy, radarRadius, viewRotation);
 
             // 6. Coordinates & Local Time Bar at bottom
-            DrawBottomCoordsBar(cx, cy + radarRadius + 4f);
+            bool radarHovered = new Rect(cx - radarRadius - 20f, cy - radarRadius - 24f, radarDiameter + 40f, radarDiameter + 56f).Contains(Event.current.mousePosition);
+            if (radarHovered || trackingMenuOpen) DrawBottomCoordsBar(cx, cy + radarRadius + 4f);
 
             // 7. Interactive Rim Buttons (+, -, 🔍, 🧭, M)
-            DrawRimButtons(cx, cy, radarRadius);
+            if (radarHovered || trackingMenuOpen) DrawRimButtons(cx, cy, radarRadius);
 
             // 8. Tracking Dropdown Menu (If Open)
             if (trackingMenuOpen)
             {
                 DrawTrackingDropdownMenu(cx, cy, radarRadius);
-            }
-
-            // 8b. Weather & Time of Day Clock Pill
-            if (WeatherSystem.Instance != null)
-            {
-                WeatherSystem.Instance.DrawWeatherClockGUI(cx, cy, radarRadius);
             }
 
             // 9. Floating Tooltip (If hovering an icon or button)
@@ -217,7 +214,7 @@ namespace Riftbound
 
             Color tagColor = isAlliance ? new Color(0.4f, 0.75f, 1f) :
                              isHorde ? new Color(1f, 0.4f, 0.35f) :
-                             new Color(1f, 0.88f, 0.35f);
+                             new Color(.78f, .73f, .60f);
 
             zoneTitleStyle.normal.textColor = tagColor;
             GUI.Label(new Rect(px, y - 1f, pillW, pillH), zone, zoneTitleStyle);
@@ -268,18 +265,21 @@ namespace Riftbound
                 float rot = Mathf.Atan2(p2.y - p1.y, p2.x - p1.x) * Mathf.Rad2Deg;
 
                 GUIUtility.RotateAroundPivot(rot, p1);
-                GUI.DrawTexture(new Rect(p1.x, p1.y - 1.5f, len, 3.5f), bezelTex);
+                GUI.DrawTexture(new Rect(p1.x, p1.y - .5f, len, 1.25f), menuBorderTex != null ? menuBorderTex : bezelTex);
                 GUI.matrix = matrix;
             }
 
-            // Cardinal Letters (N, S, E, W)
-            float cardinalDist = radius - 11f;
-            float northAngle = rotateWithCamera ? -viewRot : 0f;
+            // Cardinal Letters (N, S, E, W) - only drawn if showCompass is true
+            if (showCompass)
+            {
+                float cardinalDist = radius - 11f;
+                float northAngle = rotateWithCamera ? -viewRot : 0f;
 
-            DrawCardinal("N", cx, cy, cardinalDist, northAngle, new Color(1f, 0.35f, 0.35f));
-            DrawCardinal("E", cx, cy, cardinalDist, northAngle + 90f, new Color(1f, 0.85f, 0.4f));
-            DrawCardinal("S", cx, cy, cardinalDist, northAngle + 180f, new Color(0.85f, 0.85f, 0.85f));
-            DrawCardinal("W", cx, cy, cardinalDist, northAngle + 270f, new Color(0.85f, 0.85f, 0.85f));
+                DrawCardinal("N", cx, cy, cardinalDist, northAngle, new Color(1f, 0.35f, 0.35f));
+                DrawCardinal("E", cx, cy, cardinalDist, northAngle + 90f, new Color(1f, 0.85f, 0.4f));
+                DrawCardinal("S", cx, cy, cardinalDist, northAngle + 180f, new Color(0.85f, 0.85f, 0.85f));
+                DrawCardinal("W", cx, cy, cardinalDist, northAngle + 270f, new Color(0.85f, 0.85f, 0.85f));
+            }
         }
 
         void DrawCardinal(string text, float cx, float cy, float dist, float degAngle, Color col)
@@ -301,12 +301,8 @@ namespace Riftbound
             var matrix = GUI.matrix;
             GUIUtility.RotateAroundPivot(needleRot, new Vector2(cx, cy));
 
-            // Translucent golden vision cone
+            // Sleek player arrow
             var prevCol = GUI.color;
-            GUI.color = new Color(1f, 0.85f, 0.3f, 0.18f);
-            GUI.DrawTexture(new Rect(cx - 18f, cy - 30f, 36f, 30f), bezelTex);
-
-            // Sleek golden player arrow
             GUI.color = new Color(1f, 0.88f, 0.25f, 0.98f);
             GUI.DrawTexture(new Rect(cx - 5f, cy - 8f, 10f, 13f), playerNeedleTex);
 
@@ -333,7 +329,7 @@ namespace Riftbound
                         if (e.isBoss)
                         {
                             GUI.DrawTexture(new Rect(blip.x - 5f, blip.y - 5f, 10f, 10f), blipOrangeTex);
-                            GUI.Label(new Rect(blip.x - 6f, blip.y - 7f, 14f, 14f), "💀", blipLabelStyle);
+                            GUI.Label(new Rect(blip.x - 6f, blip.y - 7f, 14f, 14f), "", blipLabelStyle);
                         }
                         else if (e.heavyAttacker)
                         {
@@ -362,12 +358,12 @@ namespace Riftbound
                         if (n.gatheringType == GatheringType.Herbalism && trackHerbs)
                         {
                             GUI.DrawTexture(new Rect(blip.x - 3f, blip.y - 3f, 6f, 6f), blipGreenTex);
-                            GUI.Label(new Rect(blip.x - 5f, blip.y - 6f, 12f, 12f), "🌿", blipLabelStyle);
+                            GUI.Label(new Rect(blip.x - 5f, blip.y - 6f, 12f, 12f), "", blipLabelStyle);
                         }
                         else if (n.gatheringType == GatheringType.Mining && trackMinerals)
                         {
                             GUI.DrawTexture(new Rect(blip.x - 3f, blip.y - 3f, 6f, 6f), blipGoldTex);
-                            GUI.Label(new Rect(blip.x - 5f, blip.y - 6f, 12f, 12f), "⛏", blipLabelStyle);
+                            GUI.Label(new Rect(blip.x - 5f, blip.y - 6f, 12f, 12f), "", blipLabelStyle);
                         }
                     }
                 }
@@ -405,7 +401,7 @@ namespace Riftbound
                     if (blip.x > 0)
                     {
                         GUI.DrawTexture(new Rect(blip.x - 3.5f, blip.y - 3.5f, 7f, 7f), blipGoldTex);
-                        GUI.Label(new Rect(blip.x - 5f, blip.y - 6f, 12f, 12f), "📦", blipLabelStyle);
+                        GUI.Label(new Rect(blip.x - 5f, blip.y - 6f, 12f, 12f), "", blipLabelStyle);
                     }
                 }
 
@@ -577,7 +573,7 @@ namespace Riftbound
         {
             // Tracking Magnifying Glass Button (Top-Left of Rim)
             Rect trackRect = new Rect(cx - radius - 10f, cy - radius + 12f, 20f, 20f);
-            if (GUI.Button(trackRect, "🔍", rimBtnStyle))
+            if (GUI.Button(trackRect, "...", rimBtnStyle))
             {
                 trackingMenuOpen = !trackingMenuOpen;
                 AudioEffects.PlayClick();
@@ -588,19 +584,22 @@ namespace Riftbound
                 activeTooltipRect = new Rect(Event.current.mousePosition.x - 120f, Event.current.mousePosition.y - 36f, 140f, 32f);
             }
 
-            // Compass Mode Button (North-Up vs Rotating)
-            Rect rotRect = new Rect(cx - radius - 12f, cy - 8f, 22f, 20f);
-            string rotIcon = rotateWithCamera ? "🧭" : "⬆";
-            if (GUI.Button(rotRect, rotIcon, rimBtnStyle))
+            // Compass Mode Button (North-Up vs Rotating) - only shown when compass is enabled
+            if (showCompass)
             {
-                rotateWithCamera = !rotateWithCamera;
-                AudioEffects.PlayClick();
-                ChatSystem.LogSystem($"Minimap Compass: {(rotateWithCamera ? "Rotating (Camera-Facing)" : "Fixed (North-Up)")}");
-            }
-            if (rotRect.Contains(Event.current.mousePosition))
-            {
-                activeTooltip = $"<b>Minimap Mode: {(rotateWithCamera ? "Rotating" : "Fixed North")}</b>\nClick to toggle compass alignment";
-                activeTooltipRect = new Rect(Event.current.mousePosition.x - 145f, Event.current.mousePosition.y - 36f, 160f, 32f);
+                Rect rotRect = new Rect(cx - radius - 12f, cy - 8f, 22f, 20f);
+                string rotIcon = rotateWithCamera ? "R" : "N";
+                if (GUI.Button(rotRect, rotIcon, rimBtnStyle))
+                {
+                    rotateWithCamera = !rotateWithCamera;
+                    AudioEffects.PlayClick();
+                    ChatSystem.LogSystem($"Minimap Compass: {(rotateWithCamera ? "Rotating (Camera-Facing)" : "Fixed (North-Up)")}");
+                }
+                if (rotRect.Contains(Event.current.mousePosition))
+                {
+                    activeTooltip = $"<b>Minimap Mode: {(rotateWithCamera ? "Rotating" : "Fixed North")}</b>\nClick to toggle compass alignment";
+                    activeTooltipRect = new Rect(Event.current.mousePosition.x - 145f, Event.current.mousePosition.y - 36f, 160f, 32f);
+                }
             }
 
             // World Map Button (Bottom-Left of Rim)
@@ -646,7 +645,7 @@ namespace Riftbound
         void DrawTrackingDropdownMenu(float cx, float cy, float radius)
         {
             float menuW = 165f;
-            float menuH = 195f;
+            float menuH = showCompass ? 215f : 195f;
             float mx = cx - radius - menuW - 14f;
             float my = cy - radius;
 
@@ -665,7 +664,11 @@ namespace Riftbound
             trackLoot = DrawToggleRow(mx + 6f, rowY, menuW - 12f, rowH, "✨ Corpse Loot", trackLoot); rowY += rowH;
             trackChests = DrawToggleRow(mx + 6f, rowY, menuW - 12f, rowH, "📦 Treasure Chests", trackChests); rowY += rowH;
             trackNPCs = DrawToggleRow(mx + 6f, rowY, menuW - 12f, rowH, "🦅 Towns & Taxis", trackNPCs); rowY += rowH;
-            rotateWithCamera = DrawToggleRow(mx + 6f, rowY, menuW - 12f, rowH, "🧭 Rotating Compass", rotateWithCamera);
+            showCompass = DrawToggleRow(mx + 6f, rowY, menuW - 12f, rowH, "🧭 Show Compass", showCompass); rowY += rowH;
+            if (showCompass)
+            {
+                rotateWithCamera = DrawToggleRow(mx + 6f, rowY, menuW - 12f, rowH, "🔄 Rotating Compass", rotateWithCamera);
+            }
         }
 
         bool DrawToggleRow(float x, float y, float w, float h, string label, bool val)
@@ -759,7 +762,7 @@ namespace Riftbound
 
             int size = 128;
             float r = size / 2f;
-            Terrain activeTerrain = Terrain.activeTerrain;
+            var terrains = Terrain.activeTerrains;
 
             for (int y = 0; y < size; y++)
             {
@@ -779,15 +782,23 @@ namespace Riftbound
                     float wz = playerPos.z + ((y - r) / r) * radarRange;
 
                     // Sample Height
-                    float h = activeTerrain ? activeTerrain.SampleHeight(new Vector3(wx, 0, wz)) : 0f;
-                    float hEast = activeTerrain ? activeTerrain.SampleHeight(new Vector3(wx + 2f, 0, wz)) : 0f;
-                    float hNorth = activeTerrain ? activeTerrain.SampleHeight(new Vector3(wx, 0, wz + 2f)) : 0f;
+                    float h = WorldRegions.GroundHeight(new Vector3(wx, 0, wz), terrains);
+                    float hEast = WorldRegions.GroundHeight(new Vector3(wx + 2f, 0, wz), terrains);
+                    float hNorth = WorldRegions.GroundHeight(new Vector3(wx, 0, wz + 2f), terrains);
                     float slopeShade = Mathf.Clamp((hEast - h) * 0.12f + (hNorth - h) * 0.08f, -0.25f, 0.25f);
 
                     // Base Biome Color
                     Color baseCol;
 
-                    if (playerPos.y < -20f)
+                    if (WorldRegions.Expanded)
+                    {
+                        string zone = WorldRegions.ZoneName(new Vector3(wx, playerPos.y < -20 ? playerPos.y : h, wz));
+                        baseCol = zone == "Wyrmcrest Summit" ? new Color(.55f, .61f, .63f) :
+                            zone == "Duskwood Cathedral" || zone == "The Scarlet Crypts" ? new Color(.17f, .20f, .22f) :
+                            zone == "Camp Bloodrock" || zone == "Gor'Kresh Stronghold" ? new Color(.43f, .31f, .19f) :
+                            zone == "Greenhollow Valley" ? new Color(.24f, .37f, .21f) : new Color(.29f, .39f, .22f);
+                    }
+                    else if (playerPos.y < -20f)
                     {
                         // Subterranean Scarlet Crypts: ancient cathedral stonework
                         baseCol = new Color(0.18f, 0.15f, 0.22f);
@@ -857,10 +868,10 @@ namespace Riftbound
             terrainTex = new Texture2D(size, size, TextureFormat.RGBA32, false);
             terrainPixels = new Color32[size * size];
 
-            bezelTex = MakeTex(new Color(0.92f, 0.75f, 0.28f, 1f)); // Polished WoW Gold
+            bezelTex = MakeTex(new Color(.55f, .49f, .36f, .9f)); // Polished WoW Gold
             rivetTex = MakeTex(new Color(0.45f, 0.35f, 0.15f, 1f));
             menuBgTex = MakeTex(new Color(0.06f, 0.08f, 0.11f, 0.94f));
-            menuBorderTex = MakeTex(new Color(0.70f, 0.55f, 0.22f, 0.98f));
+            menuBorderTex = MakeTex(new Color(.48f, .43f, .33f, .9f));
 
             blipRedTex = MakeTex(new Color(1f, 0.18f, 0.18f));
             blipGoldTex = MakeTex(new Color(1f, 0.88f, 0.22f));
@@ -871,7 +882,7 @@ namespace Riftbound
 
             // Procedural Player Arrow Texture (sharp triangle)
             playerNeedleTex = new Texture2D(10, 14, TextureFormat.RGBA32, false);
-            Color gold = new Color(1f, 0.88f, 0.25f);
+            Color gold = new Color(.82f, .74f, .52f);
             Color darkGold = new Color(0.75f, 0.55f, 0.12f);
             Color empty = new Color(0, 0, 0, 0);
 

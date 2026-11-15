@@ -8,9 +8,10 @@ A small 3D fantasy RPG built in Unity for a diploma project and competition.
 2. Clone this repository and run `git lfs pull` inside it.
 3. Add the cloned folder in Unity Hub and open it with **Unity 6000.6.2f1**.
 4. Let Unity import assets and install the packages from `Packages/`.
-5. Open `Assets/RPG/Scenes/Outpost-Updated.unity`, press Play, select a character and choose **Enter World**.
+5. Open `Assets/RPG/Scenes/Outpost-Expanded.unity`, press Play, choose **Play** on the title screen, select a character and choose **Enter World**.
 
 Use the Game tab for playing. `Riftbound > Direct Play in Editor` bypasses character selection for quick testing.
+The opening screen is a local single-player menu. Gameplay uses painted class-ability icons, contextual hints and a compact active-quest tracker; secondary panels remain under MENU. See `Docs/PRESENTATION_UPDATE.md`.
 While playing, `Riftbound > Validate Play Mode startup` checks the player, camera, HUD and keyboard connections.
 
 ## Controls
@@ -20,11 +21,17 @@ While playing, `Riftbound > Validate Play Mode startup` checks the player, camer
 - Z: summon/dismiss mount; V: cycle unlocked mounts.
 - I: inventory; J: quests; M: map; Escape: settings/pause.
 
+You start solo. Use **MENU > Companions** to call or dismiss allies; `/crew` opens the same panel. Chat and the damage meter start hidden. The expanded world covers 768 × 768 metres with separate settlements, connecting roads, a river crossing and mountain switchbacks. See `Docs/WORLD_ZONES.md` for the layout.
+
 In the quest journal, **Track Main Quest** creates a live minimap waypoint. It follows the next raider or supply crate and returns to Abe when the objective is ready. Placing a manual waypoint stops automatic tracking.
 
 Enemies award XP on defeat. Press **E** near their remains to collect gold, bone shards and equipment. Unclaimed loot survives save/reload with its remaining two-minute gameplay timer; claimed rewards stay claimed.
 
 More controls and project notes are in `CHARACTER_UPDATE.md`, `TASKS.md` and `HANDOFF.md`.
+
+For the optional **Charting the Frontier** quest, speak with **Cartographer Elara at Greenhollow Post**. Survey Westbank Overlook, Bloodrock Vista and Wyrmcrest Lookout, then return for gold, XP and Traveler's Charm. The quest tracks your next destination and counts earlier discoveries. See `Docs/FRONTIER_UPDATE.md` for testing and build details.
+
+Elara then offers **Silence the River Reavers**: defeat Captain Selvek at the western river camp and return for Riverwarden's Signet. A graded trail connects the camp to the Westbank road. See `Docs/REAVER_UPDATE.md` for the latest build and test route.
 
 ## Work with a teammate
 
@@ -49,4 +56,4 @@ Keep the repository private while the source/license records for all imported ch
 
 Use an isolated Unity project copy containing `Assets/`, `Packages/` and `ProjectSettings/`. Start Unity in batch mode with `-executeMethod Riftbound.Editor.QuestRouteSmokeTest.Run` and without `-quit`; the check exits when finished. It creates a fresh test save under `.code-check/` and writes `QuestRouteSmokeResult.txt`.
 
-The check covers startup, movement, Abe's three quests, enemy eligibility, loot collection, legacy save compatibility and live quest navigation. Defeats are simulated through the combat damage API; visual quality and combat balance still need manual testing.
+The check covers startup, movement, solo/companion controls, four terrain tiles, relocated spawns/taxis, Abe's three quests, enemy eligibility, loot collection, legacy save compatibility and live quest navigation. Defeats are simulated through the combat damage API; visual quality and combat balance still need manual testing.

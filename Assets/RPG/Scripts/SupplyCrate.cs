@@ -18,7 +18,7 @@ namespace Riftbound
         {
             Collected = player.HasSupply(supplyId);
             gameObject.SetActive(!Collected);
-            if (marker) marker.gameObject.SetActive(player.QuestIndex == 1 && player.QuestAccepted);
+            if (marker && marker.gameObject.activeSelf) marker.gameObject.SetActive(false);
         }
         public void Collect(PlayerController player)
         {

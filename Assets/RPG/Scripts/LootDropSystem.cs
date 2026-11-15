@@ -102,29 +102,33 @@ namespace Riftbound
                 corpse.items.Add(itemId);
             }
 
-            // Create sparkling visual beacon
-            var marker = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            marker.name = $"LootSparkle_{enemyName}";
+            // Create sparkling visual diamond beacon
+            var marker = new GameObject($"LootSparkle_{enemyName}");
             marker.transform.position = pos + Vector3.up * 0.45f;
-            marker.transform.localScale = new Vector3(0.35f, 0.35f, 0.35f);
-            var col = marker.GetComponent<Collider>();
-            if (col) Destroy(col);
+            var mf = marker.AddComponent<MeshFilter>();
+            mf.sharedMesh = GetDiamondMesh();
+            var mr = marker.AddComponent<MeshRenderer>();
+            var shader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+            if (shader != null)
+            {
+                var mat = new Material(shader);
+                mat.SetColor("_BaseColor", new Color(1f, 0.88f, 0.35f));
+                mat.EnableKeyword("_EMISSION");
+                mat.SetColor("_EmissionColor", new Color(1f, 0.85f, 0.2f) * 2.2f);
+                mr.sharedMaterial = mat;
+            }
 
             var light = marker.AddComponent<Light>();
             light.type = LightType.Point;
             light.color = new Color(1.0f, 0.85f, 0.25f);
-            light.range = 3.5f;
+            light.range = 3.2f;
             light.intensity = 2.0f;
 
-            var renderer = marker.GetComponent<Renderer>();
-            if (renderer)
-            {
-                var mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-                mat.SetColor("_BaseColor", new Color(1f, 0.88f, 0.35f));
-                mat.EnableKeyword("_EMISSION");
-                mat.SetColor("_EmissionColor", new Color(1f, 0.85f, 0.2f) * 1.5f);
-                renderer.sharedMaterial = mat;
-            }
+            var col = marker.AddComponent<SphereCollider>();
+            col.radius = 0.65f;
+            col.isTrigger = true;
+            var clickTarget = marker.AddComponent<LootClickTarget>();
+            clickTarget.corpse = corpse;
 
             marker.AddComponent<LootSparkleAnim>();
             corpse.markerObject = marker;
@@ -158,9 +162,12 @@ namespace Riftbound
                 {
                     CloseLoot();
                 }
-                else if (Keyboard.current != null && (Keyboard.current.escapeKey.wasPressedThisFrame || Keyboard.current.eKey.wasPressedThisFrame))
+                else if (Time.time > openedAt + 0.25f && Keyboard.current != null)
                 {
-                    CloseLoot();
+                    if (Keyboard.current.escapeKey.wasPressedThisFrame)
+                        CloseLoot();
+                    else if (Keyboard.current.eKey.wasPressedThisFrame)
+                        LootAll(CurrentLooting);
                 }
             }
         }
@@ -181,9 +188,11 @@ namespace Riftbound
             return closest;
         }
 
+        float openedAt;
         public void OpenLoot(LootCorpse corpse)
         {
             CurrentLooting = corpse;
+            openedAt = Time.time;
             AudioEffects.PlayClick();
         }
 
@@ -194,8 +203,11 @@ namespace Riftbound
 
         public void LootAll(LootCorpse corpse)
         {
-            if (corpse == null || !player || !activeCorpses.Contains(corpse)) return;
+            if (corpse == null || !activeCorpses.Contains(corpse)) return;
+            if (!player) player = GetComponent<PlayerController>() ?? FindFirstObjectByType<PlayerController>();
+            if (!player) return;
 
+            string summary = "";
             if (corpse.gold > 0)
             {
                 int g = corpse.gold;
@@ -203,6 +215,8 @@ namespace Riftbound
                 corpse.gold = 0;
                 player.AddGoldDirect(g);
                 ChatSystem.LogLoot($"{g} Gold", "common");
+                CombatTextManager.Spawn(player.transform.position + Vector3.up * 1.8f, $"+{g} Gold", new Color(1f, 0.88f, 0.25f), false);
+                summary += $"{g} Gold";
             }
 
             if (corpse.boneShards > 0)
@@ -211,6 +225,9 @@ namespace Riftbound
                 corpse.boneShards = 0;
                 player.AddBoneShardsDirect(shards);
                 ChatSystem.LogLoot($"{shards} Bone Shards", "common");
+                CombatTextManager.Spawn(player.transform.position + Vector3.up * 2.1f, $"+{shards} Bone Shards", new Color(0.85f, 0.85f, 0.8f), false);
+                if (summary.Length > 0) summary += ", ";
+                summary += $"{shards} Bone Shards";
             }
 
             for (int i = corpse.items.Count - 1; i >= 0; i--)
@@ -218,7 +235,17 @@ namespace Riftbound
                 string id = corpse.items[i];
                 corpse.items.RemoveAt(i);
                 AwardItem(id);
+                var gear = ItemCatalog.Get(id);
+                if (gear != null)
+                {
+                    CombatTextManager.Spawn(player.transform.position + Vector3.up * 2.4f, $"★ {gear.name} ★", gear.color, true);
+                    if (summary.Length > 0) summary += ", ";
+                    summary += gear.name;
+                }
             }
+
+            if (!string.IsNullOrEmpty(summary))
+                player.Message = $"Looted: {summary}";
 
             AudioEffects.PlayLootCoin();
 
@@ -233,7 +260,7 @@ namespace Riftbound
         {
             var gear = ItemCatalog.Get(id);
             if (gear == null) return;
-            if ((gear.rarity == "Epic" || gear.rarity == "Legendary") && PartySystem.Instance && PartySystem.Instance.Members.Count > 1)
+            if ((gear.rarity == "Epic" || gear.rarity == "Legendary") && PartySystem.Instance && PartySystem.Instance.Members.Count > 0)
                 LootRollSystem.PromptRoll(gear.id, gear.name, gear.rarity, gear.Stats);
             else
             {
@@ -387,16 +414,69 @@ namespace Riftbound
                 alignment = TextAnchor.MiddleCenter
             };
         }
+
+        static Mesh s_diamondMesh;
+        public static Mesh GetDiamondMesh()
+        {
+            if (s_diamondMesh != null) return s_diamondMesh;
+            var mesh = new Mesh { name = "LootSparkleDiamond" };
+            Vector3 top = new Vector3(0f, 0.22f, 0f);
+            Vector3 bottom = new Vector3(0f, -0.22f, 0f);
+            Vector3 fwd = new Vector3(0f, 0f, 0.11f);
+            Vector3 back = new Vector3(0f, 0f, -0.11f);
+            Vector3 right = new Vector3(0.11f, 0f, 0f);
+            Vector3 left = new Vector3(-0.11f, 0f, 0f);
+
+            mesh.vertices = new Vector3[]
+            {
+                top, right, fwd,
+                top, fwd, left,
+                top, left, back,
+                top, back, right,
+                bottom, fwd, right,
+                bottom, left, fwd,
+                bottom, back, left,
+                bottom, right, back
+            };
+            mesh.triangles = new int[]
+            {
+                0, 1, 2,
+                3, 4, 5,
+                6, 7, 8,
+                9, 10, 11,
+                12, 13, 14,
+                15, 16, 17,
+                18, 19, 20,
+                21, 22, 23
+            };
+            mesh.RecalculateNormals();
+            mesh.RecalculateBounds();
+            s_diamondMesh = mesh;
+            return mesh;
+        }
     }
 
     public class LootSparkleAnim : MonoBehaviour
     {
         Vector3 basePos;
-        void Start() { basePos = transform.position; }
+        Light ptLight;
+        void Start()
+        {
+            basePos = transform.position;
+            ptLight = GetComponent<Light>();
+        }
         void Update()
         {
-            transform.position = basePos + Vector3.up * (Mathf.Sin(Time.time * 3.5f) * 0.12f);
-            transform.Rotate(0f, 65f * Time.deltaTime, 0f);
+            transform.position = basePos + Vector3.up * (Mathf.Sin(Time.time * 3.5f) * 0.08f);
+            transform.Rotate(0f, 75f * Time.deltaTime, 0f, Space.World);
+            if (ptLight != null)
+            {
+                ptLight.intensity = 1.8f + Mathf.Sin(Time.time * 5f) * 0.6f;
+            }
         }
+    }
+    public class LootClickTarget : MonoBehaviour
+    {
+        public LootDropSystem.LootCorpse corpse;
     }
 }

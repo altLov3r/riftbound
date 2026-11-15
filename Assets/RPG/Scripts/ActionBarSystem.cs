@@ -9,6 +9,8 @@ namespace Riftbound
 
         GUIStyle slotStyle, keybindStyle, costStyle, cdStyle, labelStyle, tipTitleStyle, tipBodyStyle;
         Texture2D bgTex, borderTex, healthBgTex, healthFillTex, resourceFillTex, cdOverlayTex;
+        Texture2D abilityAtlas;
+        string activeClass;
 
         void Awake()
         {
@@ -18,9 +20,10 @@ namespace Riftbound
         void InitStyles()
         {
             if (slotStyle != null) return;
+            abilityAtlas = Resources.Load<Texture2D>("UI/AbilityIcons");
 
             bgTex = MakeTex(1, 1, new Color(0.08f, 0.09f, 0.12f, 0.94f));
-            borderTex = MakeTex(1, 1, new Color(0.25f, 0.28f, 0.35f, 1f));
+            borderTex = MakeTex(1, 1, new Color(0.30f, 0.29f, 0.25f, .85f));
             healthBgTex = MakeTex(1, 1, new Color(0.12f, 0.04f, 0.04f, 0.95f));
             healthFillTex = MakeTex(1, 1, new Color(0.16f, 0.72f, 0.22f, 1f));
             resourceFillTex = MakeTex(1, 1, new Color(0.85f, 0.22f, 0.18f, 1f));
@@ -87,13 +90,14 @@ namespace Riftbound
         {
             if (!player || !player.Stats || FrontendMenu.IsOpen) return;
             InitStyles();
+            activeClass = player.CharacterClass;
 
             int slotCount = 9;
-            float slotSize = 44f;
-            float spacing = 4f;
+            float slotSize = 48f;
+            float spacing = 5f;
             float totalBarW = slotCount * slotSize + (slotCount - 1) * spacing;
             float barX = screenW / 2f - totalBarW / 2f;
-            float barY = screenH - 50f;
+            float barY = screenH - 68f;
 
             // Sleek, Low-Profile Experience Bar (3.5px) resting on top of Action Slots
             float xpRatio = player.Level == 5 ? 1f : (float)(player.Experience - player.LevelFloor) / Mathf.Max(1, player.NextLevelExperience - player.LevelFloor);
@@ -118,7 +122,7 @@ namespace Riftbound
             if (DrawSlot(new Rect(barX, barY, slotSize, slotSize), "1", s1Icon, s1Cost, 0f, () => player.CastAbility1Public()))
             {
                 hoverTitle = ab1.name;
-                hoverSub = $"{s1Cost}  •  Melee / 25 yd  •  Instant";
+                hoverSub = $"{s1Cost}  •  Primary ability  •  Instant";
                 hoverDesc = ab1.desc + "\nBuilds primary class resource when attacking.";
             }
 
@@ -129,7 +133,7 @@ namespace Riftbound
             if (DrawSlot(new Rect(barX + (slotSize + spacing) * 1, barY, slotSize, slotSize), "2", s2Icon, s2Cost, cd2, () => player.CastAbility2Public()))
             {
                 hoverTitle = ab2.name;
-                hoverSub = $"{s2Cost}  •  Instant  •  5.0s Cooldown";
+                hoverSub = $"{s2Cost}  •  Instant";
                 hoverDesc = ab2.desc + "\nDevastating multi-target burst ability.";
             }
 
@@ -140,7 +144,7 @@ namespace Riftbound
             if (DrawSlot(new Rect(barX + (slotSize + spacing) * 2, barY, slotSize, slotSize), "3", s3Icon, s3Cost, cd3, () => player.CastAbility3Public()))
             {
                 hoverTitle = ab3.name;
-                hoverSub = $"{s3Cost}  •  Instant  •  10.0s Cooldown";
+                hoverSub = $"{s3Cost}  •  Instant";
                 hoverDesc = ab3.desc + "\nDefensive recovery or mobility ability.";
             }
 
@@ -156,11 +160,23 @@ namespace Riftbound
             float cdInterrupt = player.InterruptCooldownRemaining;
             string intName = player.InterruptSpellName;
             string intIcon = player.InterruptIcon;
-            if (DrawSlot(new Rect(barX + (slotSize + spacing) * 4, barY, slotSize, slotSize), "F", intIcon, "", cdInterrupt, () => player.CastInterruptPublic()))
+            Rect intRect = new Rect(barX + (slotSize + spacing) * 4, barY, slotSize, slotSize);
+            if (DrawSlot(intRect, "F", intIcon, "", cdInterrupt, () => player.CastInterruptPublic()))
             {
                 hoverTitle = $"{intName} (Interrupt)";
                 hoverSub = $"Instant  •  12.0s Cooldown  •  {(player.CharacterClass == "Mage" ? "25m Range" : "Melee Range")}";
                 hoverDesc = $"Interrupts the enemy's spellcast, locking out that school of magic for 4 seconds.\nPress [F] or click when target begins casting.";
+            }
+            if (player.Target != null && CastBarSystem.IsTargetCasting(player.Target) && cdInterrupt <= 0.05f)
+            {
+                float pulse = 0.55f + 0.45f * Mathf.Sin(Time.time * 9f);
+                var prev = GUI.color;
+                GUI.color = new Color(1f, 0.82f, 0.18f, pulse);
+                GUI.DrawTexture(new Rect(intRect.x - 3, intRect.y - 3, intRect.width + 6, 3), borderTex);
+                GUI.DrawTexture(new Rect(intRect.x - 3, intRect.yMax, intRect.width + 6, 3), borderTex);
+                GUI.DrawTexture(new Rect(intRect.x - 3, intRect.y, 3, intRect.height), borderTex);
+                GUI.DrawTexture(new Rect(intRect.xMax, intRect.y, 3, intRect.height), borderTex);
+                GUI.color = prev;
             }
 
             // Slot 6: Guard / Shield Block [Q]
@@ -189,15 +205,15 @@ namespace Riftbound
             {
                 hoverTitle = "Hearthstone";
                 hoverSub = "5.0s Cast  •  60s Cooldown";
-                hoverDesc = "Communes with the ley leylines to teleport you safely back to Emberwatch Outpost. Cancelled by taking damage or moving.";
+                hoverDesc = "Return to your home settlement. Moving or taking damage cancels the cast.";
             }
 
             // Slot 9: World Atlas Map [M]
             if (DrawSlot(new Rect(barX + (slotSize + spacing) * 8, barY, slotSize, slotSize), "M", "🗺", "MAP", 0f, () => player.ToggleMapPublic()))
             {
-                hoverTitle = "World Atlas of Azeboth";
+                hoverTitle = "World Map";
                 hoverSub = "Continental Map  •  [M]";
-                hoverDesc = "Opens the full continental atlas detailing Highspire Keep, Amber Vale, Duskwood Cathedral, Redridge Canyons, Gor'Kresh Stronghold, and Mount Wyrmcrest.";
+                hoverDesc = "Explore the world and place a travel waypoint. Roads connect settlements and encounters.";
             }
 
             // --- 3. Mouseover Tooltip ---
@@ -214,7 +230,20 @@ namespace Riftbound
             GUI.DrawTexture(rect, bgTex);
 
             // Icon symbol
-            GUI.Label(new Rect(rect.x, rect.y + 4, rect.width, rect.height - 8), icon, slotStyle);
+            int cell = IconCell(activeClass, keybind);
+            if (abilityAtlas && cell >= 0)
+                GUI.DrawTextureWithTexCoords(new Rect(rect.x + 2, rect.y + 2, rect.width - 4, rect.height - 4),
+                    abilityAtlas, new Rect((cell % 4) * .25f + .003f, (3 - cell / 4) * .25f + .003f, .244f, .244f));
+            else
+                GUI.Label(new Rect(rect.x, rect.y + 8, rect.width, rect.height - 16), keybind == "Z" ? "Ride" : keybind == "M" ? "Map" : keybind, labelStyle);
+            bool hovered = rect.Contains(Event.current.mousePosition);
+            if (hovered)
+            {
+                var tint = GUI.color; GUI.color = new Color(.9f, .78f, .50f);
+                GUI.DrawTexture(new Rect(rect.x, rect.y, rect.width, 1), borderTex);
+                GUI.DrawTexture(new Rect(rect.x, rect.yMax - 1, rect.width, 1), borderTex);
+                GUI.color = tint;
+            }
 
             // Cooldown overlay
             if (cd > 0.05f)
@@ -224,22 +253,38 @@ namespace Riftbound
             }
 
             // Keybind badge (Top-Left)
-            GUI.Label(new Rect(rect.x + 3, rect.y + 2, 28, 16), keybind, keybindStyle);
+            GUI.DrawTexture(new Rect(rect.x + 2, rect.y + 2, 17, 15), bgTex);
+            GUI.Label(new Rect(rect.x + 4, rect.y + 1, 24, 16), keybind, keybindStyle);
 
             // Cost or sub-label (Bottom-Right)
-            if (!string.IsNullOrEmpty(cost))
+            if (!string.IsNullOrEmpty(cost) && (keybind == "4" || cost == "ACTIVE"))
             {
                 GUI.Label(new Rect(rect.x, rect.yMax - 15, rect.width - 3, 14), cost, costStyle);
             }
 
             // Click handling
-            if (Event.current.type == EventType.MouseDown && rect.Contains(Event.current.mousePosition))
+            if (Event.current.type == EventType.MouseDown && Event.current.button == 0 && hovered)
             {
                 onClick?.Invoke();
                 Event.current.Use();
             }
 
-            return rect.Contains(Event.current.mousePosition);
+            return hovered;
+        }
+
+        public static int IconCell(string characterClass, string key)
+        {
+            int index = key == "1" ? 0 : key == "2" ? 1 : key == "3" ? 2 : -1;
+            if (index >= 0)
+                return (characterClass == "Mage" ? 3 : characterClass == "Rogue" ? 6 : characterClass == "Paladin" ? 9 : 0) + index;
+            return key == "4" ? 12 : key == "F" ? 13 : key == "Q" ? 14 : key == "H" ? 15 : -1;
+        }
+
+        void OnDestroy()
+        {
+            if (Instance == this) Instance = null;
+            foreach (var texture in new[] { bgTex, borderTex, healthBgTex, healthFillTex, resourceFillTex, cdOverlayTex })
+                if (texture) Destroy(texture);
         }
 
         void DrawStatusBar(float x, float y, float width, float height, float current, float max, Color fillColor, string title, string text)

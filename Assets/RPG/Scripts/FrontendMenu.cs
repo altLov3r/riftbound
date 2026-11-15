@@ -26,13 +26,16 @@ namespace Riftbound
             public int selected;
         }
 
-        enum Page { Characters, Create, Settings, Controls }
+        enum Page { Title, Characters, Create, Settings, Controls }
         public static bool IsOpen { get; private set; }
         static Character enteringCharacter;
 
         PlayerController player;
         Roster roster;
-        Page page = Page.Characters;
+        Page page = Page.Title;
+        Page returnPage = Page.Title;
+        public bool TitleScreenOpen => IsOpen && page == Page.Title;
+        Texture2D buttonNormal, buttonHover, buttonPressed, primaryNormal, primaryHover;
 
         // Creation state
         string newName = "";
@@ -67,7 +70,7 @@ namespace Riftbound
 
         float volume = 0.8f;
         float sensitivity = 1.0f;
-        readonly Color gold = new Color(0.95f, 0.79f, 0.38f);
+        readonly Color gold = new Color(0.76f, 0.64f, 0.43f);
         readonly Color allianceBlue = new Color(0.18f, 0.42f, 0.88f);
         readonly Color hordeRed = new Color(0.85f, 0.18f, 0.12f);
 
@@ -90,6 +93,19 @@ namespace Riftbound
             volume = PlayerPrefs.GetFloat("Riftbound.Volume", 0.8f);
             sensitivity = PlayerPrefs.GetFloat("Riftbound.Sensitivity", 1.0f);
             ApplySettings();
+            Network.CoopSessionConfig.ParseCommandLineOnce();
+
+            if (Network.CoopSessionConfig.AutoSmokeExitSeconds > 0f && enteringCharacter == null)
+            {
+                IsOpen = false;
+                if (player.orbit) player.orbit.SetPaused(false);
+                player.CharacterName = Network.CoopSessionConfig.Mode == Network.CoopSessionMode.HostLan ? "HostHero" : "ClientHero";
+                player.CharacterRace = "Human";
+                player.CharacterClass = Network.CoopSessionConfig.Mode == Network.CoopSessionMode.HostLan ? "Warrior" : "Mage";
+                player.Stats.displayName = player.CharacterName;
+                player.RefreshAdventureWorld();
+                return;
+            }
 
 #if UNITY_EDITOR
             if (UnityEditor.EditorPrefs.GetBool("Riftbound.DirectPlayInEditor", false) && enteringCharacter == null)
@@ -145,7 +161,7 @@ namespace Riftbound
             IsOpen = true;
             if (player.orbit) player.orbit.SetPaused(true);
 
-            page = roster.characters.Count > 0 ? Page.Characters : Page.Create;
+            page = Page.Title;
             SetupPortraitCamera();
             RefreshPreview();
         }
@@ -184,6 +200,11 @@ namespace Riftbound
         public void EnterWorld()
         {
             if (Selected == null) return;
+            if (Network.CoopSessionConfig.Mode == Network.CoopSessionMode.JoinOnline && string.IsNullOrWhiteSpace(Network.CoopSessionConfig.JoinCode))
+            {
+                error = "Enter a session join code to join Online Co-op.";
+                return;
+            }
             if (!SaveRoster()) return;
 
             enteringCharacter = Selected;
@@ -191,6 +212,14 @@ namespace Riftbound
             Time.timeScale = 1;
             CleanupPreview();
             SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+        }
+
+        public void OpenCharacterSelect()
+        {
+            if (!IsOpen || roster == null) return;
+            page = roster.characters.Count > 0 ? Page.Characters : Page.Create;
+            error = "";
+            RefreshPreview();
         }
 
         public void ReturnToMenu()
@@ -338,6 +367,60 @@ namespace Riftbound
             return PlayerController.GetStartingZoneName(c.race);
         }
 
+        // ---- Title backgrounds & faction preview backdrops ----
+        Texture2D[] titleBgs; Texture2D cozyAlliance, cozyHorde;
+        const float BgHold = 9f, BgFade = 1.6f;
+
+        void EnsureBackgrounds()
+        {
+            if (titleBgs != null) return;
+            var list = new System.Collections.Generic.List<Texture2D>();
+            for (int i = 1; i <= 8; i++) { var t = Resources.Load<Texture2D>("TitleBackgrounds/title_0" + i); if (t) list.Add(t); }
+            titleBgs = list.ToArray();
+            cozyAlliance = Resources.Load<Texture2D>("TitleBackgrounds/cozy_alliance");
+            cozyHorde = Resources.Load<Texture2D>("TitleBackgrounds/cozy_horde");
+        }
+
+        static void DrawCover(Rect r, Texture2D tex, float zoom = 1f)
+        {
+            float ta = (float)tex.width / tex.height, ra = r.width / r.height;
+            float uw = 1f, uh = 1f;
+            if (ta > ra) uw = ra / ta; else uh = ta / ra;
+            uw /= zoom; uh /= zoom;
+            GUI.DrawTextureWithTexCoords(r, tex, new Rect((1f - uw) * 0.5f, (1f - uh) * 0.5f, uw, uh));
+        }
+
+        void DrawRotatingBackground()
+        {
+            EnsureBackgrounds();
+            if (titleBgs.Length == 0) return;
+            var full = new Rect(0, 0, Screen.width, Screen.height);
+            float cycle = BgHold + BgFade, t = Time.unscaledTime;
+            int idx = (int)(t / cycle) % titleBgs.Length;
+            float local = t % cycle;
+            var prev = GUI.color;
+            GUI.color = Color.white;
+            DrawCover(full, titleBgs[idx], 1.04f + 0.06f * (local / cycle));
+            if (local > BgHold && titleBgs.Length > 1)
+            {
+                int next = (idx + 1) % titleBgs.Length;
+                GUI.color = new Color(1, 1, 1, (local - BgHold) / BgFade);
+                DrawCover(full, titleBgs[next], 1.04f);
+            }
+            GUI.color = prev;
+        }
+
+        void DrawCozyBackdrop(Rect rect)
+        {
+            EnsureBackgrounds();
+            bool horde = page == Page.Create ? factionIndex == 1 : (Selected != null && Selected.faction == "Horde");
+            var tex = horde ? cozyHorde : cozyAlliance;
+            Fill(new Rect(rect.x - 3, rect.y - 3, rect.width + 6, rect.height + 6), (horde ? hordeRed : allianceBlue) * 0.8f);
+            if (tex) { GUI.color = Color.white; DrawCover(rect, tex); }
+            else Fill(rect, horde ? new Color(.22f, .08f, .05f) : new Color(.08f, .14f, .25f));
+            // soft vignette
+            Fill(new Rect(rect.x, rect.yMax - 90, rect.width, 90), new Color(0, 0, 0, .35f));
+        }
         void SetupPortraitCamera()
         {
             if (portrait == null)
@@ -353,7 +436,7 @@ namespace Riftbound
                 portraitCamera.targetTexture = portrait;
                 portraitCamera.cullingMask = 1 << 31;
                 portraitCamera.clearFlags = CameraClearFlags.SolidColor;
-                portraitCamera.backgroundColor = new Color(0.02f, 0.035f, 0.045f, 1f);
+                portraitCamera.backgroundColor = new Color(0.02f, 0.035f, 0.045f, 0f);
                 portraitCamera.fieldOfView = 30f;
                 portraitCamera.nearClipPlane = 0.05f;
                 portraitCamera.farClipPlane = 25f;
@@ -414,8 +497,12 @@ namespace Riftbound
             {
                 if (showDeleteConfirm) { showDeleteConfirm = false; return; }
                 if (page == Page.Create) { page = Page.Characters; error = ""; RefreshPreview(); return; }
-                if (page == Page.Settings || page == Page.Controls) { page = Page.Characters; SaveSettings(); return; }
+                if (page == Page.Settings || page == Page.Controls) { page = returnPage; SaveSettings(); return; }
+                if (page == Page.Characters) { page = Page.Title; return; }
             }
+
+            if (page == Page.Title && Keyboard.current.enterKey.wasPressedThisFrame) OpenCharacterSelect();
+            if (page != Page.Characters && page != Page.Create) return;
 
             if (Mouse.current != null)
             {
@@ -449,12 +536,20 @@ namespace Riftbound
         void OnDestroy()
         {
             CleanupPreview();
+            foreach (var texture in new[] { buttonNormal, buttonHover, buttonPressed, primaryNormal, primaryHover })
+                if (texture) Destroy(texture);
+        }
+
+        static Texture2D Solid(Color color)
+        {
+            var texture = new Texture2D(1, 1) { hideFlags = HideFlags.HideAndDontSave };
+            texture.SetPixel(0, 0, color); texture.Apply(); return texture;
         }
 
         void InitStyles()
         {
             brand = new GUIStyle(GUI.skin.label) { fontSize = 42, fontStyle = FontStyle.Bold };
-            brand.normal.textColor = gold;
+            brand.normal.textColor = new Color(.94f, .92f, .86f);
 
             heading = new GUIStyle(GUI.skin.label) { fontSize = 23, fontStyle = FontStyle.Bold };
             heading.normal.textColor = gold;
@@ -468,12 +563,25 @@ namespace Riftbound
             small = new GUIStyle(body) { fontSize = 12 };
             small.normal.textColor = new Color(0.65f, 0.68f, 0.68f);
 
-            button = new GUIStyle(GUI.skin.button) { fontSize = 15, fontStyle = FontStyle.Bold };
+            buttonNormal = Solid(new Color(.095f, .105f, .115f));
+            buttonHover = Solid(new Color(.15f, .165f, .18f));
+            buttonPressed = Solid(new Color(.20f, .21f, .22f));
+            primaryNormal = Solid(new Color(.30f, .25f, .17f));
+            primaryHover = Solid(new Color(.40f, .33f, .22f));
+            button = new GUIStyle(GUI.skin.button) { fontSize = 14, fontStyle = FontStyle.Normal, border = new RectOffset(), padding = new RectOffset(16, 16, 8, 8) };
+            button.normal.background = buttonNormal; button.hover.background = buttonHover;
+            button.active.background = buttonPressed; button.focused.background = buttonHover;
+            button.normal.textColor = new Color(.86f, .87f, .86f);
+            button.hover.textColor = Color.white; button.active.textColor = Color.white;
+            WowTheme.StyleButton(GUI.skin.button);
+            WowTheme.StyleButton(button);
 
-            enterButton = new GUIStyle(GUI.skin.button) { fontSize = 21, fontStyle = FontStyle.Bold };
+            enterButton = new GUIStyle(button) { fontSize = 17, fontStyle = FontStyle.Bold };
+            enterButton.normal.background = primaryNormal; enterButton.hover.background = primaryHover;
             enterButton.normal.textColor = new Color(1.0f, 0.95f, 0.80f);
+            WowTheme.StyleButton(enterButton, true);
 
-            dangerButton = new GUIStyle(GUI.skin.button) { fontSize = 14, fontStyle = FontStyle.Bold };
+            dangerButton = new GUIStyle(button) { fontSize = 13 };
             dangerButton.normal.textColor = new Color(1.0f, 0.40f, 0.40f);
 
             field = new GUIStyle(GUI.skin.textField) { fontSize = 20, alignment = TextAnchor.MiddleLeft, padding = new RectOffset(12, 12, 6, 6) };
@@ -492,17 +600,24 @@ namespace Riftbound
             float scale = Mathf.Min(Screen.width / 1280f, Screen.height / 720f);
             GUI.matrix = Matrix4x4.TRS(new Vector3((Screen.width - 1280 * scale) * 0.5f, (Screen.height - 720 * scale) * 0.5f), Quaternion.identity, Vector3.one * scale);
 
-            // Dark gothic background atmosphere
-            Fill(new Rect(-1000, -1000, 3280, 2720), new Color(0.012f, 0.020f, 0.026f, 0.72f));
+            GUI.matrix = oldMatrix;
+            DrawRotatingBackground();
+            GUI.matrix = Matrix4x4.TRS(new Vector3((Screen.width - 1280 * scale) * 0.5f, (Screen.height - 720 * scale) * 0.5f), Quaternion.identity, Vector3.one * scale);
+            Fill(new Rect(-1000, -1000, 3280, 2720), new Color(.018f, .023f, .029f, page == Page.Title ? .30f : .86f));
+            if (page == Page.Title) Fill(new Rect(0, 0, 640, 720), new Color(.01f, .015f, .02f, .45f));
 
             // Top WoW Bar
-            DrawTopBar();
+            if (page != Page.Title) DrawTopBar();
 
             // Active Page
-            if (page == Page.Characters) DrawCharacterSelectPage();
+            bool previousEnabled = GUI.enabled;
+            if (showDeleteConfirm) GUI.enabled = false;
+            if (page == Page.Title) DrawTitlePage();
+            else if (page == Page.Characters) DrawCharacterSelectPage();
             else if (page == Page.Create) DrawCharacterCreatePage();
             else if (page == Page.Settings) DrawSettingsPage();
             else if (page == Page.Controls) DrawControlsPage();
+            GUI.enabled = previousEnabled;
 
             // Error display
             if (!string.IsNullOrEmpty(error))
@@ -523,23 +638,36 @@ namespace Riftbound
 
         void DrawTopBar()
         {
-            // Golden filigree top border
-            Fill(new Rect(30, 20, 1220, 2), gold * 0.7f);
+            GUI.Label(new Rect(40, 24, 400, 42), "RIFTBOUND", new GUIStyle(brand) { fontSize = 28 });
+            GUI.Label(new Rect(42, 62, 450, 20), "CHRONICLES OF EMBERWATCH", small);
+            Fill(new Rect(40, 92, 1200, 1), new Color(.3f, .32f, .34f, .3f));
+        }
 
-            GUI.Label(new Rect(40, 26, 400, 48), "RIFTBOUND", brand);
-
-            var realmStyle = new GUIStyle(small) { fontStyle = FontStyle.Bold };
-            realmStyle.normal.textColor = new Color(0.85f, 0.75f, 0.45f);
-            GUI.Label(new Rect(42, 68, 450, 20), "CHRONICLES OF EMBERWATCH  â€¢  REALM: EMBERWATCH (PvE)", realmStyle);
-
-#if UNITY_EDITOR
-            bool directPlay = UnityEditor.EditorPrefs.GetBool("Riftbound.DirectPlayInEditor", false);
-            GUI.backgroundColor = directPlay ? new Color(0.35f, 0.8f, 0.45f) : new Color(0.45f, 0.45f, 0.5f);
-            if (GUI.Button(new Rect(1050, 28, 190, 32), directPlay ? "âš¡ Direct Play: ON" : "âš¡ Direct Play: OFF", button))
+        void DrawTitlePage()
+        {
+            if (portrait)
             {
-                UnityEditor.EditorPrefs.SetBool("Riftbound.DirectPlayInEditor", !directPlay);
+                var tint = GUI.color; GUI.color = new Color(1, 1, 1, .75f);
+                GUI.DrawTexture(new Rect(625, 55, 540, 620), portrait, ScaleMode.ScaleToFit);
+                GUI.color = tint;
             }
-            GUI.backgroundColor = Color.white;
+            GUI.Label(new Rect(100, 145, 460, 24), "CHRONICLES OF EMBERWATCH", small);
+            GUI.Label(new Rect(96, 179, 530, 82), "RIFTBOUND", new GUIStyle(brand) { fontSize = 56 });
+            Fill(new Rect(100, 276, 50, 2), gold);
+            GUI.Label(new Rect(100, 302, 410, 65), "Beyond the outpost, a frontier awaits.", new GUIStyle(body) { fontSize = 20 });
+            if (GUI.Button(new Rect(100, 404, 290, 54), "Play", enterButton)) OpenCharacterSelect();
+            if (GUI.Button(new Rect(100, 472, 138, 38), "Settings", button)) { returnPage = Page.Title; page = Page.Settings; }
+            if (GUI.Button(new Rect(252, 472, 138, 38), "Controls", button)) { returnPage = Page.Title; page = Page.Controls; }
+            if (GUI.Button(new Rect(100, 526, 138, 36), "Quit", button)) QuitGame();
+            GUI.Label(new Rect(100, 650, 600, 24), "A local adventure  /  " + Application.version, small);
+        }
+
+        static void QuitGame()
+        {
+#if UNITY_EDITOR
+            UnityEditor.EditorApplication.isPlaying = false;
+#else
+            Application.Quit();
 #endif
         }
 
@@ -555,24 +683,79 @@ namespace Riftbound
             DrawActionButtonsBottomRight(new Rect(880, 575, 360, 125));
 
             // Bottom Left Navigation Buttons: Settings / Controls / Quit
-            DrawNavigationButtonsBottomLeft(new Rect(40, 645, 480, 48));
+            GUI.Label(new Rect(40, 155, 245, 30), "Your adventure", subHeading);
+            GUI.Label(new Rect(40, 196, 230, 75), "Choose a character to continue, or begin a new story on the frontier.", body);
+            DrawSessionModePanel(new Rect(40, 290, 255, 230));
+            DrawNavigationButtonsBottomLeft(new Rect(40, 540, 240, 140));
+        }
+
+        void DrawSessionModePanel(Rect rect)
+        {
+            Fill(rect, new Color(0.05f, 0.06f, 0.08f, 0.78f));
+            GUI.Label(new Rect(rect.x + 10, rect.y + 8, rect.width - 20, 22), "SESSION MODE", subHeading);
+
+            float bw = (rect.width - 28f) / 3f;
+            DrawModeButton(new Rect(rect.x + 10, rect.y + 36, bw, 30), "Offline", Network.CoopSessionMode.Offline);
+            DrawModeButton(new Rect(rect.x + 14 + bw, rect.y + 36, bw, 30), "Host Online", Network.CoopSessionMode.HostOnline);
+            DrawModeButton(new Rect(rect.x + 18 + bw * 2, rect.y + 36, bw, 30), "Join Online", Network.CoopSessionMode.JoinOnline);
+
+            if (Network.CoopSessionConfig.Mode == Network.CoopSessionMode.Offline)
+            {
+                GUI.Label(new Rect(rect.x + 10, rect.y + 76, rect.width - 20, 65),
+                    "Single-player adventure with local save progression.", small);
+            }
+            else if (Network.CoopSessionConfig.Mode == Network.CoopSessionMode.HostOnline)
+            {
+                GUI.Label(new Rect(rect.x + 10, rect.y + 74, rect.width - 20, 82),
+                    "Host up to 4 players online.\nGenerates a shareable Join Code.\nSession-only co-op progress (offline saves kept safe).", small);
+            }
+            else
+            {
+                GUI.Label(new Rect(rect.x + 10, rect.y + 72, rect.width - 20, 20), "Session Join Code:", small);
+                string rawCode = GUI.TextField(
+                    new Rect(rect.x + 10, rect.y + 94, rect.width - 20, 28),
+                    Network.CoopSessionConfig.JoinCode ?? "", 16);
+                Network.CoopSessionConfig.JoinCode = Network.OnlineSessionService.NormalizeJoinCode(rawCode);
+                GUI.Label(new Rect(rect.x + 10, rect.y + 126, rect.width - 20, 38),
+                    "Session-only co-op progress (offline saves safe).", small);
+            }
+
+            if (!string.IsNullOrEmpty(Network.CoopSessionConfig.LastDisconnectReason))
+            {
+                var errStyle = new GUIStyle(small);
+                errStyle.normal.textColor = new Color(1f, 0.4f, 0.4f);
+                GUI.Label(new Rect(rect.x + 10, rect.y + 168, rect.width - 20, 55),
+                    $"Last session: {Network.CoopSessionConfig.LastDisconnectReason}", errStyle);
+            }
+        }
+
+        void DrawModeButton(Rect rect, string label, Network.CoopSessionMode mode)
+        {
+            bool active = Network.CoopSessionConfig.Mode == mode;
+            var style = active ? enterButton : button;
+            if (GUI.Button(rect, label, style))
+            {
+                Network.CoopSessionConfig.Mode = mode;
+                Network.CoopSessionConfig.LastDisconnectReason = string.Empty;
+            }
         }
 
         void DrawCharacterPreviewArea(Rect rect)
         {
+            DrawCozyBackdrop(rect);
             if (portrait)
             {
                 GUI.DrawTexture(rect, portrait, ScaleMode.ScaleToFit);
             }
 
             // Rotation Turntable buttons
-            if (GUI.Button(new Rect(rect.x + 80, rect.yMax - 36, 55, 32), "â—„", button))
+            if (GUI.Button(new Rect(rect.x + 80, rect.yMax - 36, 55, 32), "<", button))
             {
                 previewYaw -= 30f;
                 if (preview) preview.transform.rotation = Quaternion.Euler(0f, previewYaw, 0f);
             }
 
-            if (GUI.Button(new Rect(rect.xMax - 135, rect.yMax - 36, 55, 32), "â–º", button))
+            if (GUI.Button(new Rect(rect.xMax - 135, rect.yMax - 36, 55, 32), ">", button))
             {
                 previewYaw += 30f;
                 if (preview) preview.transform.rotation = Quaternion.Euler(0f, previewYaw, 0f);
@@ -582,7 +765,7 @@ namespace Riftbound
             GUI.Label(new Rect(rect.x + 140, rect.yMax - 32, rect.width - 280, 24), "Drag to rotate", tipStyle);
 
             // Character Pedestal Info under model
-            if (Selected != null)
+            if (Selected != null && page != Page.Create)
             {
                 int lvl = GetCharacterLevel(Selected);
                 string zone = GetCharacterZone(Selected);
@@ -595,21 +778,20 @@ namespace Riftbound
                 GUI.Label(new Rect(rect.x + 60, rect.yMax + 9, rect.width - 120, 24), Selected.name, nameStyle);
 
                 var detailsStyle = new GUIStyle(small) { alignment = TextAnchor.MiddleCenter };
-                GUI.Label(new Rect(rect.x + 60, rect.yMax + 29, rect.width - 120, 20), $"Level {lvl} {Selected.race} {Selected.characterClass}  â€¢  {zone}", detailsStyle);
+                GUI.Label(new Rect(rect.x + 60, rect.yMax + 29, rect.width - 120, 20), $"Level {lvl} {Selected.race} {Selected.characterClass} / {zone}", detailsStyle);
             }
         }
 
         void DrawCharacterListColumn(Rect rect)
         {
             // Panel frame
-            Fill(new Rect(rect.x - 4, rect.y - 4, rect.width + 8, rect.height + 8), new Color(0.02f, 0.035f, 0.05f, 0.92f));
-            Fill(rect, new Color(0.05f, 0.07f, 0.09f, 0.88f));
+            WowTheme.Panel(new Rect(rect.x - 4, rect.y - 4, rect.width + 8, rect.height + 8));
 
             GUI.Label(new Rect(rect.x + 16, rect.y + 10, rect.width - 32, 28), "CHARACTERS", heading);
 
             float cardY = rect.y + 44;
-            float cardH = 50f;
-            float cardSpacing = 6f;
+            float cardH = 47f;
+            float cardSpacing = 5f;
 
             for (int i = 0; i < roster.characters.Count && i < 8; i++)
             {
@@ -620,8 +802,8 @@ namespace Riftbound
                 // Card background & selection border
                 if (isSelected)
                 {
-                    Fill(new Rect(cardRect.x - 2, cardRect.y - 2, cardRect.width + 4, cardRect.height + 4), gold);
-                    Fill(cardRect, new Color(0.18f, 0.16f, 0.10f, 0.98f));
+                    Fill(cardRect, new Color(.14f, .15f, .16f, .98f));
+                    Fill(new Rect(cardRect.x, cardRect.y, 2, cardRect.height), gold);
                 }
                 else
                 {
@@ -642,63 +824,65 @@ namespace Riftbound
                 int lvl = GetCharacterLevel(character);
                 string zone = GetCharacterZone(character);
 
-                cardTitle.normal.textColor = isSelected ? gold : GetClassColor(character.characterClass);
+                cardTitle.normal.textColor = isSelected ? new Color(.96f, .93f, .85f) : new Color(.78f, .8f, .81f);
                 GUI.Label(new Rect(cardRect.x + 14, cardRect.y + 6, cardRect.width - 28, 20), character.name, cardTitle);
-                GUI.Label(new Rect(cardRect.x + 14, cardRect.y + 26, cardRect.width - 28, 18), $"Lv {lvl} {character.race} {character.characterClass} Â· {zone}", cardSub);
+                GUI.Label(new Rect(cardRect.x + 14, cardRect.y + 26, cardRect.width - 28, 18), $"Lv {lvl} {character.race} {character.characterClass} / {zone}", cardSub);
             }
         }
 
         void DrawActionButtonsBottomRight(Rect rect)
         {
+            bool canInteract = GUI.enabled;
             // Enter World (Giant Red/Gold WoW Button)
-            GUI.backgroundColor = new Color(0.78f, 0.18f, 0.12f);
-            if (GUI.Button(new Rect(rect.x, rect.y, rect.width, 52), "ENTER WORLD", enterButton))
+            GUI.backgroundColor = Color.white;
+            string enterLabel = Network.CoopSessionConfig.Mode == Network.CoopSessionMode.HostOnline
+                ? "HOST ONLINE"
+                : (Network.CoopSessionConfig.Mode == Network.CoopSessionMode.JoinOnline ? "JOIN ONLINE" : "ENTER WORLD");
+            if (GUI.Button(new Rect(rect.x, rect.y, rect.width, 52), enterLabel, enterButton))
             {
                 EnterWorld();
             }
             GUI.backgroundColor = Color.white;
 
             // Create Character (Left)
-            GUI.enabled = roster.characters.Count < 8;
-            if (GUI.Button(new Rect(rect.x, rect.y + 58, 175, 42), "+ CREATE CHARACTER", button))
+            GUI.enabled = canInteract && roster.characters.Count < 8;
+            if (GUI.Button(new Rect(rect.x, rect.y + 58, 175, 42), "Create character", button))
             {
                 newName = "";
                 error = "";
                 page = Page.Create;
                 RefreshPreview();
             }
-            GUI.enabled = true;
+            GUI.enabled = canInteract;
 
             // Delete Character (Right - Red button)
-            GUI.enabled = roster.characters.Count > 0;
-            GUI.backgroundColor = new Color(0.65f, 0.15f, 0.15f);
-            if (GUI.Button(new Rect(rect.x + 185, rect.y + 58, 175, 42), "DELETE CHARACTER", dangerButton))
+            GUI.enabled = canInteract && roster.characters.Count > 0;
+            GUI.backgroundColor = Color.white;
+            if (GUI.Button(new Rect(rect.x + 185, rect.y + 58, 175, 42), "Delete character", dangerButton))
             {
                 showDeleteConfirm = true;
             }
             GUI.backgroundColor = Color.white;
-            GUI.enabled = true;
+            GUI.enabled = canInteract;
         }
 
         void DrawNavigationButtonsBottomLeft(Rect rect)
         {
-            if (GUI.Button(new Rect(rect.x, rect.y, 140, 38), "SETTINGS", button))
+            if (GUI.Button(new Rect(rect.x, rect.y, 180, 34), "Settings", button))
             {
+                returnPage = Page.Characters;
                 page = Page.Settings;
             }
 
-            if (GUI.Button(new Rect(rect.x + 152, rect.y, 140, 38), "CONTROLS", button))
+            if (GUI.Button(new Rect(rect.x, rect.y + 43, 180, 34), "Controls", button))
             {
+                returnPage = Page.Characters;
                 page = Page.Controls;
             }
 
-            if (GUI.Button(new Rect(rect.x + 304, rect.y, 140, 38), "QUIT GAME", button))
+            if (GUI.Button(new Rect(rect.x, rect.y + 86, 180, 34), "Back to title", button))
             {
-#if UNITY_EDITOR
-                UnityEditor.EditorApplication.isPlaying = false;
-#else
-                Application.Quit();
-#endif
+                page = Page.Title;
             }
         }
 
@@ -723,8 +907,7 @@ namespace Riftbound
 
         void DrawFactionAndRaceSelection(Rect rect)
         {
-            Fill(new Rect(rect.x - 4, rect.y - 4, rect.width + 8, rect.height + 8), new Color(0.02f, 0.035f, 0.05f, 0.92f));
-            Fill(rect, new Color(0.05f, 0.07f, 0.09f, 0.88f));
+            WowTheme.Panel(new Rect(rect.x - 4, rect.y - 4, rect.width + 8, rect.height + 8));
 
             GUI.Label(new Rect(rect.x + 14, rect.y + 12, rect.width - 28, 24), "1. SELECT FACTION", subHeading);
 
@@ -770,8 +953,7 @@ namespace Riftbound
 
         void DrawClassSelection(Rect rect)
         {
-            Fill(new Rect(rect.x - 4, rect.y - 4, rect.width + 8, rect.height + 8), new Color(0.02f, 0.035f, 0.05f, 0.92f));
-            Fill(rect, new Color(0.05f, 0.07f, 0.09f, 0.88f));
+            WowTheme.Panel(new Rect(rect.x - 4, rect.y - 4, rect.width + 8, rect.height + 8));
 
             GUI.Label(new Rect(rect.x + 14, rect.y + 12, rect.width - 28, 24), "3. SELECT CLASS", subHeading);
 
@@ -810,7 +992,7 @@ namespace Riftbound
                 error = "";
             }
 
-            GUI.backgroundColor = new Color(0.85f, 0.65f, 0.25f);
+            GUI.backgroundColor = Color.white;
             if (GUI.Button(new Rect(rect.x + 415, rect.y + 20, 180, 44), "ACCEPT & CREATE", enterButton))
             {
                 CreateCharacter();
@@ -887,7 +1069,7 @@ namespace Riftbound
             if (GUI.Button(new Rect(60, 420, 220, 44), "SAVE & RETURN", button))
             {
                 SaveSettings();
-                page = Page.Characters;
+                page = returnPage;
             }
         }
 
@@ -924,9 +1106,9 @@ namespace Riftbound
                 "  F5                  Manual Save Progress\n" +
                 "  ESC                 Game Menu / Cancel Selection", body);
 
-            if (GUI.Button(new Rect(60, 520, 220, 44), "BACK TO CHARACTERS", button))
+            if (GUI.Button(new Rect(60, 520, 220, 44), "Back", button))
             {
-                page = Page.Characters;
+                page = returnPage;
             }
         }
 
@@ -950,3 +1132,6 @@ namespace Riftbound
         }
     }
 }
+
+
+

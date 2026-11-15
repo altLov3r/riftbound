@@ -10,7 +10,7 @@ namespace Riftbound
         string zoneSub = "";
         float showUntil = 0f;
         float fadeStartTime = 0f;
-        const float DisplayDuration = 4.2f;
+        const float DisplayDuration = 2.8f;
         const float FadeDuration = 0.8f;
 
         GUIStyle titleStyle, subStyle;
@@ -65,17 +65,16 @@ namespace Riftbound
             GUI.color = new Color(1f, 1f, 1f, alpha);
 
             float cx = screenW / 2f;
-            float cy = screenH * 0.22f;
+            float cy = 150f;
 
             // Filigree top line
-            GUI.DrawTexture(new Rect(cx - 180f, cy - 22f, 360f, 2f), lineTex);
 
             // Grand zone title with shadow
             titleStyle.normal.textColor = new Color(0f, 0f, 0f, alpha * 0.9f);
-            GUI.Label(new Rect(cx - 350f + 2f, cy - 18f + 2f, 700f, 44f), zoneTitle, titleStyle);
+            GUI.Label(new Rect(cx - 280f + 1f, cy - 18f + 1f, 560f, 30f), zoneTitle, titleStyle);
 
-            titleStyle.normal.textColor = new Color(1.0f, 0.84f, 0.35f, alpha);
-            GUI.Label(new Rect(cx - 350f, cy - 18f, 700f, 44f), zoneTitle, titleStyle);
+            titleStyle.normal.textColor = new Color(.86f, .78f, .60f, alpha);
+            GUI.Label(new Rect(cx - 280f, cy - 18f, 560f, 30f), zoneTitle, titleStyle);
 
             // Subtitle
             Color subColor = zoneSub.Contains("Alliance") ? new Color(0.35f, 0.75f, 1.0f, alpha) :
@@ -85,10 +84,9 @@ namespace Riftbound
                              new Color(0.9f, 0.9f, 0.5f, alpha);
 
             subStyle.normal.textColor = subColor;
-            GUI.Label(new Rect(cx - 300f, cy + 24f, 600f, 26f), zoneSub, subStyle);
+            GUI.Label(new Rect(cx - 280f, cy + 11f, 560f, 20f), zoneSub, subStyle);
 
             // Filigree bottom line
-            GUI.DrawTexture(new Rect(cx - 140f, cy + 52f, 280f, 2f), lineTex);
 
             GUI.color = oldColor;
         }
@@ -103,14 +101,14 @@ namespace Riftbound
 
             titleStyle = new GUIStyle(GUI.skin.label)
             {
-                fontSize = 32,
+                fontSize = 22,
                 fontStyle = FontStyle.Bold,
                 alignment = TextAnchor.MiddleCenter
             };
 
             subStyle = new GUIStyle(GUI.skin.label)
             {
-                fontSize = 15,
+                fontSize = 12,
                 fontStyle = FontStyle.Bold,
                 alignment = TextAnchor.MiddleCenter
             };

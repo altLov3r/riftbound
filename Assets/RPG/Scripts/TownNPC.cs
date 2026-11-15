@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -94,7 +95,7 @@ namespace Riftbound
                 labelTransform.gameObject.SetActive(showName);
 
             if (showName)
-                labelTransform.rotation = cam.transform.rotation;
+                labelTransform.rotation = cam.transform.rotation * Quaternion.Euler(0f, 180f, 0f);
 
             if (!player) player = FindFirstObjectByType<PlayerController>();
             if (player && player.Stats && player.Stats.Alive)
@@ -130,7 +131,7 @@ namespace Riftbound
             if (barkTransform.gameObject.activeSelf != showBark)
                 barkTransform.gameObject.SetActive(showBark);
             if (showBark)
-                barkTransform.rotation = cam.transform.rotation;
+                barkTransform.rotation = cam.transform.rotation * Quaternion.Euler(0f, 180f, 0f);
 
             UpdateQuestIndicator(cam, camDist);
         }
@@ -148,6 +149,27 @@ namespace Riftbound
                     if (!player.QuestAccepted && !player.QuestComplete) icon = "!";
                     else if (player.QuestAccepted && !player.QuestReady) { icon = "?"; col = new Color(0.7f, 0.7f, 0.7f); }
                     else if (player.QuestAccepted && player.QuestReady) icon = "?";
+                }
+            }
+            else if (FactionQuestSystem.Instance != null && player)
+            {
+                var fqs = FactionQuestSystem.Instance;
+                var curQ = fqs.GetActiveQuest();
+                if (fqs.HasActiveQuestToComplete(npcName, player) ||
+                    (curQ != null && curQ.targetType == "talk_npc" && string.Equals(curQ.targetId, npcName, StringComparison.OrdinalIgnoreCase)))
+                {
+                    icon = "?";
+                    col = new Color(1f, 0.85f, 0.15f);
+                }
+                else if (curQ != null && (string.Equals(curQ.giverNpc, npcName, StringComparison.OrdinalIgnoreCase) || string.Equals(curQ.targetId, npcName, StringComparison.OrdinalIgnoreCase)))
+                {
+                    icon = "?";
+                    col = new Color(0.7f, 0.7f, 0.7f);
+                }
+                else if (fqs.HasAvailableQuest(npcName, player))
+                {
+                    icon = "!";
+                    col = new Color(1f, 0.85f, 0.15f);
                 }
             }
             else if (npcName.Contains("Lucian"))
@@ -171,7 +193,7 @@ namespace Riftbound
             {
                 float bob = Mathf.Sin(Time.time * 3.2f) * 0.08f;
                 questTransform.localPosition = Vector3.up * (nameplateHeight + 0.95f + bob);
-                questTransform.rotation = cam.transform.rotation;
+                questTransform.rotation = cam.transform.rotation * Quaternion.Euler(0f, 180f, 0f);
                 if (questMesh.text != icon) questMesh.text = icon;
                 questMesh.color = col;
             }

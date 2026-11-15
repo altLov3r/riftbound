@@ -429,14 +429,20 @@ namespace Riftbound
 
         void DrawItemTooltip(Rect rect)
         {
-            GUI.DrawTexture(new Rect(rect.x - 2f, rect.y - 2f, rect.width + 4f, rect.height + 4f), borderTex);
-            GUI.DrawTexture(rect, bgTex);
+            var gear = ItemCatalog.Get(hoveredItemName);
+            string tooltipText = gear != null ? gear.FormattedTooltip :
+                $"<b>{hoveredItemName}</b>\nSlot: {hoveredSlotName} · {hoveredItemRarity}\n{hoveredItemStats}";
 
-            tooltipTitleStyle.normal.textColor = GuildSystem.GetRarityColor(hoveredItemRarity);
-            GUI.Label(new Rect(rect.x + 8f, rect.y + 6f, rect.width - 16f, 18f), hoveredItemName, tooltipTitleStyle);
+            float tipW = 240f;
+            float tipH = 135f;
+            Rect tipRect = new Rect(rect.x + rect.width + 6f, rect.y, tipW, tipH);
+            if (tipRect.xMax > Screen.width - 20f) tipRect.x = rect.x - tipW - 6f;
 
-            GUI.Label(new Rect(rect.x + 8f, rect.y + 24f, rect.width - 16f, 16f), $"Slot: {hoveredSlotName} · {hoveredItemRarity}", tooltipBodyStyle);
-            GUI.Label(new Rect(rect.x + 8f, rect.y + 42f, rect.width - 16f, 28f), hoveredItemStats, tooltipBodyStyle);
+            GUI.DrawTexture(new Rect(tipRect.x - 2f, tipRect.y - 2f, tipRect.width + 4f, tipRect.height + 4f), borderTex);
+            GUI.DrawTexture(tipRect, bgTex);
+
+            var tipStyle = new GUIStyle(tooltipBodyStyle) { richText = true, wordWrap = true, fontSize = 11 };
+            GUI.Label(new Rect(tipRect.x + 8f, tipRect.y + 6f, tipRect.width - 16f, tipRect.height - 12f), tooltipText, tipStyle);
         }
 
         void DrawSkillsTab(float x, float y, float w, float h)

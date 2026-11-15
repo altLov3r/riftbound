@@ -42,7 +42,7 @@ namespace Riftbound
 
         public List<CombatantMeterData> combatants = new List<CombatantMeterData>();
         public MeterDisplayMode displayMode = MeterDisplayMode.DamageDone;
-        public bool IsMeterOpen { get; set; } = true; // Low profile by default
+        public bool IsMeterOpen { get; set; } = false;
         public float combatDuration = 0f;
         public bool IsCombatActive { get; private set; } = false;
 

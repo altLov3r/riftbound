@@ -20,7 +20,7 @@ namespace Riftbound.Editor
                 PlayerSettings.defaultScreenWidth = 1280;
                 PlayerSettings.defaultScreenHeight = 720;
                 PlayerSettings.fullScreenMode = FullScreenMode.Windowed;
-                string scenePath = File.Exists("Assets/RPG/Scenes/Outpost-Updated.unity") ? "Assets/RPG/Scenes/Outpost-Updated.unity" : "Assets/RPG/Scenes/Outpost.unity";
+                string scenePath = File.Exists(WorldRegions.ScenePath) ? WorldRegions.ScenePath : File.Exists("Assets/RPG/Scenes/Outpost-Updated.unity") ? "Assets/RPG/Scenes/Outpost-Updated.unity" : "Assets/RPG/Scenes/Outpost.unity";
                 var active = EditorSceneManager.GetActiveScene();
                 if (active.path == scenePath && active.isDirty) EditorSceneManager.SaveScene(active);
                 var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions

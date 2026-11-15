@@ -22,7 +22,7 @@ namespace Riftbound
 
         // In-Game Day/Night Cycle (24 in-game hours per 24 minutes real-time)
         public float TimeOfDayHours { get; set; } = 14.5f; // 2:30 PM default
-        public float DayCycleSpeed { get; set; } = 1.0f;   // 1 hour per minute real time
+        public float DayCycleSpeed { get; set; } = .35f;   // 1 hour per minute real time
         public bool DayNightEnabled { get; set; } = true;
 
         public string FormattedTime
@@ -39,7 +39,7 @@ namespace Riftbound
 
         // Weather Transition timing
         float nextWeatherChangeTime;
-        public float WeatherChangeInterval = 90f; // Shift weather every 90 seconds
+        public float WeatherChangeInterval = 180f; // Shift weather every 90 seconds
 
         // Simulated Particle Precipitation & Fog State
         Color targetFogColor;
@@ -70,7 +70,7 @@ namespace Riftbound
             var lights = FindObjectsByType<Light>(FindObjectsSortMode.None);
             foreach (var l in lights)
             {
-                if (l.type == LightType.Directional)
+                if (l.type == LightType.Directional && (l.cullingMask & 1) != 0)
                 {
                     directionalSun = l;
                     break;
@@ -93,6 +93,7 @@ namespace Riftbound
                 EvaluateZoneWeather(false);
             }
 
+            ConfigureFogAndLighting();
             // Smooth atmosphere lerp
             ApplyAtmosphereLighting();
         }
@@ -143,7 +144,7 @@ namespace Riftbound
             else
             {
                 // Amber Vale (Gentle temperate)
-                chosen = (UnityEngine.Random.value < 0.35f) ? WeatherType.Rain : WeatherType.Clear;
+                chosen = instant ? WeatherType.Clear : ((UnityEngine.Random.value < .20f) ? WeatherType.Rain : WeatherType.Clear);
             }
 
             CurrentWeather = chosen;
@@ -164,27 +165,27 @@ namespace Riftbound
             {
                 case WeatherType.Clear:
                     targetFogColor = IsNight ? new Color(0.04f, 0.05f, 0.09f) : new Color(0.70f, 0.80f, 0.90f);
-                    targetFogDensity = 0.003f;
+                    targetFogDensity = .0018f;
                     break;
                 case WeatherType.Rain:
                     targetFogColor = new Color(0.35f, 0.40f, 0.45f);
-                    targetFogDensity = 0.012f;
+                    targetFogDensity = .0045f;
                     break;
                 case WeatherType.Storm:
                     targetFogColor = new Color(0.20f, 0.22f, 0.28f);
-                    targetFogDensity = 0.020f;
+                    targetFogDensity = .007f;
                     break;
                 case WeatherType.Snow:
                     targetFogColor = new Color(0.85f, 0.88f, 0.95f);
-                    targetFogDensity = 0.018f;
+                    targetFogDensity = .004f;
                     break;
                 case WeatherType.DenseFog:
                     targetFogColor = new Color(0.30f, 0.32f, 0.35f);
-                    targetFogDensity = 0.035f;
+                    targetFogDensity = .008f;
                     break;
                 case WeatherType.Sandstorm:
                     targetFogColor = new Color(0.75f, 0.58f, 0.35f);
-                    targetFogDensity = 0.025f;
+                    targetFogDensity = .006f;
                     break;
             }
         }
@@ -202,13 +203,13 @@ namespace Riftbound
             {
                 // Sun rotates 360 degrees along X based on 24hr clock (Noon = 90 deg down, Midnight = -90 deg up)
                 float sunAngle = ((TimeOfDayHours / 24f) * 360f) - 90f;
-                directionalSun.transform.rotation = Quaternion.Euler(sunAngle, -30f, 0f);
+                directionalSun.transform.rotation = Quaternion.Euler(IsNight ? sunAngle + 180f : sunAngle, -30f, 0f);
 
                 if (IsNight)
                 {
                     // Moonlight
                     directionalSun.color = Color.Lerp(directionalSun.color, new Color(0.25f, 0.35f, 0.65f), Time.deltaTime * 2f);
-                    directionalSun.intensity = Mathf.Lerp(directionalSun.intensity, 0.25f, Time.deltaTime * 2f);
+                    directionalSun.intensity = Mathf.Lerp(directionalSun.intensity, .45f, Time.deltaTime * 2f);
                 }
                 else
                 {
@@ -217,7 +218,7 @@ namespace Riftbound
                                    (CurrentWeather == WeatherType.Sandstorm) ? new Color(0.9f, 0.7f, 0.4f) :
                                    new Color(1f, 0.95f, 0.85f);
                     directionalSun.color = Color.Lerp(directionalSun.color, daySun, Time.deltaTime * 2f);
-                    directionalSun.intensity = Mathf.Lerp(directionalSun.intensity, 1.15f, Time.deltaTime * 2f);
+                    directionalSun.intensity = Mathf.Lerp(directionalSun.intensity, CurrentWeather == WeatherType.Storm ? .85f : 1.65f, Time.deltaTime * 2f);
                 }
             }
         }

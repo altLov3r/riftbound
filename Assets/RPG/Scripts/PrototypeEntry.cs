@@ -8,9 +8,12 @@ namespace Riftbound
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         static void OpenCurrentAdventure()
         {
-            if (SceneManager.GetActiveScene().name != "Outpost") return;
+            string scene = SceneManager.GetActiveScene().name;
+            if (scene != "Outpost" && scene != "Outpost-Updated") return;
             var player = Object.FindFirstObjectByType<PlayerController>();
-            if (player && Application.CanStreamedLevelBeLoaded("Outpost-Updated"))
+            if (player && Application.CanStreamedLevelBeLoaded("Outpost-Expanded"))
+                SceneManager.LoadScene("Outpost-Expanded");
+            else if (scene == "Outpost" && player && Application.CanStreamedLevelBeLoaded("Outpost-Updated"))
                 SceneManager.LoadScene("Outpost-Updated");
         }
     }

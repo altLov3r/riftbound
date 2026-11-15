@@ -33,9 +33,9 @@ namespace Riftbound
                 case "Dwarf":
                     return new RacialProfile
                     {
-                        height = 1.40f,
-                        bodyScale = new Vector3(1.24f, 0.74f, 1.24f),
-                        skinTint = new Color(1.0f, 0.92f, 0.85f),
+                        height = 1.42f,
+                        bodyScale = new Vector3(1.32f, 0.75f, 1.30f),
+                        skinTint = Color.white,
                         controllerHeight = 1.50f,
                         controllerRadius = 0.44f,
                         controllerCenter = new Vector3(0f, 0.75f, 0f),
@@ -46,22 +46,22 @@ namespace Riftbound
                 case "High Elf":
                     return new RacialProfile
                     {
-                        height = 1.86f,
-                        bodyScale = new Vector3(0.90f, 1.02f, 0.90f),
-                        skinTint = new Color(0.96f, 0.98f, 1.04f),
-                        controllerHeight = 1.95f,
-                        controllerRadius = 0.45f,
-                        controllerCenter = new Vector3(0f, 0.98f, 0f),
-                        walkStride = 1.50f,
-                        runStride = 2.85f
+                        height = 1.92f,
+                        bodyScale = new Vector3(0.88f, 1.05f, 0.88f),
+                        skinTint = Color.white,
+                        controllerHeight = 1.98f,
+                        controllerRadius = 0.44f,
+                        controllerCenter = new Vector3(0f, 0.99f, 0f),
+                        walkStride = 1.52f,
+                        runStride = 2.88f
                     };
                 case "Orc":
                 case "Brute":
                     return new RacialProfile
                     {
                         height = 2.08f,
-                        bodyScale = new Vector3(1.18f, 1.08f, 1.18f),
-                        skinTint = new Color(0.68f, 0.88f, 0.60f),
+                        bodyScale = new Vector3(1.22f, 1.08f, 1.20f),
+                        skinTint = Color.white,
                         controllerHeight = 2.20f,
                         controllerRadius = 0.55f,
                         controllerCenter = new Vector3(0f, 1.10f, 0f),
@@ -72,8 +72,8 @@ namespace Riftbound
                     return new RacialProfile
                     {
                         height = 1.80f,
-                        bodyScale = new Vector3(0.92f, 0.96f, 0.92f),
-                        skinTint = new Color(0.75f, 0.80f, 0.78f),
+                        bodyScale = new Vector3(0.94f, 0.98f, 0.94f),
+                        skinTint = Color.white,
                         controllerHeight = 1.90f,
                         controllerRadius = 0.45f,
                         controllerCenter = new Vector3(0f, 0.95f, 0f),
@@ -84,10 +84,10 @@ namespace Riftbound
                     return new RacialProfile
                     {
                         height = 1.32f,
-                        bodyScale = new Vector3(0.74f, 0.70f, 0.74f),
-                        skinTint = new Color(0.55f, 0.90f, 0.45f),
+                        bodyScale = new Vector3(1.04f, 0.72f, 1.02f),
+                        skinTint = Color.white,
                         controllerHeight = 1.40f,
-                        controllerRadius = 0.40f,
+                        controllerRadius = 0.38f,
                         controllerCenter = new Vector3(0f, 0.70f, 0f),
                         walkStride = 1.20f,
                         runStride = 2.35f
@@ -178,7 +178,7 @@ namespace Riftbound
             var instance = UnityEngine.Object.Instantiate(template, parent);
             instance.name = $"{race}_{characterClass}_Visual";
             instance.transform.localPosition = Vector3.zero;
-            instance.transform.localRotation = Quaternion.identity;
+            instance.transform.localRotation = template.transform.localRotation;
 
             // Apply body scale if instance is an archetype rather than a prebaked combination
             if (!template.name.StartsWith($"{race}_{characterClass}"))
@@ -255,7 +255,7 @@ namespace Riftbound
             var visual = CreateVisualInstance(race, characterClass, previewParent, isPreview: true);
             if (!visual) return null;
 
-            visual.transform.SetPositionAndRotation(new Vector3(0f, -500f, 0f), Quaternion.Euler(0f, yaw, 0f));
+            visual.transform.SetPositionAndRotation(new Vector3(0f, -500f, 0f), Quaternion.Euler(0f, yaw, 0f) * visual.transform.localRotation);
 
             var anim = visual.GetComponentInChildren<Animator>();
             if (anim)
@@ -311,7 +311,6 @@ namespace Riftbound
 
             newVisual.name = "Player_ActiveVisual";
             newVisual.transform.localPosition = Vector3.zero;
-            newVisual.transform.localRotation = Quaternion.identity;
 
             // 3. Connect and configure Animator (preserve prefab's rig-matched controller)
             var anim = newVisual.GetComponentInChildren<Animator>();
@@ -341,7 +340,7 @@ namespace Riftbound
 
                 // Sync GroundedVisual if attached
                 var gv = player.GetComponent<GroundedVisual>();
-                if (gv) gv.animator = anim;
+                if (gv) gv.BindAnimator(anim);
             }
 
             // 4. Update CharacterController to racial proportions

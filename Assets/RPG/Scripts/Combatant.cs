@@ -10,6 +10,7 @@ namespace Riftbound
         public bool isPlayer;
         public float flatDamageReduction;
         [System.NonSerialized] public float incomingDamageMultiplier = 1;
+        [System.NonSerialized] public float invulnerableUntil;
         public float Health { get; private set; }
         public bool Alive => Health > 0;
         public event Action<Combatant> Died;
@@ -20,10 +21,16 @@ namespace Riftbound
         public void Damage(float amount)
         {
             if (!Alive || amount <= 0) return;
+            if (Time.time < invulnerableUntil)
+            {
+                CombatTextManager.Spawn(transform.position + Vector3.up * 1.9f, "DODGED!", new Color(0.45f, 0.92f, 1f), true);
+                return;
+            }
             amount = Mathf.Max(1, (amount - flatDamageReduction) * Mathf.Clamp01(incomingDamageMultiplier));
             float previous = Health;
             Health = Mathf.Max(0, Health - amount);
             LastHit = Time.time;
+            if (isPlayer && previous > Health) OrbitCamera.Shake(0.11f, 0.1f);
             Damaged?.Invoke(previous - Health);
             if (!Alive) Died?.Invoke(this);
         }
@@ -43,6 +50,13 @@ namespace Riftbound
         {
             maxHealth = Mathf.Max(1, maximum); flatDamageReduction = Mathf.Max(0, reduction);
             Health = Mathf.Min(Health, maxHealth);
+        }
+        public void SetReplicatedHealth(float hp, float maxHp)
+        {
+            bool wasAlive = Alive;
+            maxHealth = Mathf.Max(1f, maxHp);
+            Health = Mathf.Clamp(hp, 0f, maxHealth);
+            if (wasAlive && !Alive) Died?.Invoke(this);
         }
     }
 }

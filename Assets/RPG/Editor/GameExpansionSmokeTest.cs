@@ -9,6 +9,26 @@ namespace Riftbound.Editor
 {
     public static class GameExpansionSmokeTest
     {
+        public static void BatchRunAllTests()
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(UnityEditor.SceneManagement.EditorSceneManager.GetActiveScene().path))
+                {
+                    string target = File.Exists(WorldRegions.ScenePath) ? WorldRegions.ScenePath : "Assets/RPG/Scenes/Outpost-Updated.unity";
+                    UnityEditor.SceneManagement.EditorSceneManager.OpenScene(target);
+                }
+                RunAllTestsInternal();
+                string result = File.Exists("GameExpansionTestResult.txt") ? File.ReadAllText("GameExpansionTestResult.txt") : "";
+                EditorApplication.Exit(result.Contains("RESULT: ALL TESTS PASSED!") ? 0 : 1);
+            }
+            catch (Exception ex)
+            {
+                File.WriteAllText("GameExpansionTestResult.txt", "BATCH TEST CRASH: " + ex);
+                EditorApplication.Exit(1);
+            }
+        }
+
         [MenuItem("Riftbound/🧪 Run Comprehensive Expansion Test Suite", priority = 10)]
         public static void RunAllTests()
         {
@@ -1328,6 +1348,81 @@ namespace Riftbound.Editor
                         FlightMaster.CloseActiveTaxiWindow();
                         Assert(!FlightMaster.IsAnyTaxiMapOpen, "FlightMaster CloseActiveTaxiWindow Safe Dismissal");
                     }
+
+                    // Faction Quest System Tests
+                    FactionQuestSystem.EnsureSystem(player);
+                    var fqs = FactionQuestSystem.Instance;
+                    Assert(fqs != null, "FactionQuestSystem Instance Available");
+                    var cullDef = FactionQuestSystem.GetQuest("bloodrock_cull");
+                    Assert(cullDef != null && cullDef.requiredCount == 3, "Bloodrock Vanguard Quest Definition in Catalog");
+
+                    string priorRace = player.CharacterRace;
+                    player.CharacterRace = "Brute";
+                    Assert(fqs.HasAvailableQuest("Warlord Gorgash", player), "Warlord Gorgash Offers Quest to Horde Player");
+                    fqs.AcceptQuest(cullDef, player);
+                    Assert(fqs.ActiveQuestId == "bloodrock_cull", "Faction Quest Accepted State");
+                    Assert(!fqs.IsActiveQuestReady(), "New Quest Not Ready Initially");
+
+                    var dummyOrcGO = new GameObject("Test Crag Orc");
+                    var dummyOrc = dummyOrcGO.AddComponent<EnemyController>();
+                    dummyOrc.enemyId = "redridge-orc-sentry";
+                    fqs.OnEnemyDefeated(dummyOrc);
+                    Assert(fqs.CurrentProgress == 1, "Enemy Defeat Increments Faction Quest Progress");
+                    fqs.OnEnemyDefeated(dummyOrc);
+                    fqs.OnEnemyDefeated(dummyOrc);
+                    Assert(fqs.IsActiveQuestReady(), "Target Count Reached Completes Objective");
+
+                    int preGold = player.Gold;
+                    fqs.CompleteQuest(player);
+                    Assert(player.Gold >= preGold + 35, "Faction Quest Completion Grants Gold Reward");
+                    Assert(fqs.IsQuestCompleted("bloodrock_cull"), "Completed Faction Quest Persists in History");
+                    Assert(string.IsNullOrEmpty(fqs.ActiveQuestId), "Active Quest Cleared On Hand-in");
+                    UnityEngine.Object.DestroyImmediate(dummyOrcGO);
+                    player.CharacterRace = priorRace;
+
+                    // Multi-Zone Campaign & Boundary Progression Tests
+                    var calderaQ = FactionQuestSystem.GetQuest("gorkresh_caldera_threat");
+                    var apexHordeQ = FactionQuestSystem.GetQuest("gorkresh_apex_clash");
+                    Assert(calderaQ != null && calderaQ.zone == "Redridge Volcanic Crater", "Horde Multi-Zone Caldera Quest Registered");
+                    Assert(apexHordeQ != null && apexHordeQ.zone == "Wyrmcrest Summit", "Horde Apex Dragon Quest Registered");
+
+                    var highspireQ = FactionQuestSystem.GetQuest("alliance_highspire_dispatch");
+                    var duskwoodQ = FactionQuestSystem.GetQuest("highspire_duskwood_recon");
+                    var cryptsQ = FactionQuestSystem.GetQuest("duskwood_crypt_purge");
+                    var apexAllianceQ = FactionQuestSystem.GetQuest("alliance_wyrmcrest_summit");
+                    Assert(highspireQ != null && highspireQ.giverNpc == "Abe", "Alliance Highspire Dispatch Chain Linked to Abe");
+                    Assert(duskwoodQ != null && duskwoodQ.zone == "Duskwood Cathedral", "Alliance Duskwood Recon Quest Registered");
+                    Assert(cryptsQ != null && cryptsQ.zone == "The Scarlet Crypts", "Alliance Scarlet Crypts Purge Registered");
+                    Assert(apexAllianceQ != null && apexAllianceQ.zone == "Wyrmcrest Summit", "Alliance Wyrmcrest Dragon Summit Registered");
+
+                    // Zone Boundary & Sub-Zone Detection Tests
+                    Assert(WorldRegions.ZoneName(new Vector3(-200f, 12f, -60f)) == "Highspire Keep", "Highspire Keep Zone Geofence");
+                    Assert(WorldRegions.ZoneName(new Vector3(-220f, 18f, 260f)) == "Duskwood Cathedral", "Duskwood Cathedral Zone Geofence");
+                    Assert(WorldRegions.ZoneName(new Vector3(250f, 75f, 510f)) == "Wyrmcrest Summit", "Wyrmcrest Summit Zone Geofence");
+                    Assert(WorldRegions.ZoneName(new Vector3(-150f, 15f, 75f)) == "Silverglen Sanctum", "Silverglen Sanctum Starter Village Geofence");
+                    Assert(WorldRegions.ZoneName(new Vector3(240f, 14f, 150f)) == "Rustwater Scrapworks", "Rustwater Scrapworks Starter Village Geofence");
+                    Assert(ZoneManager.GetSubZoneName(new Vector3(-200f, 12f, -60f)) == "Alliance Territory", "Alliance Territory SubZone Tag");
+                    Assert(ZoneManager.GetSubZoneName(new Vector3(340f, 25f, 290f)) == "Horde Territory", "Horde Territory SubZone Tag");
+                    Assert(ZoneManager.GetSubZoneName(new Vector3(250f, 75f, 510f)).Contains("Dragon Territory"), "Dragon Territory SubZone Tag");
+
+                    // All 6 Racial Starter-to-Capital Breadcrumb Questline Tests
+                    Assert(FactionQuestSystem.GetQuest("emberwatch_to_highspire")?.targetId == "Grand Duke Ronald", "Human Starter Breadcrumb -> Highspire Keep");
+                    Assert(FactionQuestSystem.GetQuest("frostpeak_to_highspire")?.targetId == "Grand Duke Ronald", "Dwarf Starter Breadcrumb -> Highspire Keep");
+                    Assert(FactionQuestSystem.GetQuest("silverglen_to_highspire")?.targetId == "Grand Duke Ronald", "High Elf Starter Breadcrumb -> Highspire Keep");
+                    Assert(FactionQuestSystem.GetQuest("bloodrock_stronghold")?.targetId == "Overlord Mor'gok", "Orc Starter Breadcrumb -> Gor'Kresh Stronghold");
+                    Assert(FactionQuestSystem.GetQuest("deathknell_to_gorkresh")?.targetId == "Overlord Mor'gok", "Undead Starter Breadcrumb -> Gor'Kresh Stronghold");
+                    Assert(FactionQuestSystem.GetQuest("rustwater_to_gorkresh")?.targetId == "Overlord Mor'gok", "Goblin Starter Breadcrumb -> Gor'Kresh Stronghold");
+                    Assert(FactionQuestSystem.GetQuest("frostpeak_troggs")?.giverNpc == "Thane Baelor Ironbeard", "Dwarf Starter Quest Linked to Thane Baelor Ironbeard");
+
+                    // Racial Anatomy & Unified Stylized Texture Assertions
+                    var orcMageSpec = StylizedRacialModelSystem.GetPlayableSpec("Orc", "Mage");
+                    Assert(orcMageSpec.fbxPath.Contains("Crag_Orc"), "Orc_Mage Uses Authentic Muscular Orc Body");
+                    var undeadPalSpec = StylizedRacialModelSystem.GetPlayableSpec("Undead", "Paladin");
+                    Assert(undeadPalSpec.fbxPath.Contains("Skeleton_Warrior"), "Undead_Paladin Uses Authentic Forsaken Undead Body");
+
+                    var elfPrefab = Resources.Load<GameObject>("Characters/Elf_Mage");
+                    if (elfPrefab)
+                        Assert(elfPrefab.GetComponentsInChildren<Transform>(true).Length > 10, "Elf_Mage Prefab Hierarchy Validated");
                 }
 
                 // Summary

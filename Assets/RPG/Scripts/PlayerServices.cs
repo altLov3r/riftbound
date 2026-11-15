@@ -48,10 +48,13 @@ namespace Riftbound
             if (Time.time < busyUntil || Blocking) return;
             if (LootDropSystem.Instance)
             {
-                var corpse = LootDropSystem.Instance.GetNearbyCorpse(transform.position, 3.2f);
+                var corpse = LootDropSystem.Instance.GetNearbyCorpse(transform.position, 3.5f);
                 if (corpse != null)
                 {
-                    LootDropSystem.Instance.OpenLoot(corpse);
+                    if (LootDropSystem.Instance.CurrentLooting != null)
+                        LootDropSystem.Instance.LootAll(LootDropSystem.Instance.CurrentLooting);
+                    else
+                        LootDropSystem.Instance.LootAll(corpse);
                     return;
                 }
             }
@@ -113,27 +116,62 @@ namespace Riftbound
         public bool HasOpenedChest(string id) => openedChests.Contains(id);
         public bool OpenChest(LootChest chest)
         {
+            if (chest && chest.chestId == RiverReaverCamp.CacheId && !HasDefeated(RiverReaverCamp.CaptainId))
+            { Message = "Defeat Captain Selvek at the River Reaver camp to unlock this lockbox."; return false; }
             if (chest && chest.requiresCaptainDefeated && !BossDefeated) { Message = "Defeat the captain to unlock this cache."; return false; }
             if (chest && chest.requiresWardenDefeated && !HasDefeated("crypt-warden")) { Message = "Defeat the Crypt Warden to unlock the reliquary."; return false; }
-            if (!chest || !Stats.Alive || FrontendMenu.IsOpen || DialogueOpen || ShopOpen || MapOpen || JournalOpen || (orbit && orbit.Paused) || Vector3.Distance(transform.position, chest.transform.position) >= 3 || string.IsNullOrEmpty(chest.chestId) || !openedChests.Add(chest.chestId)) return false;
+            if (!chest || !Stats.Alive || FrontendMenu.IsOpen || DialogueOpen || ShopOpen || MapOpen || JournalOpen || (orbit && orbit.Paused) || Vector3.Distance(transform.position, chest.transform.position) >= 3 || string.IsNullOrEmpty(chest.chestId) || HasOpenedChest(chest.chestId)) return false;
+            if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner != null)
+            {
+                if (!Network.RiftboundCoopPlayer.LocalOwner.RequestOpenChestServerValidated(chest)) return false;
+            }
+            return ApplyAuthorizedChestOpen(chest);
+        }
+
+        public bool ApplyAuthorizedChestOpen(LootChest chest)
+        {
+            if (!chest || string.IsNullOrEmpty(chest.chestId) || !openedChests.Add(chest.chestId)) return false;
             Gold += chest.gold; Potions = Mathf.Min(10, Potions + 1); AddExperience(chest.experience);
             string item = ChestItem(chest.chestId);
             Message = $"Cache recovered: {chest.gold} gold, {chest.experience} XP." + (item.Length > 0 ? " New item: " + item + " [I]" : ""); SaveAdventure(false); return true;
         }
+        public void SetAuthoritativeGold(int value) => Gold = Mathf.Max(0, value);
         public void BuyPotion()
         {
             if (!CanTrade() || InCombat() || Gold < 10 || Potions >= 10) return;
+            if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner != null)
+            {
+                Network.RiftboundCoopPlayer.LocalOwner.RequestTransaction("buy_potion");
+                return;
+            }
             Gold -= 10; Potions++; Message = "Purchased a health potion."; SaveAdventure(false);
         }
         public void TemperWeapon()
         {
             if (!CanTrade() || InCombat() || Gold < 45 || TemperedWeapon) return;
+            if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner != null)
+            {
+                Network.RiftboundCoopPlayer.LocalOwner.RequestTransaction("temper_weapon");
+                return;
+            }
             Gold -= 45; TemperedWeapon = true; Message = "Weapon tempered: +4 damage."; SaveAdventure(false);
         }
         public void RestAtMerchant()
         {
             if (!CanTrade() || InCombat() || Gold < 5 || Stats.Health >= Stats.maxHealth) return;
+            if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner != null)
+            {
+                Network.RiftboundCoopPlayer.LocalOwner.RequestTransaction("rest");
+                return;
+            }
             Gold -= 5; Stats.Heal(Stats.maxHealth); Message = "Rested at Emberwatch."; SaveAdventure(false);
+        }
+        public void ApplyAuthorizedTransaction(string txId, int newGold)
+        {
+            Gold = Mathf.Max(0, newGold);
+            if (txId == "buy_potion") { Potions = Mathf.Min(10, Potions + 1); Message = "Purchased a health potion."; }
+            else if (txId == "temper_weapon") { TemperedWeapon = true; Message = "Weapon tempered: +4 damage."; }
+            else if (txId == "rest") { Stats.Heal(Stats.maxHealth); Message = "Rested at Emberwatch."; }
         }
     }
 }

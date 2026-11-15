@@ -23,7 +23,17 @@ namespace Riftbound
             public int costGold;
         }
 
-        public static readonly FlightPathDestination[] WorldFlightNodes = new FlightPathDestination[]
+        public static FlightPathDestination[] WorldFlightNodes => WorldRegions.Expanded ? ExpandedFlightNodes : LegacyFlightNodes;
+        static readonly FlightPathDestination[] ExpandedFlightNodes = {
+            new FlightPathDestination { name = "Highspire Keep", zone = "Highspire Keep", faction = "Alliance", targetPos = WorldRegions.Highspire, costGold = 5 },
+            new FlightPathDestination { name = "Emberwatch Outpost", zone = "Amber Vale", faction = "Alliance", targetPos = new Vector3(2, .5f, 10), costGold = 0 },
+            new FlightPathDestination { name = "Duskwood Cathedral Grounds", zone = "Duskwood", faction = "Neutral", targetPos = WorldRegions.Cathedral + new Vector3(5, 0, -10), costGold = 5 },
+            new FlightPathDestination { name = "Camp Bloodrock", zone = "Redridge Canyons", faction = "Horde", targetPos = WorldRegions.Bloodrock + new Vector3(-5, 0, -5), costGold = 5 },
+            new FlightPathDestination { name = "Gor'Kresh Stronghold", zone = "Gor'Kresh", faction = "Horde", targetPos = WorldRegions.Stronghold, costGold = 5 },
+            new FlightPathDestination { name = "Wyrmcrest Summit", zone = "Ironfang Peaks", faction = "Neutral", targetPos = WorldRegions.Summit + new Vector3(0, 1, -10), costGold = 10 },
+            new FlightPathDestination { name = "Greenhollow Post", zone = "Greenhollow Valley", faction = "Neutral", targetPos = WorldRegions.Greenhollow + new Vector3(5, 0, -8), costGold = 5 }
+        };
+        static readonly FlightPathDestination[] LegacyFlightNodes = new FlightPathDestination[]
         {
             new FlightPathDestination { name = "Highspire Keep (Alliance Capital)", zone = "Highspire Keep", faction = "Alliance", targetPos = new Vector3(-45f, 1.2f, -20f), costGold = 5 },
             new FlightPathDestination { name = "Emberwatch Outpost", zone = "Amber Vale", faction = "Alliance", targetPos = new Vector3(2f, 0.5f, 10f), costGold = 0 },
@@ -123,7 +133,7 @@ namespace Riftbound
             }
 
             if (dest.costGold > 0)
-                player.AddGoldDirect(-dest.costGold);
+                if (!player.SpendGoldDirect(dest.costGold)) return;
 
             CloseTaxiWindow();
             StartCoroutine(FlightTaxiRoutine(dest));
@@ -147,7 +157,7 @@ namespace Riftbound
             Vector3 endPos = PlayerController.ClampAboveGround(dest.targetPos, 0.35f);
             Vector3 midPoint = (startPos + endPos) / 2f + Vector3.up * 45f; // soaring flight arc
 
-            float duration = Mathf.Clamp(Vector3.Distance(startPos, endPos) / 14f, 4.5f, 10f);
+            float duration = Mathf.Clamp(Vector3.Distance(startPos, endPos) / 24f, 4.5f, 32f);
             float elapsed = 0f;
 
             CastBarSystem.StartCast($"Flying to {dest.name}...", duration, null, false, false);

@@ -14,6 +14,8 @@ namespace Riftbound
         AudioSource musicSourceA;
         AudioSource musicSourceB;
         AudioSource combatPercussionSource;
+        AudioSource ambienceSource;
+        AudioClip windClip;
 
         AudioClip clipAmberVale;
         AudioClip clipBloodrock;
@@ -30,6 +32,9 @@ namespace Riftbound
         float masterVolume = 0.35f;
         bool crossfading = false;
         float targetCombatVolume = 0f;
+        float nextCombatCheck;
+        bool combatActive, suspended;
+        float MusicLevel => masterVolume * .65f * (SettingsSystem.Instance ? SettingsSystem.Instance.musicVolume : .75f);
 
         public static float MasterMusicVolume
         {
@@ -39,7 +44,7 @@ namespace Riftbound
                 if (Instance)
                 {
                     Instance.masterVolume = Mathf.Clamp01(value);
-                    if (Instance.activeSource) Instance.activeSource.volume = Instance.masterVolume;
+                    if (Instance.activeSource && !Instance.crossfading) Instance.activeSource.volume = Instance.MusicLevel;
                 }
             }
         }
@@ -68,6 +73,16 @@ namespace Riftbound
             combatPercussionSource.playOnAwake = false;
             combatPercussionSource.spatialBlend = 0f;
             combatPercussionSource.volume = 0f;
+            ambienceSource = gameObject.AddComponent<AudioSource>();
+            ambienceSource.loop = true;
+            ambienceSource.playOnAwake = false;
+            ambienceSource.spatialBlend = 0;
+            ambienceSource.volume = 0;
+            foreach (var voice in new[] { musicSourceA, musicSourceB, combatPercussionSource, ambienceSource })
+            {
+                voice.dopplerLevel = 0;
+                voice.priority = 200;
+            }
 
             activeSource = musicSourceA;
             inactiveSource = musicSourceB;
@@ -83,28 +98,37 @@ namespace Riftbound
             if (combatPercussionSource && clipCombatRhythm)
             {
                 combatPercussionSource.clip = clipCombatRhythm;
-                combatPercussionSource.Play();
             }
+            ambienceSource.clip = windClip;
         }
 
         void Update()
         {
-            if (FrontendMenu.IsOpen)
+            if (FrontendMenu.IsOpen || Time.timeScale <= 0)
             {
-                if (activeSource.isPlaying) activeSource.Pause();
+                if (musicSourceA.isPlaying) musicSourceA.Pause();
+                if (musicSourceB.isPlaying) musicSourceB.Pause();
                 if (combatPercussionSource.isPlaying) combatPercussionSource.Pause();
+                if (ambienceSource.isPlaying) ambienceSource.Pause();
+                suspended = true;
                 return;
             }
 
-            if (!activeSource.isPlaying && activeSource.clip != null) activeSource.UnPause();
-            if (!combatPercussionSource.isPlaying && combatPercussionSource.clip != null) combatPercussionSource.UnPause();
+            if (suspended)
+            {
+                musicSourceA.UnPause(); musicSourceB.UnPause();
+                combatPercussionSource.UnPause(); ambienceSource.UnPause();
+                suspended = false;
+            }
 
             if (!player) player = FindFirstObjectByType<PlayerController>();
             if (!player) return;
+            if (!combatPercussionSource.isPlaying && combatPercussionSource.clip) combatPercussionSource.Play();
+            if (!ambienceSource.isPlaying && ambienceSource.clip) ambienceSource.Play();
 
             // Determine current mood from zone
             AmbienceMood mood = GetMoodForPosition(player.transform.position);
-            if (mood != currentMood)
+            if (mood != currentMood && !crossfading)
             {
                 currentMood = mood;
                 AudioClip nextClip = GetClipForMood(mood);
@@ -115,17 +139,26 @@ namespace Riftbound
             }
 
             // Combat tension percussion layer
-            bool inCombat = player.InCombat();
-            targetCombatVolume = inCombat ? (masterVolume * 0.75f) : 0f;
+            if (Time.time >= nextCombatCheck)
+            {
+                nextCombatCheck = Time.time + .3f;
+                combatActive = player.InCombat();
+            }
+            if (!crossfading) activeSource.volume = Mathf.MoveTowards(activeSource.volume, MusicLevel, Time.deltaTime * .3f);
+            float ambienceVolume = SettingsSystem.Instance ? SettingsSystem.Instance.ambienceVolume : .7f;
+            float environmentLevel = mood == AmbienceMood.DungeonCrypts ? .02f : .075f;
+            ambienceSource.volume = Mathf.MoveTowards(ambienceSource.volume, ambienceVolume * environmentLevel, Time.deltaTime * .08f);
+            targetCombatVolume = combatActive ? (MusicLevel * .32f) : 0f;
             combatPercussionSource.volume = Mathf.MoveTowards(combatPercussionSource.volume, targetCombatVolume, Time.deltaTime * 0.8f);
         }
 
         AmbienceMood GetMoodForPosition(Vector3 pos)
         {
             if (pos.y < -20f) return AmbienceMood.DungeonCrypts;
-            if (pos.y > 38f || (pos.z > 210f && Mathf.Abs(pos.x) < 25f && pos.y > 22f)) return AmbienceMood.Wyrmcrest;
-            if (pos.x > 35f && pos.z > 170f) return AmbienceMood.Bloodrock;
-            if (pos.x < -35f || pos.z > 130f) return AmbienceMood.Duskwood;
+            string zone = ZoneManager.GetZoneName(pos);
+            if (zone.IndexOf("Wyrmcrest", StringComparison.OrdinalIgnoreCase) >= 0) return AmbienceMood.Wyrmcrest;
+            if (zone.IndexOf("Bloodrock", StringComparison.OrdinalIgnoreCase) >= 0 || zone.IndexOf("Redridge", StringComparison.OrdinalIgnoreCase) >= 0) return AmbienceMood.Bloodrock;
+            if (zone.IndexOf("Duskwood", StringComparison.OrdinalIgnoreCase) >= 0 || zone.IndexOf("Deathknell", StringComparison.OrdinalIgnoreCase) >= 0) return AmbienceMood.Duskwood;
             return AmbienceMood.AmberVale;
         }
 
@@ -160,7 +193,7 @@ namespace Riftbound
                 float t = Mathf.Clamp01(elapsed / duration);
 
                 activeSource.volume = Mathf.Lerp(startVol, 0f, t);
-                inactiveSource.volume = Mathf.Lerp(0f, masterVolume, t);
+                inactiveSource.volume = Mathf.Lerp(0f, MusicLevel, t);
                 yield return null;
             }
 
@@ -179,23 +212,51 @@ namespace Riftbound
         {
             const int sampleRate = 22050;
 
-            // 1. Amber Vale: Peaceful pastoral acoustic chord loop (8.0 seconds, C major / Am / F / G)
-            clipAmberVale = GeneratePastoralLoop("Music_AmberVale", sampleRate, 8.0f);
+            // Longer loops keep zone changes gentle instead of repeating a short jingle.
+            clipAmberVale = GeneratePastoralLoop("Music_AmberVale", sampleRate, 16f);
 
             // 2. Camp Bloodrock: Low tribal war drone & heavy percussive heartbeat (6.0 seconds)
-            clipBloodrock = GenerateTribalLoop("Music_Bloodrock", sampleRate, 6.0f);
+            clipBloodrock = GenerateTribalLoop("Music_Bloodrock", sampleRate, 16f);
 
             // 3. Duskwood: Eerie gothic minor choir & resonant hollow bells (8.0 seconds, D minor)
-            clipDuskwood = GenerateGothicLoop("Music_Duskwood", sampleRate, 8.0f);
+            clipDuskwood = GenerateGothicLoop("Music_Duskwood", sampleRate, 20f);
 
             // 4. Wyrmcrest Summit: Howling high wind & heroic brass crescendos (8.0 seconds)
-            clipWyrmcrest = GenerateSummitLoop("Music_Wyrmcrest", sampleRate, 8.0f);
+            clipWyrmcrest = GenerateSummitLoop("Music_Wyrmcrest", sampleRate, 20f);
 
             // 5. Dungeon Crypts: Subterranean deep reverb stone echo (7.0 seconds)
-            clipDungeonCrypts = GenerateCryptLoop("Music_DungeonCrypts", sampleRate, 7.0f);
+            clipDungeonCrypts = GenerateCryptLoop("Music_DungeonCrypts", sampleRate, 14f);
 
             // 6. Combat Tension Rhythm: Fast 130 BPM marching battle drive (4.0 seconds)
-            clipCombatRhythm = GenerateCombatLoop("Music_CombatRhythm", sampleRate, 4.0f);
+            clipCombatRhythm = GenerateCombatLoop("Music_CombatRhythm", sampleRate, 16f * 60f / 130f);
+            windClip = GenerateWindLoop(sampleRate, 16f);
+        }
+
+        AudioClip GenerateWindLoop(int sampleRate, float duration)
+        {
+            var samples = new float[Mathf.CeilToInt(sampleRate * duration)];
+            var random = new System.Random(701);
+            float low = 0, body = 0;
+            for (int i = 0; i < samples.Length; i++)
+            {
+                float t = (float)i / sampleRate;
+                float noise = (float)random.NextDouble() * 2 - 1;
+                low = Mathf.Lerp(low, noise, .008f);
+                body = Mathf.Lerp(body, noise, .08f);
+                float gust = .6f + .25f * Mathf.Sin(2 * Mathf.PI * t / duration * 3);
+                float fade = Mathf.Min(1, Mathf.Min(t, duration - t) / .5f);
+                samples[i] = (low * 1.4f + body * .3f) * gust * fade;
+            }
+            var clip = AudioClip.Create("Soft environmental wind", samples.Length, 1, sampleRate, false);
+            clip.SetData(samples, 0);
+            return clip;
+        }
+
+        void OnDestroy()
+        {
+            foreach (var clip in new[] { clipAmberVale, clipBloodrock, clipDuskwood, clipWyrmcrest, clipDungeonCrypts, clipCombatRhythm, windClip })
+                if (clip) Destroy(clip);
+            if (Instance == this) Instance = null;
         }
 
         AudioClip GeneratePastoralLoop(string name, int sampleRate, float duration)

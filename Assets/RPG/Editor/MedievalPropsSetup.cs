@@ -430,23 +430,23 @@ namespace Riftbound.Editor
                 b2.transform.rotation = Quaternion.Euler(0, -20, 0);
             }
 
-            // 4. Tavern / House Exterior Props (x=-10, z=5 to 8)
+            // 4. Tavern / House Exterior Props (x=-12.2 against wall, z=3.5 to 8.5)
             if (benchPrefab)
             {
                 var bench1 = (GameObject)PrefabUtility.InstantiatePrefab(benchPrefab, root.transform);
-                bench1.transform.position = new Vector3(-7.5f, -0.11f, 6.5f);
+                bench1.transform.position = new Vector3(-12.2f, -0.11f, 6.5f);
                 bench1.transform.rotation = Quaternion.Euler(0, 90, 0);
 
                 var bench2 = (GameObject)PrefabUtility.InstantiatePrefab(benchPrefab, root.transform);
-                bench2.transform.position = new Vector3(-7.5f, -0.11f, 3.5f);
+                bench2.transform.position = new Vector3(-12.2f, -0.11f, 3.5f);
                 bench2.transform.rotation = Quaternion.Euler(0, 90, 0);
             }
             if (barrelPrefab)
             {
                 var tb1 = (GameObject)PrefabUtility.InstantiatePrefab(barrelPrefab, root.transform);
-                tb1.transform.position = new Vector3(-9.2f, -0.11f, 7.8f);
+                tb1.transform.position = new Vector3(-11.8f, -0.11f, 7.8f);
                 var tb2 = (GameObject)PrefabUtility.InstantiatePrefab(barrelPrefab, root.transform);
-                tb2.transform.position = new Vector3(-8.5f, -0.11f, 8.4f);
+                tb2.transform.position = new Vector3(-11.2f, -0.11f, 8.4f);
             }
 
             // 5. Greenhollow Post Props (around x=-25, z=160)

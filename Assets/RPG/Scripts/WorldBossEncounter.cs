@@ -32,6 +32,7 @@ namespace Riftbound
             }
             Instance = this;
             player = GetComponent<PlayerController>();
+            if (WorldRegions.Expanded) spawnPosition = WorldRegions.WorldBoss;
         }
 
         void Start()

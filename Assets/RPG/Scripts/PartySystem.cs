@@ -57,6 +57,7 @@ namespace Riftbound
 
         List<PartyMember> members = new List<PartyMember>();
         public IReadOnlyList<PartyMember> Members => members;
+        public bool IsCompanionMenuOpen { get; set; }
 
         static Dictionary<Combatant, RaidTargetMarker> markedUnits = new Dictionary<Combatant, RaidTargetMarker>();
 
@@ -87,7 +88,6 @@ namespace Riftbound
             Instance = this;
             player = GetComponent<PlayerController>();
 
-            SeedInitialParty();
         }
 
         void OnDestroy()
@@ -190,6 +190,7 @@ namespace Riftbound
                 var cbt = follower.AddComponent<Combatant>();
                 cbt.displayName = name;
                 cbt.ConfigureVitals(member.maxHealth, 2f);
+                cbt.Restore();
                 member.combatant = cbt;
 
                 var compAI = follower.AddComponent<CompanionAI>();
@@ -203,6 +204,7 @@ namespace Riftbound
 
         public void SpawnCompanion(string name, string cls, string role, Color col)
         {
+            if (members.Count >= 4 || members.Exists(m => m.name.Equals(name, StringComparison.OrdinalIgnoreCase))) return;
             AddPartyMemberInternal(name, cls, role, col);
             ChatSystem.LogSystem($"[{name}] has joined your party as [{role}].");
         }
@@ -473,16 +475,49 @@ namespace Riftbound
             DrawWorldSpaceRaidMarkers();
 
             // 2. Draw Target Frame Raid Marker & Flyout
-            DrawTargetMarkerWidget();
+            if (members.Count > 0 || MarkerFlyoutOpen) DrawTargetMarkerWidget();
 
             // 3. Draw Low-Profile Party Member Frames
             DrawPartyFrames();
+            if (IsCompanionMenuOpen) DrawCompanionMenu(screenW, screenH);
 
             // 4. Draw Ready Check Modal Dialog
             if (ReadyCheckActive)
             {
                 DrawReadyCheckModal(screenW, screenH);
             }
+        }
+
+        public void ToggleCompanionMenu() { IsCompanionMenuOpen = !IsCompanionMenuOpen; }
+        public void CloseCompanionMenu() { IsCompanionMenuOpen = false; }
+
+        void DrawCompanionMenu(float screenW, float screenH)
+        {
+            float x = (screenW - 480f) * .5f, y = (screenH - 350f) * .5f;
+            GUI.DrawTexture(new Rect(x, y, 480f, 350f), modalBgTex);
+            GUI.Label(new Rect(x + 20f, y + 16f, 420f, 30f), "COMPANIONS", modalTitleStyle);
+            GUI.Label(new Rect(x + 20f, y + 52f, 440f, 40f), "Adventure solo, or call allies when you need support.", modalBodyStyle);
+            string[] names = { "Valeria", "Darien", "Kelsey", "Vark" };
+            string[] classes = { "Priest", "Warrior", "Mage", "Rogue" };
+            string[] roles = { "Healer", "Tank", "DPS", "DPS" };
+            Color[] colors = { Color.white, new Color(.78f, .61f, .43f), new Color(.25f, .78f, .92f), new Color(1f, .96f, .41f) };
+            bool canChange = player && player.Stats && player.Stats.Alive && !player.InCombat();
+            for (int i = 0; i < names.Length; i++)
+            {
+                float rowY = y + 102f + i * 45f;
+                string memberName = names[i];
+                bool recruited = members.Exists(m => m.name == memberName);
+                GUI.Label(new Rect(x + 20f, rowY, 300f, 28f), names[i] + "  ·  " + roles[i], modalBodyStyle);
+                GUI.enabled = canChange;
+                if (GUI.Button(new Rect(x + 342f, rowY, 116f, 30f), recruited ? "Dismiss" : "Call ally", buttonStyle))
+                {
+                    if (recruited) KickMember(memberName);
+                    else SpawnCompanion(memberName, classes[i], roles[i], colors[i]);
+                }
+                GUI.enabled = true;
+            }
+            GUI.Label(new Rect(x + 20f, y + 286f, 300f, 22f), canChange ? "Allies reset at character selection." : "Leave combat to change companions.", smallStyle);
+            if (GUI.Button(new Rect(x + 342f, y + 305f, 116f, 28f), "Close", buttonStyle)) CloseCompanionMenu();
         }
 
         void DrawWorldSpaceRaidMarkers()

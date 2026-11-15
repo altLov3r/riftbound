@@ -26,7 +26,7 @@ namespace Riftbound
         bool weaponWasEnabled;
         Vector3 riderPosition, normalCenter, mountPosition;
         float normalHeight, normalRadius, mountStarted, mountHitTime;
-        public bool MountUnlocked(MountDefinition mount) => mount && (!mount.requiresExploration || LandmarksFound >= 3);
+        public bool MountUnlocked(MountDefinition mount) => mount && (!mount.requiresExploration || GreenhollowLandmarksFound == 3);
         bool MountWindowOpen => DialogueOpen || ShopOpen || MapOpen || JournalOpen || InventoryOpen;
         bool UpdateMounts(Keyboard keys)
         {
@@ -59,7 +59,7 @@ namespace Riftbound
                 var mount = mounts[(Mathf.Max(0, index) + i) % mounts.Length];
                 if (!MountUnlocked(mount)) continue;
                 SelectedMountId = mount.mountId;
-                Message = mount.mountId == "horse" && LandmarksFound < 3 ? "Emberwatch Horse selected. Scout all three Greenhollow landmarks to unlock the zebra." : "Mount selected: " + mount.displayName + ". [Z] Summon";
+                Message = mount.mountId == "horse" && GreenhollowLandmarksFound < 3 ? "Emberwatch Horse selected. Scout all three Greenhollow landmarks to unlock the zebra." : "Mount selected: " + mount.displayName + ". [Z] Summon";
                 SaveAdventure(false); return;
             }
         }
@@ -97,6 +97,9 @@ namespace Riftbound
             motor.height = 3.6f; motor.center = Vector3.up * 1.8f; motor.radius = .62f;
             foreach (var renderer in animator.GetComponentsInChildren<Renderer>()) if (renderer.name.ToLowerInvariant().Contains("axe")) { weaponRenderer = renderer; weaponWasEnabled = renderer.enabled; renderer.enabled = false; break; }
             animator.speed = 1; Play("Ride", true); moveVelocity = Vector3.zero;
+            SpellFX.CreateArcaneBurst(transform.position);
+            if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner != null)
+                Network.RiftboundCoopPlayer.LocalOwner.RequestSetMount(true, SelectedMountId);
             Message = SelectedMount.displayName + " / [Z] Dismount. Combat actions also dismount.";
         }
         public void ToggleMount()
@@ -116,6 +119,9 @@ namespace Riftbound
             if (animator) animator.transform.localPosition = riderPosition;
             if (weaponRenderer) weaponRenderer.enabled = weaponWasEnabled;
             weaponRenderer = null; riderHips = null; moveVelocity = Vector3.zero; if (animator) { animator.speed = 1; Play("Idle", true); }
+            if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner != null)
+                Network.RiftboundCoopPlayer.LocalOwner.RequestSetMount(false, SelectedMountId);
+            SpellFX.SpawnBurst(transform.position + Vector3.up * 0.4f, new Color(0.88f, 0.82f, 0.72f), new Color(0.6f, 0.55f, 0.48f), 12, 1.5f, 3.5f, 0.12f, 0.25f, 0.4f);
         }
         public void MountForFlightTaxi()
         {

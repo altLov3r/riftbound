@@ -44,6 +44,7 @@ namespace Riftbound
 
         public ChatTab CurrentTab { get; set; } = ChatTab.All;
         public bool InputActive { get; private set; }
+        public bool HistoryVisible { get; private set; }
         public string InputText { get; set; } = "";
 
         Vector2 scrollPos = Vector2.zero;
@@ -151,6 +152,7 @@ namespace Riftbound
 
         public void OpenChat()
         {
+            HistoryVisible = true;
             InputActive = true;
             focusRequested = true;
             if (player) player.ChatOpen = true;
@@ -161,6 +163,7 @@ namespace Riftbound
             InputActive = false;
             InputText = "";
             if (player) player.ChatOpen = false;
+            HistoryVisible = false;
         }
 
         public void SubmitChat()
@@ -169,6 +172,7 @@ namespace Riftbound
             InputActive = false;
             InputText = "";
             if (player) player.ChatOpen = false;
+            HistoryVisible = false;
 
             if (string.IsNullOrEmpty(raw)) return;
 
@@ -203,6 +207,12 @@ namespace Riftbound
                     case "party":
                         if (!string.IsNullOrEmpty(args))
                             AddMessage(Channel.Party, playerName, args, new Color(0.44f, 0.76f, 1.0f));
+                        else if (PartySystem.Instance) PartySystem.Instance.ToggleCompanionMenu();
+                        break;
+
+                    case "crew":
+                    case "companions":
+                        if (PartySystem.Instance) PartySystem.Instance.ToggleCompanionMenu();
                         break;
 
                     case "g":
@@ -520,6 +530,16 @@ namespace Riftbound
                         }
                         break;
 
+                    case "compass":
+                    case "minimap":
+                    case "radar":
+                        if (MinimapRadar.Instance)
+                        {
+                            MinimapRadar.Instance.showMinimap = !MinimapRadar.Instance.showMinimap;
+                            AddMessage(Channel.System, "HUD", $"Minimap Radar HUD: {(MinimapRadar.Instance.showMinimap ? "Enabled" : "Disabled")}", new Color(1f, 0.85f, 0.4f));
+                        }
+                        break;
+
                     case "calendar":
                     case "events":
                     case "cal":
@@ -755,10 +775,18 @@ namespace Riftbound
 
             InitStyles();
 
-            float chatW = 390f;
-            float chatH = 145f;
+            if (!HistoryVisible && !InputActive)
+            {
+                if (GUI.Button(new Rect(24f, screenH - 35f, 112f, 27f), "Chat [Enter]", tabStyle)) OpenChat();
+                return;
+            }
+
+            float chatW = 320f;
+            float chatH = 110f;
             float chatX = 24f;
-            float chatY = screenH - 335f;
+            float chatY = screenH - 235f;
+
+            if (GUI.Button(new Rect(chatX + chatW - 25f, chatY - 20f, 25f, 20f), "X", tabStyle)) CancelChat();
 
             // Chat frame background
             GUI.Box(new Rect(chatX, chatY, chatW, chatH), GUIContent.none, boxStyle);
@@ -830,6 +858,12 @@ namespace Riftbound
                     SubmitChat();
                 }
             }
+        }
+
+        public void ToggleHistory()
+        {
+            HistoryVisible = !HistoryVisible;
+            if (!HistoryVisible && InputActive) CancelChat();
         }
 
         List<ChatEntry> GetFilteredMessages()

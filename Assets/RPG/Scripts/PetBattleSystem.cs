@@ -148,23 +148,6 @@ namespace Riftbound
             SeedInitialPets();
         }
 
-        void Start()
-        {
-            if (petRoster.Count > 0 && ActiveCompanion == null)
-            {
-                var defaultPet = petRoster.Find(p => p.petId == "pet_wolf") ?? petRoster[0];
-                ActiveCompanion = defaultPet;
-                if (PetCompanionSystem.Instance != null)
-                {
-                    companionFollowerObj = PetCompanionSystem.Instance.SetCompanionFromBattlePet(defaultPet.petId, PetCompanionSystem.Instance.petName);
-                }
-                else
-                {
-                    CreateCompanionFollowerObject(defaultPet);
-                }
-            }
-        }
-
         void Update()
         {
             // Keyboard shortcut Shift+P or /pets to toggle pet journal

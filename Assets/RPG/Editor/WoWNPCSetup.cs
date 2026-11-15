@@ -42,6 +42,7 @@ namespace Riftbound.Editor
 
         static void TryAutoSetup()
         {
+            if (Application.isBatchMode || File.Exists(WorldRegions.ScenePath)) return;
             if (File.Exists(AutoMarkerFile)) return;
             if (EditorApplication.isCompiling || EditorApplication.isUpdating || EditorApplication.isPlayingOrWillChangePlaymode)
             {
@@ -579,7 +580,7 @@ namespace Riftbound.Editor
             cryptLandmark.landmarkId = "scarlet-crypts";
             cryptLandmark.displayName = "Scarlet Crypts (Cathedral Dungeon)";
 
-            var stoneMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/RPG/Materials/Village_Plaster.mat");
+            var stoneMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/RPG/Materials/Village_MI_Plaster.mat");
             var cryptArchL = GameObject.CreatePrimitive(PrimitiveType.Cube);
             cryptArchL.name = "Cathedral Arch Left Pillar";
             cryptArchL.transform.SetParent(cryptRoot.transform, false);
@@ -721,7 +722,7 @@ namespace Riftbound.Editor
             Vector3 origin = new Vector3(-400f, -40f, 200f);
             dungeonRoot.transform.position = origin;
 
-            var stoneMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/RPG/Materials/Village_Plaster.mat");
+            var stoneMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/RPG/Materials/Village_MI_Plaster.mat");
             var woodMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/RPG/Materials/Dark timber.mat");
 
             // 1. Grand Cathedral Floor (50m long x 20m wide)
@@ -900,7 +901,7 @@ namespace Riftbound.Editor
             landmark.landmarkId = "wyrmcrest-summit";
             landmark.displayName = "Wyrmcrest Summit (Apex Dragon Roost)";
 
-            var stoneMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/RPG/Materials/Village_Plaster.mat");
+            var stoneMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/RPG/Materials/Village_MI_Plaster.mat");
             var darkMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/RPG/Materials/Dark timber.mat");
 
             // Grand Summit Altar Platform

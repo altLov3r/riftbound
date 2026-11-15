@@ -79,6 +79,7 @@ namespace Riftbound
             if (!enemy || enemy.trainingDummy || string.IsNullOrEmpty(enemy.enemyId) || !defeatedEnemies.Add(enemy.enemyId)) return;
             if (enemy.IsMainQuestCaptain) BossDefeated = true;
             else if (enemy.IsRoadRaider) Kills++;
+            if (FactionQuestSystem.Instance) FactionQuestSystem.Instance.OnEnemyDefeated(enemy);
             int goldGain = enemy.isBoss ? 20 : enemy.campGuard ? 5 : 3;
             int expGain = enemy.isBoss ? 120 : enemy.campGuard ? 40 : 30;
             string enemyName = enemy.GetComponent<Combatant>()?.displayName ?? "enemy";
@@ -101,15 +102,21 @@ namespace Riftbound
             if (Level > previousLevel)
             {
                 if (Stats != null) Stats.Heal(Stats.maxHealth);
-                Message = $"â˜… LEVEL {Level}! Health and damage increased. [N] Talents";
+                SpellFX.CreateLevelUpBurst(transform.position);
+                ZoneBanner.Show($"LEVEL {Level}!", "Power Increased — Check Talents [N]");
+                Message = $"★ LEVEL {Level}! Health and damage increased. [N] Talents";
                 AudioEffects.PlayLevelUp();
                 ChatSystem.LogSystem($"Congratulations! You have reached Level {Level}!");
             }
         }
+        public void AddGold(int amount) { if (amount > 0) Gold += amount; }
         public void UsePotion()
         {
             if (!Stats.Alive || FrontendMenu.IsOpen || DialogueOpen || ShopOpen || MapOpen || JournalOpen || (orbit && orbit.Paused) || Potions <= 0 || Stats.Health >= Stats.maxHealth) return;
-            Potions--; Stats.Heal(70); Message = "Health potion: restored 70 HP."; SaveAdventure(false);
+            Potions--; Stats.Heal(70); Message = "Health potion: restored 70 HP.";
+            if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner != null)
+                Network.RiftboundCoopPlayer.LocalOwner.RequestUsePotion();
+            SaveAdventure(false);
         }
         public void RefreshAdventureWorld()
         {
@@ -141,10 +148,12 @@ namespace Riftbound
             public int[] talentRanksA;
             public int[] talentRanksB;
             public bool hasPosition;
+            public int worldRevision;
             public float posX, posY, posZ;
         }
         public bool SaveAdventure(bool notify = true)
         {
+            if (Network.CoopSessionConfig.IsMultiplayer) return false;
             try
             {
                 var data = new AdventureSave { questIndex = QuestIndex, accepted = QuestAccepted, kills = Kills, gold = Gold, experience = Experience, potions = Potions, bossDefeated = BossDefeated, weaponUpgraded = WeaponUpgraded, temperedWeapon = TemperedWeapon, enemies = new List<string>(defeatedEnemies).ToArray(), supplies = new List<string>(collectedSupplies).ToArray(), chests = new List<string>(openedChests).ToArray(), characterRace = CharacterRace, characterClass = CharacterClass };
@@ -152,6 +161,7 @@ namespace Riftbound
                 data.talentRanksA = tA;
                 data.talentRanksB = tB;
                 data.lootOnCorpses = true;
+                data.worldRevision = WorldRegions.Expanded ? 1 : 0;
                 data.corpses = LootDropSystem.Instance ? LootDropSystem.Instance.ExportCorpses() : null;
                 data.items = ownedItems.ToArray(); data.weapon = EquippedWeaponId; data.armor = EquippedArmorId; data.trinket = EquippedTrinketId; data.boneShards = BoneShards;
                 data.runes = new List<string>(discoveredRunes).ToArray();
@@ -201,6 +211,17 @@ namespace Riftbound
                     raw = CharacterFaction == "Horde" ? new Vector3(50f, 9.2f, 210f) : new Vector3(0f, 0.5f, 10f);
                     break;
             }
+            if (WorldRegions.Expanded)
+            {
+                switch (CharacterRace)
+                {
+                    case "Dwarf": raw = WorldRegions.Frostpeak; break;
+                    case "Elf": case "High Elf": raw = WorldRegions.Silverglen; break;
+                    case "Undead": raw = WorldRegions.Deathknell; break;
+                    case "Goblin": raw = WorldRegions.Rustwater; break;
+                    case "Orc": case "Brute": raw = WorldRegions.Bloodrock + new Vector3(-5, 0, -5); break;
+                }
+            }
             return ClampAboveGround(raw, 0.30f);
         }
 
@@ -208,7 +229,7 @@ namespace Riftbound
         {
             switch (race)
             {
-                case "Human": return "Amber Vale (Emberwatch Outpost)";
+                case "Human": return "Emberwatch Outpost";
                 case "Dwarf": return "Frostpeak Foothills (Dwarven Haven)";
                 case "Elf":
                 case "High Elf": return "Silverglen Sanctum (Elven Grove)";
@@ -245,8 +266,8 @@ namespace Riftbound
                 else transform.position = racialSpawn;
 
                 string zone = GetStartingZoneName(CharacterRace);
-                Message = $"Welcome to Azeboth, {CharacterName}! Your adventure begins in {zone}.";
-                ZoneBanner.Show(zone, $"{CharacterFaction} Starter â€” Level 1-6");
+                Message = $"Welcome, {CharacterName}. Your adventure begins in {zone}.";
+                ZoneBanner.Show(zone, $"{CharacterFaction} territory");
                 return;
             }
             try
@@ -282,7 +303,9 @@ namespace Riftbound
                 Vector3 targetPos;
                 if (data.hasPosition)
                 {
-                    targetPos = ClampAboveGround(new Vector3(data.posX, data.posY, data.posZ), 0.30f);
+                    var savedPosition = new Vector3(data.posX, data.posY, data.posZ);
+                    if (data.worldRevision < 1) savedPosition = WorldRegions.LegacyPosition(savedPosition, CharacterRace);
+                    targetPos = ClampAboveGround(savedPosition, 0.30f);
                 }
                 else if (CharacterFaction == "Horde" && Vector2.Distance(new Vector2(transform.position.x, transform.position.z), new Vector2(0f, -6f)) < 25f)
                 {
@@ -303,7 +326,14 @@ namespace Riftbound
 
                 TalentSystem.ImportRanks(this, data.talentRanksA, data.talentRanksB);
                 RestoreMountSelection(data.mount);
-                RestoreEquipment(data); Stats.Restore(); RefreshAdventureWorld();
+                RestoreEquipment(data); Stats.Restore();
+                foreach (var enemy in FindObjectsByType<EnemyController>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+                    if (!HasDefeated(enemy.enemyId)) enemy.ResetForLoad();
+                    else enemy.gameObject.SetActive(false);
+                RefreshAdventureWorld();
+                if (WorldRegions.Expanded && data.worldRevision < 1 && data.corpses != null)
+                    foreach (var corpse in data.corpses)
+                        if (corpse != null) corpse.position = ClampAboveGround(WorldRegions.LegacyPosition(corpse.position, CharacterRace));
                 if (LootDropSystem.Instance) LootDropSystem.Instance.RestoreCorpses(data.corpses);
                 string activeZone = ZoneManager.GetZoneName(transform.position);
                 Message = $"Welcome back to {activeZone}. " + QuestObjective;

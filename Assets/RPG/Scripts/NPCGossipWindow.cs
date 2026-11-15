@@ -105,6 +105,39 @@ namespace Riftbound
                 GUILayout.Label("Choose a topic of inquiry:", bodyStyle);
                 GUILayout.Space(6f);
 
+                var fqs = FactionQuestSystem.Instance;
+                if (fqs != null && fqs.HasActiveQuestToComplete(npc.npcName, player))
+                {
+                    var q = fqs.GetActiveQuest();
+                    var oldBg = GUI.backgroundColor;
+                    GUI.backgroundColor = new Color(0.35f, 0.95f, 0.45f);
+                    if (GUILayout.Button($"❓  \"I have completed the mission: [{q.title}] (Turn In)\"", optionStyle, GUILayout.Height(32f)))
+                    {
+                        gossipMenuState = 5;
+                        AudioEffects.PlayClick();
+                    }
+                    GUI.backgroundColor = oldBg;
+                    GUILayout.Space(6f);
+                }
+                else if (fqs != null && fqs.HasAvailableQuest(npc.npcName, player))
+                {
+                    var q = fqs.GetAvailableQuestForNPC(npc.npcName, player);
+                    var oldBg = GUI.backgroundColor;
+                    GUI.backgroundColor = new Color(1.0f, 0.85f, 0.25f);
+                    if (GUILayout.Button($"❗  \"I seek a task, commander: [{q.title}]\"", optionStyle, GUILayout.Height(32f)))
+                    {
+                        gossipMenuState = 4;
+                        AudioEffects.PlayClick();
+                    }
+                    GUI.backgroundColor = oldBg;
+                    GUILayout.Space(6f);
+                }
+                else if (fqs != null && fqs.GetActiveQuest() is var activeQ && activeQ != null && (string.Equals(activeQ.giverNpc, npc.npcName, StringComparison.OrdinalIgnoreCase) || string.Equals(activeQ.targetId, npc.npcName, StringComparison.OrdinalIgnoreCase)))
+                {
+                    GUILayout.Label($"<b>Active Mission:</b> {activeQ.title} ({fqs.CurrentProgress}/{activeQ.requiredCount} {activeQ.targetName})", feedbackStyle);
+                    GUILayout.Space(6f);
+                }
+
                 if (GUILayout.Button("💬 \"Tell me about this settlement.\"", optionStyle, GUILayout.Height(28f)))
                 {
                     gossipMenuState = 1;
@@ -248,15 +281,17 @@ namespace Riftbound
 
                 if (GUILayout.Button("⚔ The Scarlet Crypts Dungeon Portal", optionStyle, GUILayout.Height(28f)))
                 {
-                    MinimapRadar.SetWaypoint(new Vector3(-55f, 0f, 215f), "The Scarlet Crypts Portal");
-                    gossipFeedback = "✔ Waypoint pinned: Scarlet Crypts Portal (-55, 215)";
+                    Vector3 cryptPos = WorldRegions.Expanded ? WorldRegions.Cathedral : new Vector3(-55f, 0f, 215f);
+                    MinimapRadar.SetWaypoint(cryptPos, "The Scarlet Crypts Portal");
+                    gossipFeedback = $"✔ Waypoint pinned: Scarlet Crypts Portal ({cryptPos.x:F0}, {cryptPos.z:F0})";
                     gossipMenuState = 0;
                 }
 
                 if (GUILayout.Button("🌋 Mount Wyrmcrest Summit Dais", optionStyle, GUILayout.Height(28f)))
                 {
-                    MinimapRadar.SetWaypoint(new Vector3(0f, 48f, 225f), "Wyrmcrest Summit (Apex Dragon)");
-                    gossipFeedback = "✔ Waypoint pinned: Mount Wyrmcrest (0, 48, 225)";
+                    Vector3 summitPos = WorldRegions.Expanded ? WorldRegions.Summit : new Vector3(0f, 48f, 225f);
+                    MinimapRadar.SetWaypoint(summitPos, "Wyrmcrest Summit (Apex Dragon)");
+                    gossipFeedback = $"✔ Waypoint pinned: Mount Wyrmcrest ({summitPos.x:F0}, {summitPos.z:F0})";
                     gossipMenuState = 0;
                 }
 
@@ -277,6 +312,100 @@ namespace Riftbound
                 {
                     gossipMenuState = 0;
                     AudioEffects.PlayClick();
+                }
+            }
+            else if (gossipMenuState == 4)
+            {
+                // Quest Offer View
+                var fqsOffer = FactionQuestSystem.Instance;
+                var q = fqsOffer != null ? fqsOffer.GetAvailableQuestForNPC(npc.npcName, player) : null;
+                if (q != null)
+                {
+                    GUILayout.Label($"<b>MISSION: {q.title.ToUpperInvariant()}</b>", bodyStyle);
+                    GUILayout.Label($"<i>Zone: {q.zone}  •  Faction: {q.faction}</i>", subStyle);
+                    GUILayout.Space(8f);
+                    DrawParchmentDivider();
+                    GUILayout.Space(8f);
+
+                    GUILayout.Label(q.description, bodyStyle);
+                    GUILayout.Space(12f);
+
+                    GUILayout.Label($"<b>OBJECTIVE:</b>\n• {q.targetName}: 0 / {q.requiredCount}", bodyStyle);
+                    GUILayout.Space(8f);
+
+                    string rewardsText = $"<b>REWARDS:</b>\n• {q.rewardGold} Gold\n• {q.rewardXP} Experience";
+                    if (!string.IsNullOrEmpty(q.rewardItem))
+                    {
+                        var itemDef = ItemCatalog.Get(q.rewardItem);
+                        rewardsText += $"\n• Equipment: [{itemDef?.name ?? q.rewardItem}] ({itemDef?.Stats ?? ""})";
+                    }
+                    GUILayout.Label(rewardsText, bodyStyle);
+                    GUILayout.Space(14f);
+                    DrawParchmentDivider();
+                    GUILayout.Space(10f);
+
+                    var oldBg = GUI.backgroundColor;
+                    GUI.backgroundColor = new Color(1.0f, 0.85f, 0.25f);
+                    if (GUILayout.Button("✔  ACCEPT QUEST", optionStyle, GUILayout.Height(32f)))
+                    {
+                        fqsOffer.AcceptQuest(q, player);
+                        gossipFeedback = $"Quest Accepted: {q.title}!";
+                        gossipMenuState = 0;
+                    }
+                    GUI.backgroundColor = oldBg;
+                    GUILayout.Space(6f);
+
+                    if (GUILayout.Button("◄ Decline & Return", optionStyle, GUILayout.Height(28f)))
+                    {
+                        gossipMenuState = 0;
+                        AudioEffects.PlayClick();
+                    }
+                }
+                else
+                {
+                    gossipMenuState = 0;
+                }
+            }
+            else if (gossipMenuState == 5)
+            {
+                // Quest Turn-in View
+                var fqsTurnIn = FactionQuestSystem.Instance;
+                var q = fqsTurnIn != null ? fqsTurnIn.GetActiveQuest() : null;
+                if (q != null)
+                {
+                    GUILayout.Label($"<b>COMPLETE MISSION: {q.title.ToUpperInvariant()}</b>", bodyStyle);
+                    GUILayout.Label($"<i>Zone: {q.zone}</i>", subStyle);
+                    GUILayout.Space(8f);
+                    DrawParchmentDivider();
+                    GUILayout.Space(8f);
+
+                    GUILayout.Label("Outstanding work, warrior! You have broken our enemies' advance and brought glory to our faction. Take these spoils with our gratitude.", bodyStyle);
+                    GUILayout.Space(12f);
+
+                    string rewardsText = $"<b>REWARDS EARNED:</b>\n• +{q.rewardGold} Gold\n• +{q.rewardXP} Experience";
+                    if (!string.IsNullOrEmpty(q.rewardItem))
+                    {
+                        var itemDef = ItemCatalog.Get(q.rewardItem);
+                        rewardsText += $"\n• Equipment Reward: [{itemDef?.name ?? q.rewardItem}]";
+                    }
+                    GUILayout.Label(rewardsText, feedbackStyle);
+                    GUILayout.Space(14f);
+                    DrawParchmentDivider();
+                    GUILayout.Space(10f);
+
+                    var oldBg = GUI.backgroundColor;
+                    GUI.backgroundColor = new Color(0.35f, 0.95f, 0.45f);
+                    if (GUILayout.Button("★  COMPLETE QUEST & CLAIM REWARDS  ★", optionStyle, GUILayout.Height(34f)))
+                    {
+                        fqsTurnIn.CompleteQuest(player);
+                        gossipFeedback = $"Completed: {q.title}! (+{q.rewardGold} Gold, +{q.rewardXP} XP)";
+                        gossipMenuState = 0;
+                    }
+                    GUI.backgroundColor = oldBg;
+                }
+                else
+                {
+                    gossipMenuState = 0;
                 }
             }
 

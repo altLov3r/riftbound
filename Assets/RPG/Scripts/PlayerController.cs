@@ -40,6 +40,10 @@ namespace Riftbound
         string currentAnimation;
         LineRenderer targetRing;
         float sprintUntil;
+        TrailRenderer sprintTrail;
+        float dodgeReadyTime, dodgeEnds;
+        Vector3 dodgeDir;
+        public float DodgeCooldownRemaining => Mathf.Max(0f, dodgeReadyTime - Time.time);
         Vector3 moveVelocity;
         public float ClassResource { get; private set; } = 100f;
         public float MaxClassResource => CharacterClass == "Paladin" ? 5f : 100f;
@@ -88,6 +92,7 @@ namespace Riftbound
             if (!AchievementSystem.Instance && !GetComponent<AchievementSystem>()) gameObject.AddComponent<AchievementSystem>();
             if (!ReputationSystem.Instance && !GetComponent<ReputationSystem>()) gameObject.AddComponent<ReputationSystem>();
             if (!EncounterJournal.Instance && !GetComponent<EncounterJournal>()) gameObject.AddComponent<EncounterJournal>();
+            FactionQuestSystem.EnsureSystem(this);
             // Loading a character can publish zone notifications and use these services.
             var frontend = GetComponent<FrontendMenu>() ?? gameObject.AddComponent<FrontendMenu>();
             frontend.Initialize(this);
@@ -134,6 +139,14 @@ namespace Riftbound
             }
             var keys = Keyboard.current;
             if (keys == null || FrontendMenu.IsOpen || (orbit && orbit.Paused)) return;
+            if (PrototypeHUD.MenuOpen || (PartySystem.Instance && PartySystem.Instance.IsCompanionMenuOpen))
+            {
+                moveVelocity = Vector3.zero;
+                if (animator) animator.speed = 1;
+                Play(Mounted ? "Ride" : "Idle");
+                GravityOnly();
+                return;
+            }
             if (UpdateMounts(keys)) return;
             if (UpdateUtilities(keys)) return;
             if (keys.mKey.wasPressedThisFrame && Stats.Alive && !DialogueOpen && !ShopOpen && !ChatOpen && Time.time >= busyUntil) { MapOpen = !MapOpen; InventoryOpen = false; JournalOpen = false; TalentsOpen = false; ProfessionSystem.IsOpen = false; }
@@ -168,6 +181,15 @@ namespace Riftbound
             {
                 moveVelocity = Vector3.zero; Play(Mounted ? "Ride" : "Idle"); if (animator) animator.speed = 1;
                 GravityOnly();
+                if (keys.escapeKey.wasPressedThisFrame)
+                {
+                    if (ShopOpen) CloseShop();
+                    MapOpen = false; JournalOpen = false; EncounterJournalOpen = false;
+                    TalentsOpen = false; SpellbookOpen = false; AchievementOpen = false;
+                    ReputationOpen = false; ProfessionSystem.IsOpen = false;
+                    if (GuildSystem.Instance) GuildSystem.Instance.IsOpen = false;
+                    return;
+                }
                 if (ShopOpen && (!CanTrade() || keys.eKey.wasPressedThisFrame)) CloseShop();
                 return;
             }
@@ -178,7 +200,7 @@ namespace Riftbound
                 GravityOnly();
                 bool withinRange = (ActiveQuestGiver != null && CanTalk()) || 
                                    (ActiveTownNPC != null && Vector3.Distance(transform.position, ActiveTownNPC.transform.position) < 4.5f);
-                if (!withinRange || Stats.LastHit > dialogueOpenedAt || (Time.time > dialogueOpenedAt + 0.35f && keys.eKey.wasPressedThisFrame)) CloseDialogue();
+                if (keys.escapeKey.wasPressedThisFrame || !withinRange || Stats.LastHit > dialogueOpenedAt || (Time.time > dialogueOpenedAt + 0.35f && keys.eKey.wasPressedThisFrame)) CloseDialogue();
                 return;
             }
             if (!Stats.Alive)
@@ -187,20 +209,41 @@ namespace Riftbound
                 if (keys.rKey.wasPressedThisFrame) Respawn();
                 return;
             }
+            if (keys.escapeKey.wasPressedThisFrame)
+            {
+                if (InventoryOpen) InventoryOpen = false;
+                else if (CharacterSheetSystem.Instance && CharacterSheetSystem.Instance.IsOpen) CharacterSheetSystem.Instance.IsOpen = false;
+                else if (PrototypeHUD.MenuOpen) PrototypeHUD.MenuOpen = false;
+                else if (Target != null) Target = null;
+                else PrototypeHUD.MenuOpen = true;
+            }
             if (keys.tabKey.wasPressedThisFrame) SelectTarget();
-            if (keys.iKey.wasPressedThisFrame) InventoryOpen = !InventoryOpen;
+            if (keys.iKey.wasPressedThisFrame || keys.bKey.wasPressedThisFrame) InventoryOpen = !InventoryOpen;
             if (keys.f5Key.wasPressedThisFrame) SaveAdventure();
             if (keys.digit4Key.wasPressedThisFrame) UsePotion();
-            if (Target && (!Target.Alive || Vector3.Distance(transform.position, Target.transform.position) > 25)) Target = null;
+            if (Target && (!Target.Alive || Vector3.Distance(transform.position, Target.transform.position) > 28)) Target = null;
 
             var mouse = Mouse.current;
-            if (mouse != null && mouse.leftButton.wasPressedThisFrame && !DialogueOpen && !ShopOpen && !MapOpen && !JournalOpen && !InventoryOpen && Camera.main)
+            if (mouse != null && (mouse.leftButton.wasPressedThisFrame || mouse.rightButton.wasPressedThisFrame) && !DialogueOpen && !ShopOpen && !MapOpen && !JournalOpen && !InventoryOpen && Camera.main)
             {
                 var ray = Camera.main.ScreenPointToRay(mouse.position.ReadValue());
-                if (Physics.Raycast(ray, out var hit, 40f, ~(1 << 2), QueryTriggerInteraction.Ignore))
+                if (Physics.Raycast(ray, out var hit, 40f, ~(1 << 2), QueryTriggerInteraction.Collide))
                 {
+                    var lootTarget = hit.collider.GetComponentInParent<LootClickTarget>();
+                    if (lootTarget != null && lootTarget.corpse != null && LootDropSystem.Instance)
+                    {
+                        if (Vector3.Distance(transform.position, lootTarget.corpse.position) <= 4.5f)
+                        {
+                            LootDropSystem.Instance.LootAll(lootTarget.corpse);
+                            return;
+                        }
+                        else
+                        {
+                            Message = "Move closer to loot the remains.";
+                        }
+                    }
                     var combatant = hit.collider.GetComponentInParent<Combatant>();
-                    if (combatant && !combatant.isPlayer && combatant.Alive) Target = combatant;
+                    if (combatant && !combatant.isPlayer && combatant.Alive && mouse.leftButton.wasPressedThisFrame) Target = combatant;
                 }
             }
 
@@ -215,9 +258,10 @@ namespace Riftbound
             bool rightMouseSteering = orbit && orbit.IsSteering;
             bool bothMiceDown = orbit && orbit.BothMouseButtonsPressed;
 
+            bool qPressed = keys.qKey != null && keys.qKey.isPressed;
             bool forwardInput = keys.wKey.isPressed || keys.upArrowKey.isPressed || bothMiceDown;
             bool backInput = keys.sKey.isPressed || keys.downArrowKey.isPressed;
-            bool leftInput = keys.aKey.isPressed || keys.leftArrowKey.isPressed;
+            bool leftInput = keys.aKey.isPressed || keys.leftArrowKey.isPressed || (rightMouseSteering && qPressed);
             bool rightInput = keys.dKey.isPressed || keys.rightArrowKey.isPressed;
 
             bool isFlyingMount = Mounted && SelectedMount && SelectedMount.isFlying;
@@ -280,6 +324,8 @@ namespace Riftbound
             float speed = Mounted && SelectedMount ? (running ? SelectedMount.runSpeed : SelectedMount.walkSpeed) : running ? runSpeed : walkSpeed;
             if (CharacterRace == "Human") speed *= 1.10f;
             if (Time.time < sprintUntil) speed *= 1.65f;
+            speed *= WorldShrineSystem.GetSpeedMultiplier();
+            UpdateMotionTrail(Time.time < sprintUntil || Time.time < dodgeEnds || Mounted);
             if (isBackpedaling && !Mounted) speed *= backwardMultiplier;
 
             if (isFlyingMount)
@@ -314,12 +360,12 @@ namespace Riftbound
             var desiredVelocity = attacking ? Vector3.zero : moveDirection * speed;
 
             // In WoW: Instant acceleration/deceleration response (no sliding inertia)
-            moveVelocity = desiredVelocity;
+            moveVelocity = Time.time < dodgeEnds ? dodgeDir * 15.5f : desiredVelocity;
             if (Mounted && !MountPathClear(moveVelocity)) moveVelocity = Vector3.zero;
             if (motor && motor.enabled)
                 motor.Move((moveVelocity + Vector3.up * vertical) * Time.deltaTime);
             EnsureAboveTerrain(isFlyingMount);
-            if (transform.position.x > -200f && transform.position.y < -10) Respawn();
+            if (transform.position.y < -10 && !WorldRegions.Underground(transform.position)) Respawn();
 
             var planarVelocity = motor.velocity; planarVelocity.y = 0;
             float actualSpeed = planarVelocity.magnitude;
@@ -347,7 +393,20 @@ namespace Riftbound
             if (keys.digit2Key.wasPressedThisFrame && !Blocking && !InventoryOpen && motor.isGrounded) CastAbility2();
             if (keys.digit3Key.wasPressedThisFrame) CastAbility3();
             if (keys.fKey.wasPressedThisFrame && !Blocking && !InventoryOpen) CastInterruptPublic();
+            if (keys.leftAltKey.wasPressedThisFrame && !Mounted && !InventoryOpen) PerformDodgeRoll(moveDirection);
             if (keys.eKey.wasPressedThisFrame) Interact();
+        }
+
+        void PerformDodgeRoll(Vector3 inputDir)
+        {
+            if (Stats && !Stats.Alive) return;
+            if (Time.time < dodgeReadyTime) return;
+            dodgeReadyTime = Time.time + 3.5f;
+            dodgeEnds = Time.time + 0.32f;
+            dodgeDir = inputDir.sqrMagnitude > 0.05f ? inputDir.normalized : transform.forward;
+            if (Stats) Stats.invulnerableUntil = Time.time + 0.38f;
+            SpellFX.CreateArcaneBurst(transform.position);
+            CombatTextManager.Spawn(transform.position + Vector3.up * 1.8f, "DODGE!", new Color(0.55f, 0.95f, 1f), false);
         }
         float interruptReadyTime;
         public float InterruptCooldownRemaining => Mathf.Max(0f, interruptReadyTime - Time.time);
@@ -379,10 +438,14 @@ namespace Riftbound
             if (CastBarSystem.IsTargetCasting(Target))
             {
                 bool success = CastBarSystem.InterruptTarget(Target, InterruptSpellName);
+                if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner != null)
+                    Network.RiftboundCoopPlayer.LocalOwner.RequestAbilityAttack(Target, "interrupt");
                 if (success)
                 {
                     interruptReadyTime = Time.time + 12f;
                     CombatTextManager.Spawn(Target.transform.position + Vector3.up * 1.5f, $"★ {InterruptSpellName.ToUpper()}! ★", Color.red, true);
+                    SpellFX.CreateExpandingRing(Target.transform.position, 0.3f, 2.2f, 0.25f, new Color(0.4f, 0.85f, 1f, 0.9f), 0.14f);
+                    OrbitCamera.Shake(0.12f, 0.12f);
                     AudioEffects.PlayBladeHit();
                     ChatSystem.LogCombat($"<color=#ff4040>Your [{InterruptSpellName}] INTERRUPTED {Target.displayName}!</color>");
                     Message = $"Interrupted {Target.displayName}!";
@@ -418,6 +481,7 @@ namespace Riftbound
         {
             if (!npc) return;
             if (Stats && !Stats.Alive) return;
+            FactionQuestSystem.Instance?.OnTalkedToNPC(npc.npcName);
             ActiveTownNPC = npc;
             ActiveQuestGiver = null;
             DialogueOpen = true;
@@ -429,6 +493,8 @@ namespace Riftbound
             if (!DialogueOpen || !CanTalk() || QuestAccepted || !ActiveQuestGiver) return;
             if (QuestComplete) return;
             QuestAccepted = true; Message = QuestObjective;
+            if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner != null)
+                Network.RiftboundCoopPlayer.LocalOwner.RequestAcceptQuest();
             AudioEffects.PlayQuestAccept();
             ChatSystem.LogQuest($"Quest Accepted: {QuestName}");
             CloseDialogue();
@@ -437,6 +503,16 @@ namespace Riftbound
         public void CompleteQuest()
         {
             if (!DialogueOpen || !CanTalk() || !QuestReady || QuestComplete || !ActiveQuestGiver) return;
+            if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner != null)
+            {
+                if (!Network.RiftboundCoopPlayer.LocalOwner.RequestCompleteQuestServerValidated(QuestIndex)) return;
+            }
+            ApplyAuthorizedCompleteQuest(QuestIndex);
+        }
+
+        public void ApplyAuthorizedCompleteQuest(int expectedIndex)
+        {
+            if (QuestComplete || QuestIndex != expectedIndex) return;
             int goldGain = QuestGold;
             int questExperience = QuestExperience;
             string completedQuest = QuestName;
@@ -585,7 +661,7 @@ namespace Riftbound
                 HealReady = Time.time + 10f;
                 motor.Move(transform.forward * 7.5f);
                 Stats.Heal(40);
-                SpellFX.CreateFrostNova(transform.position, 3f);
+                SpellFX.CreateArcaneBurst(transform.position);
                 Message = "Blink & Arcane Ward: Teleported & shielded 40 HP!";
             }
             else if (CharacterClass == "Rogue")
@@ -635,15 +711,37 @@ namespace Riftbound
             if (!Stats.Alive) yield break;
             if (cleave)
             {
+                SpellFX.CreateCleaveArc(transform.position, 3.8f, CharacterClass);
+                OrbitCamera.Shake(0.16f, 0.16f);
                 foreach (var enemy in FindObjectsByType<EnemyController>(FindObjectsSortMode.None))
                     if (Vector3.Distance(transform.position, enemy.transform.position) < 3.8f) Hit(enemy.GetComponent<Combatant>(), damage);
                 Message = string.IsNullOrEmpty(message) ? "Whirlwind!" : message;
             }
             else if (victim && Vector3.Distance(transform.position, victim.transform.position) < 3.5f && Vector3.Dot(transform.forward, (victim.transform.position - transform.position).normalized) > .1f)
             {
+                SpellFX.CreateSlashArc(transform.position, transform.forward, CharacterClass);
                 Hit(victim, damage);
                 if (!string.IsNullOrEmpty(message)) Message = message;
             }
+        }
+
+        void UpdateMotionTrail(bool active)
+        {
+            if (!active && !sprintTrail) return;
+            if (!sprintTrail)
+            {
+                var go = new GameObject("MotionTrail");
+                go.transform.SetParent(transform, false);
+                go.transform.localPosition = new Vector3(0f, 1.0f, 0f);
+                sprintTrail = go.AddComponent<TrailRenderer>();
+                sprintTrail.time = 0.28f;
+                sprintTrail.startWidth = 0.28f;
+                sprintTrail.endWidth = 0.02f;
+                sprintTrail.sharedMaterial = new Material(Shader.Find("Sprites/Default"));
+                sprintTrail.startColor = new Color(0.75f, 0.92f, 1f, 0.45f);
+                sprintTrail.endColor = new Color(0.75f, 0.92f, 1f, 0f);
+            }
+            sprintTrail.emitting = active;
         }
         void Hit(Combatant enemy, float damage)
         {
@@ -651,15 +749,22 @@ namespace Riftbound
             float finalDmg = damage + (Level - 1) * 3 + WeaponBonus;
             if (CharacterRace == "Brute") finalDmg *= 1.15f;
             finalDmg *= TalentSystem.GetDamageMultiplier(this);
+            finalDmg *= WorldShrineSystem.GetDamageMultiplier();
 
-            bool isCrit = UnityEngine.Random.value < (CharacterClass == "Rogue" ? 0.28f : 0.16f);
+            float critChance = (CharacterClass == "Rogue" ? 0.28f : 0.16f) + WorldShrineSystem.GetCritBonus();
+            bool isCrit = UnityEngine.Random.value < critChance;
             if (isCrit) finalDmg *= 1.8f;
 
             AudioEffects.PlayBladeHit();
+            SpellFX.CreateHitSparks(enemy.transform.position + Vector3.up * 1.1f, isCrit);
+            if (isCrit) OrbitCamera.Shake(0.13f, 0.14f);
             CombatTextManager.SpawnDamage(enemy.transform.position, finalDmg, isCrit);
             string critMsg = isCrit ? " [CRITICAL!]" : "";
             ChatSystem.LogCombat($"Your strike hits {enemy.displayName} for {Mathf.RoundToInt(finalDmg)} Physical damage{critMsg}.");
-            enemy.Damage(finalDmg);
+            if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner != null)
+                Network.RiftboundCoopPlayer.LocalOwner.RequestAbilityAttack(enemy, "melee");
+            else
+                enemy.Damage(finalDmg);
             if (CharacterClass == "Warrior")
                 BuffSystem.ApplyTargetDebuff(enemy, "rend", "Rend", "Suffering 6 Physical bleed damage every second.", "🩸", new Color(0.85f, 0.2f, 0.2f), 5f, 6f, 1f);
             else if (CharacterClass == "Rogue")
@@ -672,9 +777,35 @@ namespace Riftbound
         }
         public void SelectTarget()
         {
-            var targets = FindObjectsByType<EnemyController>(FindObjectsSortMode.None).Select(e => e.GetComponent<Combatant>()).Where(s => s.Alive && Vector3.Distance(transform.position, s.transform.position) < 22).OrderBy(s => (s.transform.position - transform.position).sqrMagnitude).ToArray();
+            Camera cam = Camera.main;
+            Vector3 camFwd = cam ? cam.transform.forward : transform.forward;
+            camFwd.y = 0f;
+            if (camFwd.sqrMagnitude > 0.001f) camFwd.Normalize();
+
+            var candidates = FindObjectsByType<EnemyController>(FindObjectsSortMode.None)
+                .Select(e => e.GetComponent<Combatant>())
+                .Where(s => s != null && s.Alive && Vector3.Distance(transform.position, s.transform.position) < 28f)
+                .ToList();
+
+            if (candidates.Count == 0)
+            {
+                Target = null;
+                return;
+            }
+
+            var targets = candidates.OrderBy(s =>
+            {
+                Vector3 toEnemy = s.transform.position - transform.position;
+                float dist = toEnemy.magnitude;
+                toEnemy.y = 0f;
+                if (toEnemy.sqrMagnitude > 0.001f) toEnemy.Normalize();
+                float dot = Vector3.Dot(camFwd, toEnemy);
+                int inConeTier = dot > 0.15f ? 0 : 1;
+                return inConeTier * 1000f - dot * 10f + dist;
+            }).ToArray();
+
             int index = System.Array.IndexOf(targets, Target);
-            Target = targets.Length == 0 ? null : targets[(index + 1) % targets.Length];
+            Target = targets[(index + 1) % targets.Length];
         }
         public void SetTarget(Combatant newTarget)
         {
@@ -682,13 +813,13 @@ namespace Riftbound
         }
         public static float SampleSafeGroundY(Vector3 worldPos, float clearance = 0.15f)
         {
-            if (worldPos.x < -200f || worldPos.y < -20f || worldPos.y >= 40f)
+            if (WorldRegions.Underground(worldPos) || (!WorldRegions.Expanded && (worldPos.x < -200f || worldPos.y >= 40f)))
                 return worldPos.y;
 
             float groundY = worldPos.y;
             bool hasTerrainSample = false;
 
-            var terrain = Terrain.activeTerrain ?? FindFirstObjectByType<Terrain>();
+            var terrain = WorldRegions.TerrainAt(worldPos);
             if (terrain != null && terrain.terrainData != null)
             {
                 Vector3 tp = terrain.transform.position;
@@ -730,7 +861,7 @@ namespace Riftbound
 
         public static Vector3 ClampAboveGround(Vector3 worldPos, float clearance = 0.15f)
         {
-            if (worldPos.x < -200f || worldPos.y < -20f || worldPos.y >= 40f)
+            if (WorldRegions.Underground(worldPos) || (!WorldRegions.Expanded && (worldPos.x < -200f || worldPos.y >= 40f)))
                 return worldPos;
 
             float minSafeY = SampleSafeGroundY(worldPos, clearance);
@@ -741,8 +872,8 @@ namespace Riftbound
 
         void EnsureAboveTerrain(bool isFlyingMount)
         {
-            if (isFlyingMount || transform.position.x < -200f || transform.position.y >= 40f) return;
-            var terrain = Terrain.activeTerrain;
+            if (isFlyingMount || WorldRegions.Underground(transform.position) || (!WorldRegions.Expanded && (transform.position.x < -200f || transform.position.y >= 40f))) return;
+            var terrain = WorldRegions.TerrainAt(transform.position);
             if (!terrain || !terrain.terrainData) return;
 
             Vector3 p = transform.position;
@@ -764,11 +895,20 @@ namespace Riftbound
 
         void Respawn()
         {
+            if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner != null)
+            {
+                Network.RiftboundCoopPlayer.LocalOwner.RequestRespawn();
+                return;
+            }
+            ApplyAuthorizedRespawn(ClampAboveGround(spawn, 0.25f));
+        }
+
+        public void ApplyAuthorizedRespawn(Vector3 safeSpawn)
+        {
             Dismount();
             CloseDialogue();
             CloseShop(); MapOpen = false; JournalOpen = false; EncounterJournalOpen = false; InventoryOpen = false; TalentsOpen = false; SpellbookOpen = false; AchievementOpen = false; ReputationOpen = false; ChatOpen = false; ProfessionSystem.IsOpen = false; AuctionHouseSystem.AuctionOpen = false; AuctionHouseSystem.MailboxOpen = false; if (GuildSystem.Instance) GuildSystem.Instance.IsOpen = false; if (CharacterSheetSystem.Instance) CharacterSheetSystem.Instance.IsOpen = false;
             StopGuard(); ReturningHome = false;
-            Vector3 safeSpawn = ClampAboveGround(spawn, 0.25f);
             StopAllCoroutines(); motor.enabled = false; transform.position = safeSpawn; motor.enabled = true;
             vertical = 0; moveVelocity = Vector3.zero; Stats.Restore(); Target = null; busyUntil = 0;
             if (animator) animator.speed = 1;

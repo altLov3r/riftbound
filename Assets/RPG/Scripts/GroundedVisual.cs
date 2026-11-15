@@ -11,6 +11,7 @@ namespace Riftbound
         CharacterController motor;
         Combatant stats;
         PlayerController player;
+        Animator boundAnimator;
         Transform leftFoot, rightFoot;
         bool calibrated;
         Vector3 groundedPosition;
@@ -21,7 +22,19 @@ namespace Riftbound
             motor = GetComponent<CharacterController>();
             stats = GetComponent<Combatant>();
             player = GetComponent<PlayerController>();
+            if (animator) BindAnimator(animator);
+        }
+
+        public void BindAnimator(Animator newAnimator)
+        {
+            animator = newAnimator;
+            boundAnimator = newAnimator;
+            leftFoot = null;
+            rightFoot = null;
+            calibrated = false;
+            currentOffset = 0f;
             if (!animator) return;
+
             if (animator.isHuman)
             {
                 leftFoot = animator.GetBoneTransform(HumanBodyBones.LeftToes) ?? animator.GetBoneTransform(HumanBodyBones.LeftFoot);
@@ -40,6 +53,7 @@ namespace Riftbound
         {
             if (Time.deltaTime <= 0 || (player && player.Mounted)) return;
             if (!animator || !stats || !stats.Alive) return;
+            if (animator != boundAnimator) BindAnimator(animator);
 
             // When airborne, smoothly return to base grounded position
             if (!motor || !motor.isGrounded)
@@ -72,7 +86,7 @@ namespace Riftbound
         {
             if (!Physics.Raycast(transform.position + Vector3.up * .4f, Vector3.down, out var hit, 1, ~(1 << 2), QueryTriggerInteraction.Ignore)) return;
             float lowestFoot = Mathf.Min(leftFoot.position.y, rightFoot.position.y);
-            float adjustment = (hit.point.y + soleHeight) - lowestFoot;
+            float adjustment = Mathf.Clamp((hit.point.y + soleHeight) - lowestFoot, -0.06f, 0.06f);
             animator.transform.position += Vector3.up * adjustment;
             groundedPosition = animator.transform.localPosition;
             calibrated = true;

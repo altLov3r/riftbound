@@ -17,7 +17,9 @@ namespace Riftbound
         {
             if (!Stats.Alive) { StopGuard(); ReturningHome = false; return false; }
             if (Blocking && (!keys.qKey.isPressed || Time.time >= GuardEnds || !motor.isGrounded || DialogueOpen || ShopOpen || MapOpen || JournalOpen || InventoryOpen)) StopGuard();
-            if (!Blocking && keys.qKey.isPressed && Time.time >= GuardReady && Time.time >= busyUntil && motor.isGrounded && !DialogueOpen && !ShopOpen && !MapOpen && !JournalOpen && !InventoryOpen && !ReturningHome)
+            bool isSteering = orbit && orbit.IsSteering;
+            bool isMoving = keys.wKey.isPressed || keys.sKey.isPressed || keys.aKey.isPressed || keys.dKey.isPressed;
+            if (!Blocking && keys.qKey.isPressed && !isSteering && !isMoving && Time.time >= GuardReady && Time.time >= busyUntil && motor.isGrounded && !DialogueOpen && !ShopOpen && !MapOpen && !JournalOpen && !InventoryOpen && !ReturningHome)
             {
                 Blocking = true; GuardEnds = Time.time + 3; Stats.incomingDamageMultiplier = .5f;
                 moveVelocity = Vector3.zero; if (animator) animator.speed = 1; Play("Block", true);

@@ -54,13 +54,21 @@ namespace Riftbound
             GUI.EndScrollView();
 
             GUI.Label(new Rect(x + 338, y + 96, 450, 40), ChapterNames[journalSelection], title);
-            GUI.Label(new Rect(x + 338, y + 144, 450, 160), ChapterText[journalSelection], label);
+            string chapterText = ChapterText[journalSelection];
+            if (WorldRegions.Expanded)
+                chapterText = chapterText.Replace("(-55, 215)", "(-220, 260)").Replace("(55, 215)", "(280, 210)").Replace("(0, 48, 225)", "(250, 75, 510)");
+            GUI.Label(new Rect(x + 338, y + 144, 450, 160), chapterText, label);
 
             string objective = "";
             if (journalSelection == 7)
                 objective = $"Mount: {(player.SelectedMount && player.SelectedMount.isFlying ? "WINGED STEED READY" : "SUMMON MOUNT [Z]")}\nVermithrax: {(player.OwnsItem("ember-drake-scale") ? "DEFEATED" : "ALIVE AT PEAK (Lv 8)")}\nLegendary Heart: {(player.OwnsItem("ember-drake-scale") ? "RECOVERED" : "SEALED IN HOARD")}";
             else if (journalSelection == 6)
-                objective = $"Camp Bloodrock: DISCOVERED\nBloodrock Decapitator: {(player.OwnsItem("bloodrock-waraxe") ? "ACQUIRED" : "UNCLAIMED")}\nTerritory: Horde Outpost";
+            {
+                var fqs = FactionQuestSystem.Instance;
+                var fq = fqs != null ? fqs.GetActiveQuest() : null;
+                string fqLine = fq != null ? $"\nActive Mission: {fq.title} ({fqs.CurrentProgress}/{fq.requiredCount})" : "";
+                objective = $"Camp Bloodrock: DISCOVERED\nBloodrock Decapitator: {(player.OwnsItem("bloodrock-waraxe") ? "ACQUIRED" : "UNCLAIMED")}\nTerritory: Horde Outpost{fqLine}";
+            }
             else if (journalSelection == 5)
                 objective = $"Cathedral Portal: FOUND (-55, 215)\nInquisitor's Sunblade: {(player.OwnsItem("scarlet-blade") ? "ACQUIRED" : "UNCLAIMED")}\nDungeon Bosses: High Inquisitor Malakar & Dread Abbot Vael";
             else if (journalSelection == 4)
@@ -70,6 +78,7 @@ namespace Riftbound
             else
                 objective = player.QuestIndex > journalSelection ? "Chapter completed. Rewards claimed." : player.QuestIndex == journalSelection ? player.QuestObjective : "Complete the earlier chapters with Abe.";
 
+            if (WorldRegions.Expanded) objective = objective.Replace("(-55, 215)", "(-220, 260)");
             GUI.Label(new Rect(x + 338, y + 312, 450, 105), objective, label);
 
             if (GUI.Button(new Rect(x + 24, y + 432, 170, 36), "WORLD MAP [M]", questButton)) { player.JournalOpen = false; player.MapOpen = true; }

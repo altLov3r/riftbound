@@ -168,10 +168,10 @@ namespace Riftbound
                 }
             }
 
-            // Selected Item Detailed Inspection Box
-            float inspectY = gridStartY + 4 * (slotBoxSize + slotGap) + 8f;
-            float inspectH = 138f;
-            Fill(new Rect(rightX, inspectY, rightW, inspectH), new Color(0.04f, 0.05f, 0.07f, 0.88f));
+            // Selected Item Detailed Inspection Box (WoW-style Tooltip)
+            float inspectY = gridStartY + 4 * (slotBoxSize + slotGap) + 4f;
+            float inspectH = 148f;
+            Fill(new Rect(rightX, inspectY, rightW, inspectH), new Color(0.04f, 0.05f, 0.07f, 0.94f));
 
             if (!player.OwnsItem(selectedItem)) selectedItem = player.EquippedWeaponId;
             var curSelected = ItemCatalog.Get(selectedItem);
@@ -180,20 +180,14 @@ namespace Riftbound
             {
                 Fill(new Rect(rightX, inspectY, rightW, 2f), curSelected.color);
 
-                var selNameStyle = new GUIStyle(label) { fontStyle = FontStyle.Bold };
-                selNameStyle.normal.textColor = curSelected.color;
-                GUI.Label(new Rect(rightX + 10f, inspectY + 6f, rightW - 120f, 20f), curSelected.name, selNameStyle);
-
-                string typeSlot = $"{curSelected.rarity} {curSelected.slot}";
-                GUI.Label(new Rect(rightX + 10f, inspectY + 26f, rightW - 20f, 18f), typeSlot, small);
-
-                GUI.Label(new Rect(rightX + 10f, inspectY + 46f, rightW - 20f, 36f), curSelected.Stats, label);
+                var tipStyle = new GUIStyle(small) { richText = true, wordWrap = true, fontSize = 11 };
+                GUI.Label(new Rect(rightX + 10f, inspectY + 6f, rightW - 20f, 106f), curSelected.FormattedTooltip, tipStyle);
 
                 // Equip / Equipped Button
                 bool isEquipped = player.IsEquipped(curSelected);
                 GUI.enabled = !isEquipped && !player.InCombat();
-                string equipBtnText = isEquipped ? "✔ EQUIPPED" : "EQUIP ITEM";
-                if (GUI.Button(new Rect(rightX + 10f, inspectY + 92f, 150f, 32f), equipBtnText, questButton))
+                string equipBtnText = isEquipped ? "✔ EQUIPPED" : "EQUIP ITEM [RMB]";
+                if (GUI.Button(new Rect(rightX + 10f, inspectY + 114f, 160f, 28f), equipBtnText, questButton))
                 {
                     player.EquipItem(curSelected.id);
                     AudioEffects.PlayBladeHit();
@@ -204,7 +198,7 @@ namespace Riftbound
                 {
                     var redSmall = new GUIStyle(small);
                     redSmall.normal.textColor = new Color(1f, 0.4f, 0.4f);
-                    GUI.Label(new Rect(rightX + 170f, inspectY + 96f, 200f, 24f), "Cannot equip in combat", redSmall);
+                    GUI.Label(new Rect(rightX + 180f, inspectY + 118f, 190f, 24f), "Cannot equip in combat", redSmall);
                 }
             }
 

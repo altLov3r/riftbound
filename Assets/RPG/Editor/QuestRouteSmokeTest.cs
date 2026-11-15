@@ -20,7 +20,7 @@ namespace Riftbound.Editor
         static readonly List<string> Results = new List<string>();
         static readonly List<string> Errors = new List<string>();
         static double due, timeout;
-        static int stage;
+        static int stage, frontPhase;
         static Keyboard keyboard;
         static Vector3 start;
 
@@ -33,6 +33,10 @@ namespace Riftbound.Editor
         {
             if (!Application.isBatchMode) throw new InvalidOperationException("Run this check in an isolated Unity batch process.");
             Directory.CreateDirectory(".code-check");
+            UIArtSetup.Configure();
+            UIArtSetup.PrepareGameView();
+            SessionState.SetBool(Running + ".DirectPlay", EditorPrefs.GetBool("Riftbound.DirectPlayInEditor", false));
+            EditorPrefs.SetBool("Riftbound.DirectPlayInEditor", false);
             SessionState.SetBool(Running, true);
             SessionState.SetBool(Running + ".Failed", false);
             SessionState.SetString(Running + ".SavePath", Path.GetFullPath(".code-check/quest-route-save-" + Guid.NewGuid().ToString("N") + ".json"));
@@ -40,7 +44,7 @@ namespace Riftbound.Editor
             PlayerSettings.runInBackground = true;
             EditorApplication.isPaused = false;
             EditorSettings.enterPlayModeOptionsEnabled = false;
-            EditorSceneManager.OpenScene("Assets/RPG/Scenes/Outpost-Updated.unity");
+            EditorSceneManager.OpenScene(File.Exists(WorldRegions.ScenePath) ? WorldRegions.ScenePath : "Assets/RPG/Scenes/Outpost-Updated.unity");
             EditorApplication.isPlaying = true;
         }
 
@@ -62,12 +66,14 @@ namespace Riftbound.Editor
                 due = EditorApplication.timeSinceStartup + 3;
                 timeout = due + 90;
                 stage = 0;
+                frontPhase = 0;
                 Application.logMessageReceived += Log;
                 EditorApplication.update += Tick;
             }
             if (change == PlayModeStateChange.EnteredEditMode)
             {
                 SessionState.SetBool(Running, false);
+                EditorPrefs.SetBool("Riftbound.DirectPlayInEditor", SessionState.GetBool(Running + ".DirectPlay", false));
                 EditorApplication.Exit(SessionState.GetBool(Running + ".Failed", false) ? 1 : 0);
             }
         }
@@ -109,6 +115,24 @@ namespace Riftbound.Editor
                     Results.Add($"Initial frame={Time.frameCount}, background={Application.runInBackground}, focused={Application.isFocused}, editorPaused={EditorApplication.isPaused}");
                     var menu = player.GetComponent<FrontendMenu>();
                     Check(menu, "Frontend exists");
+                    if (frontPhase == 0)
+                    {
+                        Check(menu.TitleScreenOpen, "Startup opens the title screen");
+                        var atlas = Resources.Load<Texture2D>("UI/AbilityIcons");
+                        Check(atlas && atlas.width == atlas.height && atlas.width >= 512, "Painted ability atlas is packaged as a square texture");
+                        var cells = new HashSet<int>();
+                        foreach (string cls in new[] { "Warrior", "Mage", "Rogue", "Paladin" })
+                            foreach (string key in new[] { "1", "2", "3" }) cells.Add(ActionBarSystem.IconCell(cls, key));
+                        foreach (string key in new[] { "4", "F", "Q", "H" }) cells.Add(ActionBarSystem.IconCell("Warrior", key));
+                        Check(cells.Count == 16 && cells.Min() == 0 && cells.Max() == 15, "Class and shared actions map to sixteen distinct icon cells");
+                        CaptureUI("Title"); frontPhase = 1; due = EditorApplication.timeSinceStartup + 1; return;
+                    }
+                    if (frontPhase == 1)
+                    {
+                        menu.OpenCharacterSelect();
+                        Check(!menu.TitleScreenOpen && FrontendMenu.IsOpen, "Play opens character selection while gameplay stays gated");
+                        CaptureUI("Characters"); frontPhase = 2; due = EditorApplication.timeSinceStartup + 1; return;
+                    }
                     Check(FrontendMenu.IsOpen || (!player.orbit.Paused && Time.timeScale > 0), "Menu or direct-play controls are available");
                     Results.Add("Initial character selection shown: " + FrontendMenu.IsOpen);
                     PlayerController.SavePathOverride = SessionState.GetString(Running + ".SavePath", "");
@@ -124,10 +148,15 @@ namespace Riftbound.Editor
                 else if (stage == 1)
                 {
                     var player = Player();
+                    if (frontPhase == 2)
+                    {
+                        CaptureUI("HUD"); frontPhase = 3; due = EditorApplication.timeSinceStartup + 1; return;
+                    }
                     Results.Add($"World state: menu={FrontendMenu.IsOpen}, paused={player.orbit.Paused}, timeScale={Time.timeScale}, name={player.CharacterName}, frames={Time.frameCount}");
                     Check(!FrontendMenu.IsOpen && !player.orbit.Paused && Time.timeScale > 0, "Entering the world restores gameplay time and camera control");
                     Check(player.CharacterName == "BuildCheck", "Selected character is applied after scene reload");
                     Check(player.CharacterRace == "Human", "Fresh test character retains its selected race");
+                    if (WorldRegions.Expanded) CheckExpandedWorld(player);
                     Check(player.GetComponentsInChildren<Renderer>().Length > 0, "Character has a visible model");
                     InputSystem.settings.editorInputBehaviorInPlayMode = InputSettings.EditorInputBehaviorInPlayMode.AllDeviceInputAlwaysGoesToGameView;
                     InputSystem.settings.backgroundBehavior = InputSettings.BackgroundBehavior.IgnoreFocus;
@@ -206,6 +235,224 @@ namespace Riftbound.Editor
             controller.enabled = true;
         }
 
+        static void CheckExpandedWorld(PlayerController player)
+        {
+            Check(Terrain.activeTerrains.Count(t=>t.isActiveAndEnabled)==4,"Expanded world has four active terrain tiles");
+            Check(WorldRegions.Bounds.width==768 && WorldRegions.Bounds.height==768,"World footprint is 768 by 768 metres");
+            Check(PartySystem.Instance && PartySystem.Instance.Members.Count==0,"Characters start solo without companions");
+            var party=PartySystem.Instance;
+            party.SpawnCompanion("Validation ally","Warrior","Tank",Color.white);
+            Check(party.Members.Count==1 && party.Members[0].companionObject,"An ally can be called explicitly");
+            party.KickMember("Validation ally");
+            Check(party.Members.Count==0,"Called allies can be dismissed");
+            Check(AudioEffects.LoadRecording("mouseclick1") && AudioEffects.LoadRecording("footstep00"),"Recorded UI and footstep audio is packaged");
+            foreach(var point in new[]{WorldRegions.Cathedral,WorldRegions.Bloodrock,WorldRegions.Summit,WorldRegions.Greenhollow,WorldRegions.Deathknell})
+            {
+                Check(WorldRegions.TerrainAt(point),"Terrain exists below region "+point);
+                var grounded=PlayerController.ClampAboveGround(new Vector3(point.x,-2,point.z),.3f);
+                Check(grounded.y>=WorldRegions.GroundHeight(point),"Grounding supports all tiles and high-elevation regions");
+            }
+            Check(WorldRegions.LegacyPosition(new Vector3(50,9.2f,210),"Brute").x>200,"Legacy Horde save positions migrate to the expanded eastern region");
+            Check(WorldRegions.LegacyPosition(new Vector3(-400,-40,200))==new Vector3(-400,-40,200),"Underground save positions stay in the dungeon");
+            Check(FlightMaster.WorldFlightNodes.Any(n=>n.targetPos.x>200)&&FlightMaster.WorldFlightNodes.Any(n=>n.targetPos.z>450),"Flight destinations use separated eastern and northern zones");
+            CheckExploration(player);
+            CheckFactionBossObjectives(player);
+            CheckCartography(player);
+            var restoredCaptain = Object.FindObjectsByType<EnemyController>(FindObjectsInactive.Include, FindObjectsSortMode.None).Single(e => e.enemyId == RiverReaverCamp.CaptainId);
+            Check(restoredCaptain.gameObject.activeSelf && restoredCaptain.GetComponent<Combatant>().Alive && restoredCaptain.GetComponent<CharacterController>().enabled, "Loading an earlier character restores enemies it has not defeated");
+        }
+
+        static void CheckCartography(PlayerController player)
+        {
+            var system = FactionQuestSystem.Instance;
+            player.SaveAdventure(false);
+            string adventure = File.ReadAllText(PlayerController.SavePathOverride);
+            string path = Path.ChangeExtension(PlayerController.SavePathOverride, ".faction.json");
+            string faction = File.ReadAllText(path);
+            try
+            {
+                var npc = Object.FindObjectsByType<TownNPC>(FindObjectsSortMode.None).Single(n => n.npcName == ExplorationSites.CartographerName);
+                Check(npc.GetComponentInChildren<Animator>(), "Cartographer has an animated character model");
+                Move(player, npc.transform.position + Vector3.forward * 1.5f);
+                typeof(PlayerController).GetMethod("Interact", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(player, null);
+                Check(player.DialogueOpen && player.ActiveTownNPC == npc, "Cartographer opens the existing NPC dialogue");
+                var quest = system.GetAvailableQuestForNPC(npc.npcName, player);
+                Check(quest != null && quest.id == "frontier_cartography", "Cartographer offers the survey quest");
+                system.AcceptQuest(quest, player); player.CloseDialogue();
+                player.DiscoverLandmark(ExplorationSites.SurveyIds[0]);
+                Check(system.CurrentProgress == 1, "Survey advances when a site is discovered");
+                player.DiscoverLandmark(ExplorationSites.SurveyIds[0]);
+                Check(system.CurrentProgress == 1, "Survey ignores repeated discoveries");
+                player.LoadAdventure(); system.LoadData();
+                Check(system.CurrentProgress == 1, "Survey progress survives reload");
+                player.DiscoverLandmark(ExplorationSites.SurveyIds[1]); player.DiscoverLandmark(ExplorationSites.SurveyIds[2]);
+                Check(system.HasActiveQuestToComplete(npc.npcName, player), "All sites make the survey ready for hand-in");
+                Check(MinimapRadar.Instance.customWaypoint.HasValue && Vector3.Distance(MinimapRadar.Instance.customWaypoint.Value, npc.transform.position) < .1f, "Completed survey waypoint returns to the cartographer");
+                Move(player, npc.transform.position + Vector3.forward);
+                system.CompleteQuest(player);
+                Check(system.IsQuestCompleted("frontier_cartography"), "Survey completion is recorded");
+                int gold = player.Gold, xp = player.Experience;
+                system.CompleteQuest(player);
+                Check(player.Gold == gold && player.Experience == xp, "Survey hand-in rewards cannot repeat");
+                system.LoadData();
+                Check(system.IsQuestCompleted("frontier_cartography"), "Survey completion survives reload");
+                CheckRiverReavers(player, system, npc);
+                File.WriteAllText(path, JsonUtility.ToJson(new FactionQuestSystem.FactionQuestSaveData())); system.LoadData();
+                system.AcceptQuest(quest, player);
+                Check(system.CurrentProgress == 3, "Sites discovered before quest acceptance count toward the survey");
+            }
+            finally
+            {
+                player.CloseDialogue(); File.WriteAllText(PlayerController.SavePathOverride, adventure); player.LoadAdventure();
+                File.WriteAllText(path, faction); system.LoadData(); MinimapRadar.ClearWaypoint();
+            }
+        }
+
+        static void CheckRiverReavers(PlayerController player, FactionQuestSystem system, TownNPC giver)
+        {
+            var actors = Object.FindObjectsByType<EnemyController>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            var captain = actors.Single(e => e.enemyId == RiverReaverCamp.CaptainId);
+            var stats = captain.GetComponent<Combatant>();
+            Check(captain.animator && captain.isBoss && stats.maxHealth == 260, "River Reaver captain has a complete boss rig and vitals");
+            Check(AssetDatabase.GetAssetPath(WorldRegions.TerrainAt(RiverReaverCamp.Position).terrainData).Contains("/ReaverCamp/"), "Camp uses a separate terrain asset");
+            Check(ReaverCampTerrainSetup.CheckApproach() <= 35, "Camp approach supports walking and mounted travel below35 degrees");
+            Check(actors.Count(e => e.enemyId.StartsWith("westbank-reaver-")) == 3, "River Reaver camp has exactly one captain and two guards");
+            CheckEnemyDisengagement(player, captain);
+            var quest = system.GetAvailableQuestForNPC(giver.npcName, player);
+            Check(quest != null && quest.id == "river_reaver_bounty", "Cartography unlocks the River Reaver bounty");
+            system.AcceptQuest(quest, player);
+            var chest = Object.FindObjectsByType<LootChest>(FindObjectsSortMode.None).Single(c => c.chestId == RiverReaverCamp.CacheId);
+            Move(player, chest.transform.position + Vector3.forward);
+            Check(!player.OpenChest(chest), "Reaver lockbox is unavailable before the captain's defeat");
+            system.OnEnemyDefeated(actors.Single(e => e.enemyId == "westbank-reaver-1"));
+            Check(system.CurrentProgress == 0, "A guard does not satisfy the captain bounty");
+            stats.Damage(10000);
+            Check(player.HasDefeated(RiverReaverCamp.CaptainId) && system.IsActiveQuestReady(), "Captain death advances the bounty through the real damage event");
+            Check(!player.BossDefeated && player.Kills == 0, "Optional captain does not alter Abe's campaign");
+            Check(player.OpenChest(chest) && !player.OpenChest(chest), "Captain unlocks a one-time camp lockbox");
+            player.LoadAdventure(); system.LoadData();
+            Check(!captain.gameObject.activeSelf && player.HasDefeated(RiverReaverCamp.CaptainId), "Defeated captain stays defeated and is hidden after reload");
+            Check(player.HasOpenedChest(RiverReaverCamp.CacheId), "Claimed lockbox survives reload");
+            Move(player, giver.transform.position + Vector3.forward);
+            system.CompleteQuest(player);
+            Check(player.OwnsItem("riverwarden-signet") && system.IsQuestCompleted("river_reaver_bounty"), "Bounty awards Riverwarden's Signet and completes");
+            int gold = player.Gold;
+            system.CompleteQuest(player);
+            Check(player.Gold == gold, "Bounty hand-in cannot award twice");
+            File.WriteAllText(Path.ChangeExtension(PlayerController.SavePathOverride, ".faction.json"), JsonUtility.ToJson(new FactionQuestSystem.FactionQuestSaveData()));
+            system.LoadData(); system.AcceptQuest(quest, player);
+            Check(system.IsActiveQuestReady(), "Defeating the captain before accepting the bounty still counts");
+        }
+
+        static void CheckEnemyDisengagement(PlayerController player, EnemyController actor)
+        {
+            const BindingFlags hidden = BindingFlags.Instance | BindingFlags.NonPublic;
+            var type = typeof(EnemyController);
+            var motor = actor.GetComponent<CharacterController>();
+            var stats = actor.GetComponent<Combatant>();
+            Vector3 home = actor.transform.position;
+            var update = type.GetMethod("Update", hidden);
+            void Set(string name, object value) => type.GetField(name, hidden).SetValue(actor, value);
+            void Position(Vector3 value) { motor.enabled = false; actor.transform.position = value; motor.enabled = true; Physics.SyncTransforms(); }
+            try
+            {
+                Position(home + Vector3.right * 29);
+                Move(player, home + Vector3.right * 30);
+                Set("pendingDamage", true); Set("damageAt", Time.time - 1); Set("attackEnds", Time.time + 3);
+                float health = player.Stats.Health;
+                update.Invoke(actor, null);
+                Check(player.Stats.Health == health && !(bool)type.GetField("pendingDamage", hidden).GetValue(actor), "Leashing cancels a queued melee hit without damaging the player");
+                Move(player, home + Vector3.right * 24);
+                update.Invoke(actor, null);
+                Check((bool)type.GetField("evading", hidden).GetValue(actor), "Enemy cannot reaggro midway through its return home");
+                Move(player, home + Vector3.right * 30);
+                type.GetMethod("HeavyAttack", hidden).Invoke(actor, null);
+                update.Invoke(actor, null);
+                Check((float)type.GetField("heavyUntil", hidden).GetValue(actor) == 0 && !CastBarSystem.IsTargetCasting(stats), "Leashing cancels the heavy telegraph and cast bar");
+                stats.Damage(20); Position(home + Vector3.right * .5f);
+                update.Invoke(actor, null);
+                Check(stats.Health == stats.maxHealth, "An evading enemy fully recovers on reaching home");
+                actor.ResetForLoad();
+                Check(Vector3.Distance(actor.transform.position, home) < .01f && motor.enabled && stats.Alive, "Reload reset restores enemy position, health and motor");
+                Move(player, home + Vector3.forward * 4);
+                actor.transform.rotation = Quaternion.identity;
+                var wall = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                try
+                {
+                    wall.name = "Isolated enemy sight test wall";
+                    wall.transform.position = home + Vector3.forward * 2 + Vector3.up;
+                    wall.transform.localScale = new Vector3(3, 3, .25f); Physics.SyncTransforms();
+                    Check(!(bool)type.GetMethod("ClearSight", hidden).Invoke(actor, null), "A solid wall blocks enemy line of sight");
+                    wall.SetActive(false); Physics.SyncTransforms();
+                    Check((bool)type.GetMethod("ClearSight", hidden).Invoke(actor, null), "Enemy sight accepts the player collider when the path is clear");
+                }
+                finally { Object.Destroy(wall); }
+            }
+            finally { actor.ResetForLoad(); player.Stats.Restore(); }
+        }
+
+        static void CheckFactionBossObjectives(PlayerController player)
+        {
+            FactionQuestSystem.EnsureSystem(player);
+            var system = FactionQuestSystem.Instance;
+            string path = Path.ChangeExtension(PlayerController.SavePathOverride, ".faction.json");
+            string saved = File.Exists(path) ? File.ReadAllText(path) : JsonUtility.ToJson(new FactionQuestSystem.FactionQuestSaveData());
+            string originalOverride = PlayerController.SavePathOverride;
+            try
+            {
+                var enemies = Object.FindObjectsByType<EnemyController>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+                var captain = enemies.Single(e => e.enemyId == "ashwood-captain");
+                foreach (string id in new[] { "bloodrock_warlord", "gorkresh_apex_clash", "alliance_wyrmcrest_summit" })
+                {
+                    var quest = FactionQuestSystem.GetQuest(id);
+                    system.AcceptQuest(quest, player);
+                    system.OnEnemyDefeated(captain);
+                    Check(system.CurrentProgress == 0, "Unrelated captain cannot complete " + id);
+                    system.OnEnemyDefeated(enemies.Single(e => e.enemyId == quest.targetId));
+                    Check(system.IsActiveQuestReady(), "Correct regional boss completes " + id);
+                }
+                PlayerController.SavePathOverride = Path.GetFullPath(".code-check/no-faction-save-" + Guid.NewGuid().ToString("N") + ".json");
+                system.LoadData();
+                Check(system.ActiveQuestId == "" && system.CurrentProgress == 0, "Character without a faction save starts with empty quest progress");
+            }
+            finally
+            {
+                PlayerController.SavePathOverride = originalOverride;
+                File.WriteAllText(path, saved); system.LoadData(); MinimapRadar.ClearWaypoint();
+            }
+        }
+
+        static void CheckExploration(PlayerController player)
+        {
+            player.SaveAdventure(false);
+            string saved = File.ReadAllText(PlayerController.SavePathOverride);
+            try
+            {
+                var zebra = player.mounts.First(m => m.mountId == "zebra");
+                foreach (string id in new[] { "westbank-overlook", "bloodrock-vista", "wyrmcrest-lookout" })
+                {
+                    var marker = Object.FindObjectsByType<Landmark>(FindObjectsSortMode.None).Single(m => m.landmarkId == id);
+                    Check(Mathf.Abs(marker.transform.position.y - WorldRegions.GroundHeight(marker.transform.position)) < .15f, "Exploration site grounded: " + id);
+                    player.DiscoverLandmark(id);
+                    int gold = player.Gold, xp = player.Experience;
+                    player.DiscoverLandmark(id);
+                    Check(player.Gold == gold && player.Experience == xp, "Exploration rewards pay once: " + id);
+                }
+                Check(player.GreenhollowLandmarksFound == 0 && !player.MountUnlocked(zebra), "Other discoveries cannot unlock the Greenhollow mount");
+                player.DiscoverLandmark("willow-crossing"); player.DiscoverLandmark("greenhollow-post");
+                Check(!player.MountUnlocked(zebra), "Two Greenhollow sites keep zebra locked");
+                player.DiscoverLandmark("ancient-grove");
+                Check(player.MountUnlocked(zebra), "All three Greenhollow sites unlock zebra");
+                player.LoadAdventure();
+                Check(player.HasLandmark("wyrmcrest-lookout") && player.MountUnlocked(zebra), "New discoveries and mount unlock survive reload");
+                var cache = Object.FindObjectsByType<LootChest>(FindObjectsSortMode.None).Single(c => c.chestId == "westbank-overlook-cache");
+                Move(player, cache.transform.position + Vector3.forward);
+                Check(player.OpenChest(cache), "New exploration supply cache can be collected");
+                Check(!player.OpenChest(cache), "Exploration cache cannot pay twice");
+            }
+            finally { File.WriteAllText(PlayerController.SavePathOverride, saved); player.LoadAdventure(); }
+        }
+
         static void OpenAbe(PlayerController player)
         {
             Move(player, player.questGiver.position);
@@ -278,6 +525,12 @@ namespace Riftbound.Editor
             File.WriteAllText(player.SavePath, JsonUtility.ToJson(data));
             player.LoadAdventure();
             Check(!player.OwnsItem("raider-cleaver"), "New-format saves do not auto-grant enemy equipment");
+        }
+
+        static void CaptureUI(string name)
+        {
+            if (SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Null)
+                ScreenCapture.CaptureScreenshot(".code-check/UI-" + name + ".png");
         }
 
         static void Finish(bool failed)

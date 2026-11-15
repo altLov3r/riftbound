@@ -52,12 +52,14 @@ namespace Riftbound
                     ZoneBanner.Show(zone, sub);
                     AudioEffects.PlayZoneDiscover();
                     ChatSystem.LogZone(zone);
+                    if (WeatherSystem.Instance) WeatherSystem.Instance.EvaluateZoneWeather(false);
                 }
             }
         }
 
         public static string GetZoneName(Vector3 pos)
         {
+            if (WorldRegions.Expanded) return WorldRegions.ZoneName(pos);
             // Underground Cathedral Dungeon
             if (pos.y < -20f)
                 return "The Scarlet Crypts";
@@ -88,6 +90,17 @@ namespace Riftbound
 
         public static string GetSubZoneName(Vector3 pos)
         {
+            if (WorldRegions.Expanded)
+            {
+                string zone = WorldRegions.ZoneName(pos);
+                if (WorldRegions.Underground(pos)) return "Cathedral Instance (Dungeon)";
+                if (zone == "Camp Bloodrock" || zone == "Gor'Kresh Stronghold" || zone == "Deathknell Hollow" || zone == "Rustwater Scrapworks") return "Horde Territory";
+                if (zone == "Emberwatch Outpost" || zone == "Highspire Keep" || zone == "Frostpeak Foothills" || zone == "Silverglen Sanctum") return "Alliance Territory";
+                if (zone == "Wyrmcrest Summit" || zone == "Wyrmcrest Crags") return "Dragon Territory (Dangerous)";
+                if (zone == "Duskwood Cathedral" || zone == "Duskwood Wilds") return "Contested Haunted Lands";
+                if (zone == "Redridge Canyons" || zone == "Redridge Volcanic Crater") return "Contested Badlands";
+                return "Contested Wilderness";
+            }
             if (pos.y < -20f) return "Cathedral Instance (Dungeon)";
             if (pos.y > 40f || (pos.z > 210f && Mathf.Abs(pos.x) < 25f && pos.y > 25f)) return "Dragon's Roost (Apex Boss)";
             if (pos.x > 35f && pos.z > 175f) return "Horde Frontier Outpost";

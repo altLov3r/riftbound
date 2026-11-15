@@ -62,11 +62,31 @@ namespace Riftbound
                 }
             }
 
-            IsInRestZone = (currentZone == "Emberwatch Outpost") || (currentZone == "Camp Bloodrock") || nearInnkeeper;
+            // Check proximity to campfires or forges across the world
+            bool nearCampfire = false;
+            foreach (var l in FindObjectsByType<Light>(FindObjectsSortMode.None))
+            {
+                if (l != null && (l.name.IndexOf("Campfire", StringComparison.OrdinalIgnoreCase) >= 0 || l.name.IndexOf("Forge", StringComparison.OrdinalIgnoreCase) >= 0))
+                {
+                    if (Vector3.Distance(player.transform.position, l.transform.position) < 8f)
+                    {
+                        nearCampfire = true;
+                        break;
+                    }
+                }
+            }
+
+            IsInRestZone = (currentZone == "Emberwatch Outpost") || (currentZone == "Camp Bloodrock") || nearInnkeeper || nearCampfire;
 
             if (IsInRestZone && !wasResting)
             {
                 ChatSystem.LogZone("You have entered a resting area (Zzz). Double XP enabled!");
+            }
+
+            // Out-of-combat health recovery when resting by campfire or tavern
+            if (IsInRestZone && !player.InCombat() && player.Stats && player.Stats.Alive && player.Stats.Health < player.Stats.maxHealth)
+            {
+                player.Stats.Heal(player.Stats.maxHealth * 0.08f * Time.deltaTime);
             }
 
             // Accumulate rested XP while resting

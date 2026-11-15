@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Riftbound
@@ -5,6 +6,9 @@ namespace Riftbound
     [RequireComponent(typeof(CharacterController), typeof(Combatant))]
     public class EnemyController : MonoBehaviour
     {
+        public static readonly Dictionary<string, EnemyController> AllByKey = new Dictionary<string, EnemyController>();
+        public string NetworkKey => !string.IsNullOrEmpty(enemyId) ? enemyId : gameObject.name;
+        public static EnemyController FindByKey(string key) => !string.IsNullOrEmpty(key) && AllByKey.TryGetValue(key, out var e) ? e : null;
         public Animator animator;
         public float attackDuration = 1.2f;
         public PlayerController player;
@@ -21,23 +25,115 @@ namespace Riftbound
         public float attackInterval = 1.6f;
         public float walkStrideSpeed, runStrideSpeed;
         public float cleaveDuration = 1.22f;
+        public enum EnemyAffix { None, Molten, Vampiric, Frostbound, Arcane }
+        public EnemyAffix Affix { get; private set; }
         Combatant stats;
         CharacterController motor;
         Vector3 home;
+        Quaternion homeRotation;
         float nextAttack, deathTime, attackEnds, damageAt;
-        bool pendingDamage, dying;
+        bool pendingDamage, dying, evading, initialized, resetPoseOnEnable, wasChasing;
         string state;
         float heavyUntil, nextHeavy;
         Vector3 heavyCenter;
         LineRenderer warning;
-        void Awake()
+        bool hasReplicatedState;
+        Vector3 replicatedPos;
+        float replicatedYaw;
+        float netBroadcastTimer;
+        void Awake() { Initialize(); }
+        void Initialize()
         {
-            stats = GetComponent<Combatant>(); motor = GetComponent<CharacterController>(); home = transform.position;
+            if (initialized) return;
+            stats = GetComponent<Combatant>(); motor = GetComponent<CharacterController>();
+            home = transform.position; homeRotation = transform.rotation;
             stats.Died += Defeated;
+            AllByKey[NetworkKey] = this;
+            if (!trainingDummy)
+            {
+                int hash = Mathf.Abs((string.IsNullOrEmpty(enemyId) ? gameObject.name : enemyId).GetHashCode());
+                if (isBoss || heavyAttacker || (hash % 4 == 0))
+                    Affix = (EnemyAffix)((hash % 4) + 1);
+            }
+            initialized = true;
         }
-        void Defeated(Combatant _) { if (!trainingDummy && player) player.RecordEnemyDefeat(this); if (warning) warning.enabled = false; }
-        void OnDisable() { heavyUntil = 0; pendingDamage = false; if (warning) warning.enabled = false; }
-        void OnDestroy() { if (stats) stats.Died -= Defeated; if (warning) { Destroy(warning.material); Destroy(warning.gameObject); } }
+        void OnEnable()
+        {
+            wasChasing = false;
+            if (resetPoseOnEnable) ResetIdlePose();
+        }
+        public void ResetForLoad()
+        {
+            Initialize();
+            CancelAttack(); dying = false; evading = false;
+            nextAttack = nextHeavy = deathTime = damageAt = 0;
+            motor.enabled = false;
+            transform.SetPositionAndRotation(home, homeRotation);
+            motor.enabled = true;
+            stats.Restore();
+            resetPoseOnEnable = true;
+            ResetIdlePose();
+        }
+        void ResetIdlePose()
+        {
+            if (!animator) animator = GetComponentInChildren<Animator>(true);
+            if (!animator) { resetPoseOnEnable = false; return; }
+            animator.speed = 1;
+            if (!animator.isActiveAndEnabled) return;
+            animator.Rebind();
+            animator.Play("Idle", 0, 0);
+            animator.Update(0);
+            state = "Idle"; resetPoseOnEnable = false;
+        }
+        void Defeated(Combatant _)
+        {
+            CancelAttack();
+            if (!trainingDummy && player)
+            {
+                if (Network.CoopSessionConfig.IsMultiplayer && Unity.Netcode.NetworkManager.Singleton && Unity.Netcode.NetworkManager.Singleton.IsListening)
+                {
+                    if (Unity.Netcode.NetworkManager.Singleton.IsServer)
+                        Network.RiftboundCoopPlayer.DispatchEnemyDefeatedToEligiblePlayers(this);
+                }
+                else
+                {
+                    player.RecordEnemyDefeat(this);
+                }
+                CombatStreakSystem.RegisterKill(transform.position);
+                if (Affix == EnemyAffix.Molten)
+                    SpellFX.CreateHeavySlam(transform.position, 3.2f);
+                else if (Affix == EnemyAffix.Arcane)
+                {
+                    player.AddExperience(40);
+                    CombatTextManager.Spawn(transform.position + Vector3.up * 2.1f, "+40 ARCANE XP", new Color(0.85f, 0.65f, 1f), true);
+                }
+                SpellFX.SpawnBurst(transform.position + Vector3.up * 0.9f, new Color(1f, 0.8f, 0.3f), new Color(0.6f, 0.25f, 0.95f), 18, 2f, 5f, 0.1f, 0.22f, 0.55f);
+                SpellFX.CreateSoulOrb(transform.position + Vector3.up * 1.1f, player.transform);
+            }
+        }
+        void OnDisable() { CancelAttack(); evading = false; }
+        void CancelAttack()
+        {
+            heavyUntil = 0; pendingDamage = false; attackEnds = 0;
+            if (warning) warning.enabled = false;
+            CastBarSystem.CancelTargetCast(stats);
+        }
+        void OnDestroy()
+        {
+            if (AllByKey.TryGetValue(NetworkKey, out var existing) && existing == this) AllByKey.Remove(NetworkKey);
+            if (stats) stats.Died -= Defeated;
+            if (warning) { Destroy(warning.material); Destroy(warning.gameObject); }
+        }
+
+        public void ApplyReplicatedState(float hp, float maxHp, bool alive, Vector3 pos, float yaw)
+        {
+            if (!stats) Initialize();
+            replicatedPos = pos;
+            replicatedYaw = yaw;
+            hasReplicatedState = true;
+            stats.SetReplicatedHealth(hp, maxHp);
+            if (alive && !gameObject.activeSelf) ResetForLoad();
+        }
         void HeavyAttack()
         {
             if (!warning)
@@ -48,6 +144,7 @@ namespace Riftbound
                 warning.positionCount = 65; warning.startWidth = warning.endWidth = .16f;
             }
             heavyCenter = transform.position; heavyUntil = Time.time + 1.8f; nextHeavy = Time.time + 9;
+            CombatTextManager.Spawn(transform.position + Vector3.up * 2.5f, "⚠ HEAVY SLAM!", new Color(1f, 0.45f, 0.1f), true);
             warning.enabled = true;
             for (int i = 0; i < warning.positionCount; i++)
             {
@@ -62,6 +159,38 @@ namespace Riftbound
         void Update()
         {
             if (FrontendMenu.IsOpen || Time.timeScale <= 0) return;
+
+            bool isNetClient = Network.CoopSessionConfig.IsMultiplayer
+                && Unity.Netcode.NetworkManager.Singleton
+                && Unity.Netcode.NetworkManager.Singleton.IsListening
+                && !Unity.Netcode.NetworkManager.Singleton.IsServer;
+
+            if (isNetClient)
+            {
+                if (!stats.Alive)
+                {
+                    if (!dying) { dying = true; deathTime = Time.time; motor.enabled = false; if (animator) animator.speed = 1; Play(nativeDeathAnimation ? "Death" : "Hit", true); }
+                    if (!nativeDeathAnimation) transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.Euler(0, transform.eulerAngles.y, 82), Time.deltaTime * 3);
+                    if (Time.time > deathTime + 5) gameObject.SetActive(false);
+                    return;
+                }
+                if (hasReplicatedState)
+                {
+                    float d = Vector3.Distance(transform.position, replicatedPos);
+                    if (d > 0.08f)
+                    {
+                        transform.position = Vector3.Lerp(transform.position, replicatedPos, Time.deltaTime * 12f);
+                        Play("Run", false);
+                    }
+                    else
+                    {
+                        Play("Idle", false);
+                    }
+                    transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.Euler(0f, replicatedYaw, 0f), Time.deltaTime * 12f);
+                }
+                return;
+            }
+
             if (trainingDummy)
             {
                 if (!stats.Alive || Time.time - stats.LastHit > 3) stats.Restore();
@@ -69,14 +198,52 @@ namespace Riftbound
             }
             if (!stats.Alive)
             {
-                if (!dying) { dying = true; deathTime = Time.time; motor.enabled = false; if (animator) animator.speed = 1; Play(nativeDeathAnimation ? "Death" : "Hit", true); }
+                if (!dying)
+                {
+                    dying = true; deathTime = Time.time; motor.enabled = false; if (animator) animator.speed = 1; Play(nativeDeathAnimation ? "Death" : "Hit", true);
+                    if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner)
+                        Network.RiftboundCoopPlayer.LocalOwner.BroadcastEnemyState(this);
+                }
                 if (!nativeDeathAnimation) transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.Euler(0, transform.eulerAngles.y, 82), Time.deltaTime * 3);
                 if (Time.time > deathTime + 5) gameObject.SetActive(false);
                 return;
             }
-            if (!player) return;
+
+            Transform targetTransform = player ? player.transform : null;
+            bool targetAlive = player && player.Stats && player.Stats.Alive;
+            ulong targetClientId = 0;
+            bool targetIsRemote = false;
+
+            if (Network.CoopSessionConfig.IsMultiplayer && Unity.Netcode.NetworkManager.Singleton && Unity.Netcode.NetworkManager.Singleton.IsServer)
+            {
+                float bestDist = float.MaxValue;
+                foreach (var cp in Network.RiftboundCoopPlayer.AllPlayers)
+                {
+                    if (!cp || !cp.IsSpawned || cp.Health.Value <= 0) continue;
+                    float dist = Vector3.Distance(transform.position, cp.transform.position);
+                    if (dist < bestDist)
+                    {
+                        bestDist = dist;
+                        targetTransform = cp.transform;
+                        targetAlive = true;
+                        targetClientId = cp.OwnerClientId;
+                        targetIsRemote = !cp.IsOwner;
+                    }
+                }
+            }
+
+            if (!targetTransform) return;
             motor.Move(Vector3.down * 4 * Time.deltaTime);
-            float range = Vector3.Distance(transform.position, player.transform.position);
+            float range = Vector3.Distance(transform.position, targetTransform.position);
+            float homeDistance = Vector3.Distance(transform.position, home);
+            bool inPursuitRange = targetAlive && range < 14 && Vector3.Distance(home, targetTransform.position) < 25;
+            if (!inPursuitRange && homeDistance > 1.2f) evading = true;
+            if (evading && homeDistance <= 1.2f) { evading = false; stats.Restore(); }
+            bool chasing = inPursuitRange && !evading;
+            if (chasing && !wasChasing)
+                CombatTextManager.Spawn(transform.position + Vector3.up * 2.2f, "!", new Color(1f, 0.25f, 0.15f), true);
+            wasChasing = chasing;
+            if (!chasing) CancelAttack();
             if (heavyUntil > 0)
             {
                 if (CastBarSystem.GetTargetCast(stats) is var tCast && tCast != null && tCast.isInterrupted)
@@ -85,48 +252,120 @@ namespace Riftbound
                     if (warning) warning.enabled = false;
                     return;
                 }
-                if (Time.time < heavyUntil) { FacePlayer(); return; }
+                if (Time.time < heavyUntil) { FacePoint(targetTransform.position); return; }
                 heavyUntil = 0; warning.enabled = false;
-                if (player.Stats.Alive && Vector3.Distance(player.transform.position, heavyCenter) < 4) player.Stats.Damage(38);
+                SpellFX.CreateHeavySlam(heavyCenter, 4f);
+                if (targetAlive && Vector3.Distance(targetTransform.position, heavyCenter) < 4)
+                {
+                    if (targetIsRemote)
+                        Network.RiftboundCoopPlayer.DispatchEnemyHitToPlayer(targetClientId, 38f, NetworkKey);
+                    else if (player && player.Stats)
+                    {
+                        player.Stats.Damage(38);
+                        if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner)
+                            Network.RiftboundCoopPlayer.LocalOwner.Health.Value = Mathf.Max(0, Mathf.RoundToInt(player.Stats.Health));
+                    }
+                }
                 Play("Cleave", true); attackEnds = Time.time + cleaveDuration; return;
             }
-            bool chasing = player.Stats.Alive && range < 12 && Vector3.Distance(home, player.transform.position) < 19;
-            if (chasing && Time.time < attackEnds) FacePlayer();
+            if (chasing && Time.time < attackEnds) FacePoint(targetTransform.position);
+            if (pendingDamage)
+            {
+                if (CastBarSystem.GetTargetCast(stats) is var tCast && tCast != null && tCast.isInterrupted)
+                {
+                    pendingDamage = false;
+                    attackEnds = Time.time + 2.0f;
+                    Play("Idle", true);
+                    return;
+                }
+            }
             if (pendingDamage && Time.time >= damageAt)
             {
                 pendingDamage = false;
-                if (player.Stats.Alive && ranged && range < attackRange + 2)
-                    EnemyProjectile.Launch(transform.position + Vector3.up * 1.25f, player, attackDamage);
-                else if (player.Stats.Alive && !ranged && range < 2.8f && ClearSight()) player.Stats.Damage(attackDamage);
+                CastBarSystem.CancelTargetCast(stats);
+                if (targetAlive && ranged && range < attackRange + 2 && (targetIsRemote || ClearSight()))
+                {
+                    if (targetIsRemote)
+                        Network.RiftboundCoopPlayer.DispatchEnemyHitToPlayer(targetClientId, attackDamage, NetworkKey);
+                    else if (player)
+                    {
+                        EnemyProjectile.Launch(transform.position + Vector3.up * 1.25f, player, attackDamage);
+                    }
+                }
+                else if (targetAlive && !ranged && range < 2.8f && (targetIsRemote || ClearSight()))
+                {
+                    if (targetIsRemote)
+                    {
+                        Network.RiftboundCoopPlayer.DispatchEnemyHitToPlayer(targetClientId, attackDamage, NetworkKey);
+                    }
+                    else if (player && player.Stats)
+                    {
+                        player.Stats.Damage(attackDamage);
+                        if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner)
+                            Network.RiftboundCoopPlayer.LocalOwner.Health.Value = Mathf.Max(0, Mathf.RoundToInt(player.Stats.Health));
+                        if (Affix == EnemyAffix.Vampiric) stats.Heal(attackDamage * 0.35f);
+                        else if (Affix == EnemyAffix.Frostbound)
+                            BuffSystem.ApplyTargetDebuff(player.Stats, "frost_chill", "Chilled", "Slowed by frostbound foe.", "❄", new Color(0.4f, 0.85f, 1f), 2.5f, 0f);
+                    }
+                }
             }
             if (Time.time < attackEnds) return;
             if ((isBoss || heavyAttacker) && chasing && range < 7 && Time.time >= nextHeavy) { HeavyAttack(); return; }
-            Vector3 destination = chasing ? player.transform.position : home;
+            Vector3 destination = chasing ? targetTransform.position : home;
+            if (!chasing && Vector3.Distance(transform.position, home) > 1.2f)
+            {
+                // Evading / Leashing back to home camp: rapidly regenerate health
+                if (stats && stats.Health < stats.maxHealth)
+                    stats.Heal(stats.maxHealth * Time.deltaTime * 0.45f);
+            }
             var direction = destination - transform.position; direction.y = 0;
             if (chasing && range < attackRange)
             {
-                FacePlayer();
+                FacePoint(targetTransform.position);
                 if (Time.time >= nextAttack)
                 {
                     nextAttack = Time.time + Mathf.Max(attackInterval, attackDuration + .1f);
                     attackEnds = Time.time + attackDuration; damageAt = Time.time + attackDuration * .45f;
                     if (animator) animator.speed = 1;
                     pendingDamage = true; Play("Attack", true);
+                    if (ranged)
+                    {
+                        string spellName = gameObject.name.Contains("Hexer") ? "Shadow Bolt" : gameObject.name.Contains("Sorcerer") ? "Chaos Fire" : "Frost Bolt";
+                        string icon = gameObject.name.Contains("Hexer") ? "💀" : gameObject.name.Contains("Sorcerer") ? "🔥" : "❄";
+                        CastBarSystem.StartTargetCast(stats, spellName, icon, attackDuration * 0.85f, null, true);
+                    }
                 }
                 else { Play("Idle"); if (animator) animator.speed = 1; }
             }
             else if (direction.magnitude > .6f)
             {
                 transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(direction), Time.deltaTime * 7);
-                float speed = (chasing ? player.runSpeed : player.walkSpeed) * movementMultiplier;
+                float speed = (chasing ? (player ? player.runSpeed : 6f) : (player ? player.walkSpeed : 3.2f)) * movementMultiplier;
                 var previousPosition = transform.position;
                 motor.Move(direction.normalized * speed * Time.deltaTime);
                 var travelled = transform.position - previousPosition; travelled.y = 0;
                 Play(travelled.sqrMagnitude > .000001f ? (chasing ? "Run" : "Walk") : "Idle");
-                float stride = chasing ? (runStrideSpeed > 0 ? runStrideSpeed : player.runStrideSpeed) : (walkStrideSpeed > 0 ? walkStrideSpeed : player.walkStrideSpeed);
+                float stride = chasing ? (runStrideSpeed > 0 ? runStrideSpeed : (player ? player.runStrideSpeed : 5f)) : (walkStrideSpeed > 0 ? walkStrideSpeed : (player ? player.walkStrideSpeed : 2.5f));
                 if (animator) animator.speed = Mathf.Clamp(travelled.magnitude / Mathf.Max(.001f, Time.deltaTime * stride), .6f, 2.0f);
             }
             else { Play("Idle"); if (animator) animator.speed = 1; }
+
+            if (Network.CoopSessionConfig.IsMultiplayer && Unity.Netcode.NetworkManager.Singleton && Unity.Netcode.NetworkManager.Singleton.IsServer && (chasing || evading))
+            {
+                netBroadcastTimer += Time.deltaTime;
+                if (netBroadcastTimer >= 0.1f)
+                {
+                    netBroadcastTimer = 0f;
+                    if (Network.RiftboundCoopPlayer.LocalOwner)
+                        Network.RiftboundCoopPlayer.LocalOwner.BroadcastEnemyState(this);
+                }
+            }
+        }
+
+        void FacePoint(Vector3 point)
+        {
+            var look = point - transform.position; look.y = 0;
+            if (look.sqrMagnitude > .01f) transform.rotation = Quaternion.LookRotation(look);
         }
         void Play(string value, bool force = false)
         {
@@ -138,7 +377,9 @@ namespace Riftbound
             Vector3 origin = transform.position + Vector3.up * 1.1f;
             Vector3 delta = player.transform.position + Vector3.up - origin;
             Vector3 heading = Vector3.ProjectOnPlane(delta, Vector3.up);
-            return (heading.sqrMagnitude < .01f || Vector3.Dot(transform.forward, heading.normalized) > .25f) && !Physics.Raycast(origin, delta.normalized, delta.magnitude, ~(1 << 2), QueryTriggerInteraction.Ignore);
+            if (heading.sqrMagnitude >= .01f && Vector3.Dot(transform.forward, heading.normalized) <= .25f) return false;
+            return !Physics.Raycast(origin, delta.normalized, out var hit, delta.magnitude, ~(1 << 2), QueryTriggerInteraction.Ignore) ||
+                hit.collider.GetComponentInParent<PlayerController>() == player;
         }
         void FacePlayer()
         {

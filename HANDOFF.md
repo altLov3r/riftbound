@@ -1,13 +1,17 @@
 # Riftbound — agent handoff
 
-Updated: 2026-10-31. No Antigravity agent has been started or connected by this file.
+**Current user priority: opening screen and minimal HUD with original ability icons.** Models are paused. Read Docs/PRESENTATION_UPDATE.md for the latest UI pass; Docs/FREE_CHARACTER_ART_PLAN.md retains the free-asset plan.
+
+> ACTIVE CHECKPOINT: read **Docs/ANTIGRAVITY_HANDOFF.md** and **Docs/PRESENTATION_UPDATE.md** first. New title page, refined HUD and original class icons;145 gameplay/UI assertions pass. The notes below include historical passes.
+
+Updated: 2026-11-10. No Antigravity agent has been started or connected by this file.
 
 ## Project
 - Unity 6000.6.2f1, URP, C#, Input System.
 - Open this directory as the Unity project; Assets/, Packages/ and ProjectSettings/ are here.
-- Current scene: Assets/RPG/Scenes/Outpost-Updated.unity.
-- Latest validated executable: Builds/QuestUpdate/Riftbound.exe. Builds/GitHubPreview and Builds/Windows are earlier outputs; the normal build menu writes future builds to Builds/Windows.
-- Legacy Outpost.unity still contains the old rig. PrototypeEntry routes Play from it to Outpost-Updated.
+- Current scene: Assets/RPG/Scenes/Outpost-Expanded.unity. Original Updated scene and terrain preserved.
+- Latest validated executable: Builds/PresentationUpdate/Riftbound.exe (145 UI/gameplay assertions;0 build errors). Earlier builds retained.
+- Legacy Outpost.unity still contains the old rig. PrototypeEntry routes old scenes to Expanded when available.
 - GitHub repository: https://github.com/altLov3r/riftbound (private). Use Git with Git LFS; preserve .meta GUIDs. The original .plastic metadata remains local as a fallback.
 
 ## Working features
@@ -18,7 +22,9 @@ Updated: 2026-10-31. No Antigravity agent has been started or connected by this 
 - Three main quests: raiders, supplies, captain. Village, camp, watchtower, optional Western Crypt and Greenhollow frontier with three scouting landmarks.
 - Four Skeleton enemy models with melee/ranged roles, boss telegraph.
 - Two provisioners, potions, eleven gear items, equipment stats, six loot caches, expanded map, damage numbers.
-- Ground is now 160x300m; northern route crosses a brook/bridge to Greenhollow Post and Ancient Grove. Three new scouts and five harmless wildlife actors.
+- Expanded ground is 768x768m across four connected Terrain tiles. Separated faction settlements, Greenhollow valley, western river bridge and a 75m summit connect through real terrain roads. See Docs/WORLD_ZONES.md.
+- HUD uses a MENU launcher, collapsed chat, temporary notifications and a hidden-by-default damage meter. Start solo; MENU > Companions explicitly calls/dismisses allies. Pets also start dismissed.
+- Eighteen recorded CC0 Kenney effects and Poly Haven ground textures are included with source/license records. Fog/bloom are reduced; GameView helper gizmos are hidden on Play.
 - Z summons/dismounts; V cycles unlocked mounts. Horse is immediate, zebra unlocks from all three scouting markers. Summoning takes 1.5 seconds outside combat; damage/actions dismount. Selected mount and markers persist per character.
 - Mounts use ScriptableObject definitions, native animal clips and a Brute riding pose. Moving saddle aligns rider hips, axe is hidden, standing capsule/model restored on dismount. Mount body uses clearance/sweep checks; camera frames the rider.
 - Three persistent runestones unlock Crypt Warden; independent of the main captain quest. Warden drops axe, locked reliquary gives signet.

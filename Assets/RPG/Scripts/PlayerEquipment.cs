@@ -66,13 +66,54 @@ namespace Riftbound
             Stats.ConfigureVitals(150 + (Level - 1) * 20 + health + raceHpBonus + gemHp, ArmorRating + raceArmorBonus + gemArmor);
             if (!animator || Weapon == null) return;
             var block = new MaterialPropertyBlock();
-            Color tint = Weapon.rarity == "Rare" ? new Color(.8f, .9f, 1) : Weapon.rarity == "Uncommon" ? new Color(.85f, 1, .85f) : Color.white;
+            Color tint = Weapon.rarity == "Legendary" ? new Color(1.0f, 0.65f, 0.2f) :
+                         Weapon.rarity == "Epic" ? new Color(0.85f, 0.45f, 1.0f) :
+                         Weapon.rarity == "Rare" ? new Color(0.45f, 0.75f, 1.0f) :
+                         Weapon.rarity == "Uncommon" ? new Color(0.45f, 1.0f, 0.5f) : Color.white;
+
+            Transform handSlot = null;
+            if (animator.isHuman) handSlot = animator.GetBoneTransform(HumanBodyBones.RightHand);
+            if (!handSlot)
+            {
+                foreach (var t in animator.GetComponentsInChildren<Transform>())
+                {
+                    string tName = t.name.ToLowerInvariant();
+                    if (tName == "handslot.r" || tName.EndsWith(":righthand") || tName.Contains("hand.r"))
+                    { handSlot = t; break; }
+                }
+            }
+
+            if (handSlot)
+            {
+                foreach (var r in handSlot.GetComponentsInChildren<Renderer>())
+                {
+                    for (int i = 0; i < r.sharedMaterials.Length; i++)
+                    {
+                        r.GetPropertyBlock(block, i);
+                        block.SetColor("_BaseColor", tint);
+                        if (Weapon.rarity == "Epic" || Weapon.rarity == "Legendary")
+                            block.SetColor("_EmissionColor", tint * 0.45f);
+                        r.SetPropertyBlock(block, i);
+                    }
+                }
+            }
+
             foreach (var renderer in animator.GetComponentsInChildren<Renderer>())
             {
                 var materials = renderer.sharedMaterials;
                 for (int i = 0; i < materials.Length; i++)
-                    if (materials[i] && (materials[i].name.ToLowerInvariant().Contains("blinn") || materials[i].name.ToLowerInvariant().Contains("axe")))
-                    { renderer.GetPropertyBlock(block, i); block.SetColor("_BaseColor", tint); renderer.SetPropertyBlock(block, i); }
+                {
+                    if (materials[i] == null) continue;
+                    string mName = materials[i].name.ToLowerInvariant();
+                    if (mName.Contains("blinn") || mName.Contains("axe") || mName.Contains("weapon") || mName.Contains("blade") || mName.Contains("staff"))
+                    {
+                        renderer.GetPropertyBlock(block, i);
+                        block.SetColor("_BaseColor", tint);
+                        if (Weapon.rarity == "Epic" || Weapon.rarity == "Legendary")
+                            block.SetColor("_EmissionColor", tint * 0.45f);
+                        renderer.SetPropertyBlock(block, i);
+                    }
+                }
             }
         }
         string EnemyItem(EnemyController enemy)

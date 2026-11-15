@@ -9,7 +9,7 @@ namespace Riftbound
         void LateUpdate()
         {
             var camera = Camera.main; if (!camera) return;
-            transform.rotation = camera.transform.rotation;
+            transform.rotation = camera.transform.rotation * Quaternion.Euler(0, 180, 0);
             if (textRenderer) textRenderer.enabled = (camera.transform.position - transform.position).sqrMagnitude < 900;
         }
     }

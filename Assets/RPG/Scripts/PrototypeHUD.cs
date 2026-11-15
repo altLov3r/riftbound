@@ -5,6 +5,9 @@ namespace Riftbound
     public partial class PrototypeHUD : MonoBehaviour
     {
         public PlayerController player;
+        public static bool MenuOpen { get; set; }
+        string previousMessage;
+        float messageUntil;
         GUIStyle title, label, small, nameplate;
         GUIStyle questBody, questHeading, questButton;
         GUIStyle microBtnStyle, tooltipStyle, badgeStyle;
@@ -15,6 +18,18 @@ namespace Riftbound
         Texture2D white;
         void Start()
         {
+            // Region discovery has a top-screen ZoneBanner; legacy 3D floating captions duplicate it.
+            foreach (var text in FindObjectsByType<TextMesh>(FindObjectsSortMode.None))
+            {
+                if (text.GetComponentInParent<TownNPC>() || text.GetComponentInParent<Merchant>() || text.GetComponentInParent<QuestGiver>() || text.GetComponent<FloatingCombatNumber>())
+                    continue;
+                var renderer = text.GetComponent<MeshRenderer>(); if (renderer) renderer.enabled = false;
+                var billboard = text.GetComponent<WorldLabel>(); if (billboard) billboard.enabled = false;
+                text.gameObject.SetActive(false);
+            }
+            ExplorationSites.Ensure();
+            RiverReaverCamp.Ensure();
+            RoadPatrolGuard.Ensure();
             if (!ActionBarSystem.Instance && !GetComponent<ActionBarSystem>()) gameObject.AddComponent<ActionBarSystem>();
             if (!CathedralBossEncounter.Instance && !GetComponent<CathedralBossEncounter>()) gameObject.AddComponent<CathedralBossEncounter>();
             if (!ApexBossEncounter.Instance && !GetComponent<ApexBossEncounter>()) gameObject.AddComponent<ApexBossEncounter>();
@@ -39,6 +54,12 @@ namespace Riftbound
             if (!DamageMeterSystem.Instance && !GetComponent<DamageMeterSystem>()) gameObject.AddComponent<DamageMeterSystem>();
             if (!GlyphSystem.Instance && !GetComponent<GlyphSystem>()) gameObject.AddComponent<GlyphSystem>();
             if (!GemSocketSystem.Instance && !GetComponent<GemSocketSystem>()) gameObject.AddComponent<GemSocketSystem>();
+            if (!GetComponent<TargetSelectionRing>()) gameObject.AddComponent<TargetSelectionRing>();
+            if (!GetComponent<AmbientParticles>()) gameObject.AddComponent<AmbientParticles>();
+            if (!GetComponent<CombatStreakSystem>()) gameObject.AddComponent<CombatStreakSystem>();
+            if (!GetComponent<WorldShrineSystem>()) gameObject.AddComponent<WorldShrineSystem>();
+            if (!GetComponent<TargetFrameHUD>()) gameObject.AddComponent<TargetFrameHUD>();
+            if (!GetComponent<LivingWorldEvents>()) gameObject.AddComponent<LivingWorldEvents>();
         }
         void OnGUI()
         {
@@ -47,14 +68,15 @@ namespace Riftbound
             {
                 white = Texture2D.whiteTexture;
                 title = new GUIStyle(GUI.skin.label) { fontSize = 25, fontStyle = FontStyle.Bold };
-                title.normal.textColor = new Color(.95f, .79f, .45f);
-                label = new GUIStyle(GUI.skin.label) { fontSize = 16, wordWrap = true };
+                title.normal.textColor = new Color(.78f, .69f, .49f);
+                label = new GUIStyle(GUI.skin.label) { fontSize = 14, wordWrap = true };
                 label.normal.textColor = new Color(.92f, .94f, .91f);
                 small = new GUIStyle(label) { fontSize = 13 };
                 nameplate = new GUIStyle(small) { fontSize = 12, alignment = TextAnchor.MiddleCenter, wordWrap = false };
                 questBody = new GUIStyle(label) { fontSize = 17 };
                 questBody.normal.textColor = new Color(.19f, .12f, .065f);
                 questHeading = new GUIStyle(questBody) { fontSize = 22, fontStyle = FontStyle.Bold };
+                WowTheme.StyleButton(GUI.skin.button);
                 questButton = new GUIStyle(GUI.skin.button) { fontSize = 16, fontStyle = FontStyle.Bold };
                 microBtnStyle = new GUIStyle(GUI.skin.button)
                 {
@@ -78,10 +100,26 @@ namespace Riftbound
                 badgeStyle.normal.textColor = new Color(0.1f, 0.1f, 0.1f);
             }
             var oldMatrix = GUI.matrix;
+            float lowHpRatio = player.Stats.maxHealth > 0f ? player.Stats.Health / player.Stats.maxHealth : 1f;
+            if (player.Stats.Alive && lowHpRatio < 0.30f)
+            {
+                float severity = 1f - (lowHpRatio / 0.30f);
+                float pulse = 0.55f + 0.45f * Mathf.Sin(Time.time * 5.5f);
+                float alpha = Mathf.Clamp01((0.12f + 0.24f * severity) * pulse);
+                var prevColor = GUI.color;
+                GUI.color = new Color(0.75f, 0.04f, 0.04f, alpha);
+                float edge = 28f;
+                GUI.DrawTexture(new Rect(0, 0, Screen.width, edge), white);
+                GUI.DrawTexture(new Rect(0, Screen.height - edge, Screen.width, edge), white);
+                GUI.DrawTexture(new Rect(0, edge, edge, Screen.height - edge * 2f), white);
+                GUI.DrawTexture(new Rect(Screen.width - edge, edge, edge, Screen.height - edge * 2f), white);
+                GUI.color = prevColor;
+            }
             foreach (var enemy in FindObjectsByType<EnemyController>(FindObjectsSortMode.None))
             {
                 var stats = enemy.GetComponent<Combatant>();
-                if (!stats.Alive || Vector3.Distance(player.transform.position, enemy.transform.position) > 16) continue;
+                if (!stats.Alive || !Camera.main || Vector3.Distance(player.transform.position, enemy.transform.position) > 16) continue;
+                if (player.Target != stats && (stats.Health >= stats.maxHealth || Time.time - stats.LastHit > 6)) continue;
                 var point = Camera.main.WorldToScreenPoint(enemy.transform.position + Vector3.up * 2.6f);
                 if (point.z <= 0) continue;
                 var rect = new Rect(point.x - 45, Screen.height - point.y, 90, 7);
@@ -96,7 +134,8 @@ namespace Riftbound
                                      levelDiff <= 2 ? new Color(1f, 0.55f, 0.1f) :
                                      new Color(0.9f, 0.15f, 0.15f);
                     nameplate.normal.textColor = tagColor;
-                    string tagText = enemy.isBoss ? $"[Lv {enemyLevel} Boss] {stats.displayName}" : $"[Lv {enemyLevel}] {stats.displayName}";
+                    string affixTag = enemy.Affix != EnemyController.EnemyAffix.None ? $" · {enemy.Affix}" : "";
+                    string tagText = enemy.isBoss ? $"[Lv {enemyLevel} Boss{affixTag}] {stats.displayName}" : $"[Lv {enemyLevel}{affixTag}] {stats.displayName}";
                     GUI.Label(new Rect(point.x - 100, rect.y - 25, 200, 23), tagText, nameplate);
                 }
             }
@@ -107,16 +146,14 @@ namespace Riftbound
 
             // --- 1. Low-Profile Player Unit Frame (WoW Style: Portrait ring + Name/Title + HP + Resource + XP) ---
             float pfx = 24f, pfy = 20f, pfw = 224f, pfh = 52f;
-            Fill(new Rect(pfx, pfy, pfw, pfh), new Color(0.06f, 0.08f, 0.11f, 0.90f));
-            Fill(new Rect(pfx, pfy, pfw, 1.5f), new Color(0.85f, 0.70f, 0.28f, 0.95f)); // Gold top trim
+            WowTheme.Panel(new Rect(pfx - 3, pfy - 3, pfw + 6, pfh + 6));
+            Fill(new Rect(pfx, pfy, pfw, 1.5f), new Color(.66f, .55f, .33f, .85f)); // Gold top trim
             Fill(new Rect(pfx, pfy + pfh - 1f, pfw, 1f), new Color(0.35f, 0.30f, 0.15f, 0.8f));
 
             // Class Icon Portrait Badge
             float portSize = 36f;
             Fill(new Rect(pfx + 6f, pfy + 8f, portSize, portSize), new Color(0.12f, 0.15f, 0.20f, 0.95f));
-            string classIcon = player.CharacterClass == "Warrior" ? "⚔" :
-                               player.CharacterClass == "Paladin" ? "✝" :
-                               player.CharacterClass == "Mage" ? "🔥" : "🗡";
+            string classIcon = string.IsNullOrEmpty(player.CharacterClass) ? "?" : player.CharacterClass.Substring(0, 1);
             var portStyle = new GUIStyle(title) { fontSize = 20, alignment = TextAnchor.MiddleCenter };
             GUI.Label(new Rect(pfx + 6f, pfy + 7f, portSize, portSize), classIcon, portStyle);
 
@@ -127,19 +164,19 @@ namespace Riftbound
             // Formatted Name & Title
             float textX = pfx + portSize + 12f;
             float barW = pfw - portSize - 18f;
-            string charName = PlayerTitleSystem.GetFormattedName(player);
+            string charName = player.CharacterName;
             GUI.Label(new Rect(textX, pfy + 3f, barW, 16f), charName, label);
 
             // Heroic Difficulty Badge on Player Frame
             if (DungeonInstanceManager.Instance && DungeonInstanceManager.Instance.CurrentDifficulty == DungeonInstanceManager.DungeonDifficulty.Heroic)
             {
                 Fill(new Rect(pfx + pfw - 62f, pfy - 14f, 62f, 13f), new Color(0.6f, 0.12f, 0.12f, 0.95f));
-                GUI.Label(new Rect(pfx + pfw - 62f, pfy - 15f, 62f, 13f), "💀 HEROIC", badgeStyle);
+                GUI.Label(new Rect(pfx + pfw - 62f, pfy - 15f, 62f, 13f), "HEROIC", badgeStyle);
             }
 
             // Health Bar (13px)
             float hpPct = player.Stats.Health / player.Stats.maxHealth;
-            Bar(new Rect(textX, pfy + 21f, barW, 13f), hpPct, new Color(0.16f, 0.75f, 0.22f));
+            Bar(new Rect(textX, pfy + 21f, barW, 13f), hpPct, new Color(.30f, .57f, .43f));
             GUI.Label(new Rect(textX, pfy + 19f, barW, 15f), $"{Mathf.CeilToInt(player.Stats.Health)} / {player.Stats.maxHealth}", small);
 
             // Resource Bar (9px)
@@ -150,14 +187,10 @@ namespace Riftbound
             float resRatio = Mathf.Clamp01(player.ClassResource / Mathf.Max(1f, player.MaxClassResource));
             Bar(new Rect(textX, pfy + 36f, barW, 9f), resRatio, resColor);
 
-            // Ultra-thin XP Bar along bottom edge of Player Unit Frame (3px)
-            float xpRatio = player.Level == 5 ? 1f : (float)(player.Experience - player.LevelFloor) / Mathf.Max(1, player.NextLevelExperience - player.LevelFloor);
-            Bar(new Rect(pfx, pfy + pfh - 3f, pfw, 3f), xpRatio, new Color(0.55f, 0.25f, 0.90f));
-
             // Tooltip on Player Frame Hover (Shows Gold & XP Details)
             if (new Rect(pfx, pfy, pfw, pfh).Contains(Event.current.mousePosition))
             {
-                activeMicroTip = $"<b>{charName}</b>\nLevel {player.Level} {player.CharacterRace} {player.CharacterClass}\nGold: {player.Gold} 💰  ·  XP: {player.Experience}/{player.NextLevelExperience}";
+                activeMicroTip = $"<b>{charName}</b>\nLevel {player.Level} {player.CharacterRace} {player.CharacterClass}\nGold: {player.Gold}  ·  XP: {player.Experience}/{player.NextLevelExperience}";
                 activeMicroTipRect = new Rect(Event.current.mousePosition.x + 12f, Event.current.mousePosition.y + 12f, 210f, 48f);
             }
 
@@ -165,13 +198,13 @@ namespace Riftbound
             if (player.Target)
             {
                 float tfx = pfx + pfw + 10f, tfy = pfy, tfw = 205f, tfh = 52f;
-                Fill(new Rect(tfx, tfy, tfw, tfh), new Color(0.06f, 0.08f, 0.11f, 0.90f));
+                WowTheme.Panel(new Rect(tfx - 3, tfy - 3, tfw + 6, tfh + 6));
                 Fill(new Rect(tfx, tfy, tfw, 1.5f), new Color(0.85f, 0.35f, 0.28f, 0.95f)); // Crimson top trim
                 Fill(new Rect(tfx, tfy + tfh - 1f, tfw, 1f), new Color(0.35f, 0.15f, 0.15f, 0.8f));
 
                 var enemyComp = player.Target.GetComponentInParent<EnemyController>();
                 int targetLvl = enemyComp ? (enemyComp.isBoss ? 5 : enemyComp.heavyAttacker ? 4 : enemyComp.campGuard ? 3 : 2) : 1;
-                string targetIcon = enemyComp && enemyComp.isBoss ? "💀" : "⚔";
+                string targetIcon = enemyComp && enemyComp.isBoss ? "B" : "·";
 
                 // Target Portrait Icon
                 Fill(new Rect(tfx + 6f, tfy + 8f, portSize, portSize), new Color(0.22f, 0.10f, 0.10f, 0.95f));
@@ -204,67 +237,50 @@ namespace Riftbound
                 var duelSys = DuelSystem.Instance ?? UnityEngine.Object.FindAnyObjectByType<DuelSystem>();
                 if (duelSys && duelSys.State == DuelSystem.DuelState.Inactive && player.Target.Alive && player.Target != player.Stats)
                 {
-                    if (GUI.Button(new Rect(tfx + tfw + 4f, tfy + 12f, 54f, 26f), "⚔ DUEL", small))
+                    if (GUI.Button(new Rect(tfx + tfw + 4f, tfy + 12f, 54f, 26f), "DUEL", small))
                     {
                         duelSys.Challenge(player.Target, out _);
                     }
                 }
             }
 
-            // --- 3. Low-Profile Collapsible Quest Tracker (Beneath Minimap) ---
-            float qtw = 236f;
-            float qtx = width - qtw - 16f;
-            float qty = 166f;
-
-            // Header Bar
-            Fill(new Rect(qtx, qty, qtw, 20f), new Color(0.06f, 0.08f, 0.11f, 0.85f));
-            Fill(new Rect(qtx, qty, qtw, 1.5f), new Color(0.85f, 0.70f, 0.28f, 0.95f));
-
-            string toggleText = questTrackerCollapsed ? "[+] " : "[-] ";
-            if (GUI.Button(new Rect(qtx + 2f, qty, 24f, 19f), toggleText, small))
+            // Keep the world visible: show only active objectives, with details in the journal.
+            float qtw = 236f, qtx = width - qtw - 20f;
+            float qty = (MinimapRadar.Instance != null && MinimapRadar.Instance.showMinimap) ? 198f : 20f;
+            var fqs = FactionQuestSystem.Instance;
+            var fq = fqs != null ? fqs.GetActiveQuest() : null;
+            bool hasObjective = fq != null || player.QuestAccepted;
+            if (hasObjective)
             {
-                questTrackerCollapsed = !questTrackerCollapsed;
-                AudioEffects.PlayClick();
-            }
-            GUI.Label(new Rect(qtx + 26f, qty + 1f, qtw - 30f, 18f), $"QUESTS ({Mathf.Min(player.QuestIndex + 1, 3)}/3)", small);
-
-            if (!questTrackerCollapsed)
-            {
-                float bodyH = 74f;
-                Fill(new Rect(qtx, qty + 20f, qtw, bodyH), new Color(0.04f, 0.05f, 0.07f, 0.65f));
-
-                // Quest Title in Gold
-                GUI.Label(new Rect(qtx + 8f, qty + 22f, qtw - 16f, 18f), player.QuestName, label);
-
-                // Objective with Checkbox
-                string check = player.QuestReady ? "☑ " : "☐ ";
-                GUI.Label(new Rect(qtx + 8f, qty + 40f, qtw - 16f, 32f), check + player.QuestObjective, small);
-
-                // Distance
-                float distance = Vector3.Distance(player.transform.position, player.ObjectivePosition);
-                GUI.Label(new Rect(qtx + 8f, qty + 74f, qtw - 16f, 18f), player.QuestComplete ? "All 3 quests completed" : $"Objective: {Mathf.RoundToInt(distance)}m away", small);
+                Fill(new Rect(qtx, qty, qtw, 28f), new Color(.055f, .065f, .08f, .84f));
+                Fill(new Rect(qtx, qty, 2f, 28f), new Color(.66f, .55f, .33f, .85f));
+                if (GUI.Button(new Rect(qtx + 10f, qty + 3f, qtw - 18f, 23f), questTrackerCollapsed ? "OBJECTIVES  +" : "OBJECTIVES  -", small))
+                {
+                    questTrackerCollapsed = !questTrackerCollapsed;
+                    AudioEffects.PlayClick();
+                }
+                if (!questTrackerCollapsed)
+                {
+                    float rows = fq != null && player.QuestAccepted ? 2f : 1f;
+                    Fill(new Rect(qtx, qty + 28f, qtw, rows * 58f + 8f), new Color(.045f, .055f, .07f, .72f));
+                    float objectiveY = qty + 35f;
+                    if (fq != null)
+                    {
+                        GUI.Label(new Rect(qtx + 12f, objectiveY, qtw - 24f, 22f), fq.title, label);
+                        string objective = fqs.IsActiveQuestReady() ? "Return to " + fq.giverNpc : $"{fq.targetName}: {fqs.CurrentProgress}/{fq.requiredCount}";
+                        GUI.Label(new Rect(qtx + 12f, objectiveY + 23f, qtw - 24f, 32f), objective, small);
+                        objectiveY += 58f;
+                    }
+                    if (player.QuestAccepted)
+                    {
+                        GUI.Label(new Rect(qtx + 12f, objectiveY, qtw - 24f, 22f), player.QuestName, label);
+                        GUI.Label(new Rect(qtx + 12f, objectiveY + 23f, qtw - 24f, 32f), player.QuestObjective, small);
+                    }
+                }
             }
 
             if (!player.DialogueOpen)
             {
-                int unspent = TalentSystem.GetUnspentTalentPoints(player);
-                if (unspent > 0)
-                {
-                    float pulse = 0.8f + Mathf.PingPong(Time.time * 2f, 0.4f);
-                    var oldColor = GUI.color;
-                    GUI.color = new Color(1f, 0.85f * pulse, 0.25f * pulse);
-                    if (GUI.Button(new Rect(width / 2 - 140, height - 90, 280, 26), $"★ {unspent} UNSPENT TALENT POINT{(unspent > 1 ? "S" : "")} [N]", questButton))
-                    {
-                        player.TalentsOpen = !player.TalentsOpen;
-                    }
-                    GUI.color = oldColor;
-                }
-                else if (player.Mounted && player.SelectedMount && player.SelectedMount.isFlying)
-                {
-                    Panel(new Rect(width / 2 - 200, height - 85, 400, 24));
-                    GUI.Label(new Rect(width / 2 - 190, height - 85, 380, 22), "★ FLYING: [Space] Ascend  ·  [X] Descend  ·  [Shift] Boost", small);
-                }
-
                 if (ActionBarSystem.Instance)
                 {
                     ActionBarSystem.Instance.DrawActionBar(player, width, height);
@@ -280,116 +296,56 @@ namespace Riftbound
                 }
 
                 // Centered Notification Toast
-                if (!string.IsNullOrEmpty(player.Message))
+                if (previousMessage != player.Message)
                 {
-                    float msgW = Mathf.Min(480f, width - 120f);
+                    previousMessage = player.Message;
+                    messageUntil = Time.unscaledTime + 4f;
+                }
+                if (!string.IsNullOrEmpty(player.Message) && Time.unscaledTime < messageUntil)
+                {
+                    float msgW = Mathf.Min(580f, width - 120f);
                     float msgX = width / 2f - msgW / 2f;
-                    float msgY = height - 110f;
-                    Fill(new Rect(msgX - 6f, msgY - 3f, msgW + 12f, 26f), new Color(0.04f, 0.06f, 0.08f, 0.85f));
-                    var centerMsg = new GUIStyle(label) { alignment = TextAnchor.MiddleCenter };
-                    GUI.Label(new Rect(msgX, msgY, msgW, 22f), player.Message, centerMsg);
+                    float msgY = height - 124f;
+                    Fill(new Rect(msgX - 6f, msgY - 3f, msgW + 12f, 42f), new Color(0.04f, 0.06f, 0.08f, .65f));
+                    var centerMsg = new GUIStyle(small) { alignment = TextAnchor.MiddleCenter, wordWrap = true };
+                    GUI.Label(new Rect(msgX, msgY, msgW, 36f), player.Message, centerMsg);
                 }
 
-                // --- 4. WoW-Style Low-Profile Micro-Menu Icons Bar (Bottom Right) ---
-                float btnSize = 25f;
-                float btnSpacing = 3f;
-                float totalBarW = 16 * (btnSize + btnSpacing);
-                float mmX = width - totalBarW - 14f;
-                float mmY = height - 29f;
-
-                void DrawMicroIcon(int index, string icon, string tipText, System.Action onClick, bool pulse = false)
-                {
-                    Rect btnRect = new Rect(mmX + index * (btnSize + btnSpacing), mmY, btnSize, btnSize);
-                    if (pulse)
-                    {
-                        float p = 0.8f + Mathf.PingPong(Time.time * 3f, 0.35f);
-                        GUI.color = new Color(1f, 0.85f * p, 0.25f * p);
-                    }
-                    if (GUI.Button(btnRect, icon, microBtnStyle))
-                    {
-                        onClick?.Invoke();
-                        AudioEffects.PlayClick();
-                    }
-                    GUI.color = Color.white;
-
-                    if (btnRect.Contains(Event.current.mousePosition))
-                    {
-                        activeMicroTip = tipText;
-                        activeMicroTipRect = new Rect(btnRect.x - 45f, btnRect.y - 28f, 125f, 24f);
-                    }
-                }
-
-                int unspentPts = TalentSystem.GetUnspentTalentPoints(player);
-                bool hasMail = MailboxSystem.Instance && MailboxSystem.Instance.HasUnreadMail();
-                DrawMicroIcon(0, "👤", "Character [C]", () => { if (CharacterSheetSystem.Instance) CharacterSheetSystem.Instance.ToggleSheet(); });
-                DrawMicroIcon(1, "📖", "Spellbook [P]", () => { player.SpellbookOpen = !player.SpellbookOpen; });
-                DrawMicroIcon(2, "⚡", unspentPts > 0 ? $"Talents ({unspentPts}) [N]" : "Talents [N]", () => { player.TalentsOpen = !player.TalentsOpen; }, unspentPts > 0);
-                DrawMicroIcon(3, "📜", "Quest Log [J]", () => { player.JournalOpen = !player.JournalOpen; });
-                DrawMicroIcon(4, "🏰", "Guild & Vault [G]", () => { if (GuildSystem.Instance) GuildSystem.Instance.IsOpen = !GuildSystem.Instance.IsOpen; });
-                DrawMicroIcon(5, "⚒", "Professions [K]", () => { ProfessionSystem.IsOpen = !ProfessionSystem.IsOpen; });
-                DrawMicroIcon(6, "🏛", "Auction House", () => { AuctionHouseSystem.AuctionOpen = !AuctionHouseSystem.AuctionOpen; });
-                DrawMicroIcon(7, "🏆", "Achievements [Y]", () => { player.AchievementOpen = !player.AchievementOpen; });
-                DrawMicroIcon(8, "🎖", "Reputation [U]", () => { player.ReputationOpen = !player.ReputationOpen; });
-                DrawMicroIcon(9, "⚔", "PvP & Arena [Shift+H]", () => { if (BattlegroundSystem.Instance) BattlegroundSystem.Instance.IsWindowOpen = !BattlegroundSystem.Instance.IsWindowOpen; });
-                DrawMicroIcon(10, "👁", "Dungeon Finder [I/LFG]", () => { if (DungeonFinderSystem.Instance) DungeonFinderSystem.Instance.ToggleWindow(); }, DungeonFinderSystem.Instance && DungeonFinderSystem.Instance.State == DungeonFinderSystem.QueueState.Queued);
-                DrawMicroIcon(11, "🐾", "Pet Journal & Battles [Shift+P]", () => { if (PetBattleSystem.Instance) PetBattleSystem.Instance.ToggleJournal(); });
-                DrawMicroIcon(12, "✉", hasMail ? "Mailbox (New Mail!)" : "Mailbox", () => { if (MailboxSystem.Instance) MailboxSystem.Instance.IsOpen = !MailboxSystem.Instance.IsOpen; }, hasMail);
-                DrawMicroIcon(13, "🎒", "Bags [B]", () => { player.InventoryOpen = !player.InventoryOpen; });
-                DrawMicroIcon(14, "🗺", "World Map [M]", () => { player.MapOpen = !player.MapOpen; });
-                DrawMicroIcon(15, "❓", "Help & Keybinds", () => { showHelpOverlay = !showHelpOverlay; });
-
-                // Micro-Menu Tooltip
-                if (!string.IsNullOrEmpty(activeMicroTip))
-                {
-                    GUI.Box(activeMicroTipRect, activeMicroTip, tooltipStyle);
-                }
-
-                // Help & Controls Popup Overlay (Only when requested via ❓ button)
-                if (showHelpOverlay)
-                {
-                    float hw = 340f, hh = 145f;
-                    float hx = width - hw - 14f, hy = height - hh - 36f;
-                    Fill(new Rect(hx - 2f, hy - 2f, hw + 4f, hh + 4f), new Color(0.85f, 0.70f, 0.28f, 0.95f));
-                    Fill(new Rect(hx, hy, hw, hh), new Color(0.06f, 0.08f, 0.11f, 0.96f));
-
-                    GUI.Label(new Rect(hx + 10f, hy + 6f, hw - 50f, 20f), "KEYBOARD & CONTROLS", label);
-                    if (GUI.Button(new Rect(hx + hw - 26f, hy + 5f, 20f, 20f), "✕", microBtnStyle))
-                    {
-                        showHelpOverlay = false;
-                        AudioEffects.PlayClick();
-                    }
-                    string helpText = "<b>Movement:</b> WASD Run  ·  C Walk  ·  Space Jump\n" +
-                                      "<b>Camera:</b> RMB + Mouse Look  ·  Wheel Zoom\n" +
-                                      "<b>Combat:</b> 1-3 Abilities  ·  4 Potion  ·  Q Shield  ·  Z Mount\n" +
-                                      "<b>UI Windows:</b> C/I Bags  ·  N Talents  ·  J Quest  ·  M Map  ·  K Craft\n" +
-                                      "<b>Chat:</b> Enter to Chat  ·  Tab Target";
-                    GUI.Label(new Rect(hx + 10f, hy + 30f, hw - 20f, hh - 36f), helpText, small);
-                }
+                DrawUtilityMenu(width, height);
             }
-            if (!player.DialogueOpen && !player.ShopOpen && LootDropSystem.Instance && LootDropSystem.Instance.GetNearbyCorpse(player.transform.position, 3.2f) is var corpse && corpse != null)
-                GUI.Label(new Rect(width / 2 - 140, height / 2 + 70, 350, 35), $"[E] Loot {corpse.name}", label);
-            else if (!player.DialogueOpen && !player.ShopOpen && Mailbox.GetNearby(player.transform.position) is var mbNear && mbNear != null)
-                GUI.Label(new Rect(width / 2 - 140, height / 2 + 70, 350, 35), "[E] Open Mailbox", label);
-            else if (!player.DialogueOpen && !player.ShopOpen && TownNPC.FindNearby(player.transform.position) is TownNPC townNpcAuc && townNpcAuc.roleTag == "Auctioneer")
-                GUI.Label(new Rect(width / 2 - 140, height / 2 + 70, 360, 35), "[E] Browse Auction House", label);
-            else if (!player.DialogueOpen && !player.ShopOpen && FlightMaster.GetNearby(player.transform.position) is var fm && fm != null)
-                GUI.Label(new Rect(width / 2 - 140, height / 2 + 70, 360, 35), "[E] Flight Master: " + fm.nodeName, label);
-            else if (!player.DialogueOpen && !player.ShopOpen && GatheringNode.GetNearby(player.transform.position, 3.2f) is var gn && gn != null)
-                GUI.Label(new Rect(width / 2 - 140, height / 2 + 70, 360, 35), "[E] " + gn.ActionPrompt, label);
-            else if (!player.DialogueOpen && !player.ShopOpen && player.NearbyMerchant())
-                GUI.Label(new Rect(width / 2 - 140, height / 2 + 70, 350, 35), "[E] " + player.NearbyMerchant().npcName, label);
-            else if (!player.DialogueOpen && player.CanTalk())
-                GUI.Label(new Rect(width / 2 - 100, height / 2 + 70, 260, 35), "[E] Talk to Abe", label);
-            else if (!player.DialogueOpen && player.NearbyLandmark())
-                GUI.Label(new Rect(width / 2 - 150, height / 2 + 70, 380, 35), "[E] Discover " + player.NearbyLandmark().displayName, label);
-            else if (!player.DialogueOpen && player.NearbyRune())
-                GUI.Label(new Rect(width / 2 - 120, height / 2 + 70, 300, 35), "[E] Activate runestone", label);
-            else if (!player.DialogueOpen && player.NearbySupply())
-                GUI.Label(new Rect(width / 2 - 120, height / 2 + 70, 300, 35), "[E] Recover supplies", label);
-            else if (!player.DialogueOpen && player.NearbyChest())
-                GUI.Label(new Rect(width / 2 - 120, height / 2 + 70, 300, 35), "[E] Open loot cache", label);
-            else if (!player.DialogueOpen && !player.ShopOpen && TownNPC.FindNearby(player.transform.position) is TownNPC townNpc)
-                GUI.Label(new Rect(width / 2 - 140, height / 2 + 70, 360, 35), "[E] Speak with " + townNpc.npcName, label);
+            if (!player.DialogueOpen && !player.ShopOpen)
+            {
+                string promptKey = "E";
+                string promptText = null;
+
+                if (LootDropSystem.Instance && LootDropSystem.Instance.GetNearbyCorpse(player.transform.position, 3.2f) is var corpse && corpse != null)
+                    promptText = $"Loot {corpse.name}";
+                else if (Mailbox.GetNearby(player.transform.position, 3.5f) is var mbNear && mbNear != null)
+                    promptText = $"Open {mbNear.mailboxName}";
+                else if (TownNPC.FindNearby(player.transform.position) is TownNPC townNpcAuc && townNpcAuc.roleTag == "Auctioneer")
+                    promptText = "Browse Auction House";
+                else if (FlightMaster.GetNearby(player.transform.position) is var fm && fm != null)
+                    promptText = $"Flight Master: {fm.nodeName}";
+                else if (GatheringNode.GetNearby(player.transform.position, 3.2f) is var gn && gn != null)
+                    promptText = gn.ActionPrompt;
+                else if (player.NearbyMerchant())
+                    promptText = $"Trade with {player.NearbyMerchant().npcName}";
+                else if (player.CanTalk())
+                    promptText = "Speak with Elder Abe";
+                else if (player.NearbyLandmark())
+                    promptText = $"Discover {player.NearbyLandmark().displayName}";
+                else if (player.NearbyRune())
+                    promptText = "Activate Runestone";
+                else if (player.NearbySupply())
+                    promptText = "Recover Supplies";
+                else if (player.NearbyChest())
+                    promptText = "Open Loot Cache";
+                else if (TownNPC.FindNearby(player.transform.position) is TownNPC townNpc)
+                    promptText = $"Speak with {townNpc.npcName}";
+
+                if (!string.IsNullOrEmpty(promptText))
+                    DrawInteractionBadge(promptKey, promptText, width, height);
+            }
             if (player.DialogueOpen)
             {
                 if (player.ActiveQuestGiver) DrawQuestWindow(height);
@@ -440,7 +396,7 @@ namespace Riftbound
             {
                 var prevColor = GUI.backgroundColor;
                 GUI.backgroundColor = new Color(1.0f, 0.85f, 0.2f, 0.95f);
-                if (GUI.Button(new Rect(width - 165, 8, 115, 26), "✉ NEW MAIL", questButton))
+                if (GUI.Button(new Rect(width - 282, 20, 60, 24), "Mail", small))
                 {
                     AuctionHouseSystem.MailboxOpen = !AuctionHouseSystem.MailboxOpen;
                 }
@@ -486,15 +442,6 @@ namespace Riftbound
             if (GlyphSystem.Instance) GlyphSystem.Instance.DrawGlyphGUI(width, height);
             if (GemSocketSystem.Instance) GemSocketSystem.Instance.DrawGemSocketGUI(width, height);
 
-            // Nearby Physical Mailbox interaction prompt
-            var nearMailbox = Mailbox.GetNearby(player.transform.position, 3.5f);
-            if (nearMailbox && !FrontendMenu.IsOpen && (!MailboxSystem.Instance || !MailboxSystem.Instance.IsOpen))
-            {
-                float mw = 220f, mh = 32f;
-                float mx = (width - mw) * 0.5f, my = height * 0.65f;
-                Fill(new Rect(mx, my, mw, mh), new Color(0.06f, 0.08f, 0.12f, 0.85f));
-                GUI.Label(new Rect(mx, my + 6f, mw, 20f), $"[E] Open {nearMailbox.mailboxName}", label);
-            }
             if (FlightMaster.ActiveFlightMaster != null && FlightMaster.ActiveFlightMaster.TaxiMapOpen)
                 FlightMaster.ActiveFlightMaster.DrawTaxiMapGUI(width, height);
             else if (FlightMaster.Instance != null && FlightMaster.Instance.TaxiMapOpen)
@@ -505,6 +452,124 @@ namespace Riftbound
 
             GUI.matrix = oldMatrix;
         }
+        void OnDestroy() { MenuOpen = false; }
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        static void ResetMenu() { MenuOpen = false; }
+
+        void DrawInteractionBadge(string key, string promptText, float width, float height)
+        {
+            float badgeW = Mathf.Max(220f, promptText.Length * 8.5f + 64f);
+            float badgeH = 34f;
+            float badgeX = (width - badgeW) * 0.5f;
+            float badgeY = height * 0.5f + 78f;
+
+            // Sleek dark panel with warm gold border
+            Fill(new Rect(badgeX - 1f, badgeY - 1f, badgeW + 2f, badgeH + 2f), new Color(0.35f, 0.28f, 0.14f, 0.90f));
+            Fill(new Rect(badgeX, badgeY, badgeW, badgeH), new Color(0.06f, 0.08f, 0.11f, 0.94f));
+
+            // Gold key badge
+            float keyW = 28f, keyH = 22f;
+            float keyX = badgeX + 6f, keyY = badgeY + 6f;
+            Fill(new Rect(keyX, keyY, keyW, keyH), new Color(0.86f, 0.68f, 0.25f, 1f));
+            var keyStyle = new GUIStyle(small) { fontSize = 13, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+            keyStyle.normal.textColor = new Color(0.08f, 0.06f, 0.02f);
+            GUI.Label(new Rect(keyX, keyY - 1f, keyW, keyH), key, keyStyle);
+
+            // Action label
+            var textStyle = new GUIStyle(label) { fontSize = 14, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft };
+            textStyle.normal.textColor = new Color(0.95f, 0.92f, 0.85f);
+            GUI.Label(new Rect(keyX + keyW + 8f, badgeY + 4f, badgeW - keyW - 14f, 26f), promptText, textStyle);
+        }
+
+        void DrawUtilityMenu(float width, float height)
+        {
+            if (GUI.Button(new Rect(width - 98f, height - 34f, 84f, 26f), "MENU", questButton))
+            {
+                if (!MenuOpen) showHelpOverlay = false;
+                MenuOpen = !MenuOpen;
+                if (PartySystem.Instance) PartySystem.Instance.CloseCompanionMenu();
+                AudioEffects.PlayClick();
+            }
+            if (MenuOpen && !showHelpOverlay)
+            {
+                float w = 420f, h = 470f;
+                float x = width - w - 16f, y = height - h - 42f;
+                Panel(new Rect(x, y, w, h));
+                GUI.Label(new Rect(x + 18f, y + 12f, 300f, 26f), "GAME MENU", title);
+                if (GUI.Button(new Rect(x + w - 38f, y + 10f, 26f, 24f), "X", questButton)) { MenuOpen = false; AudioEffects.PlayClick(); }
+
+                var headerStyle = new GUIStyle(small) { fontStyle = FontStyle.Bold, fontSize = 11 };
+                headerStyle.normal.textColor = new Color(0.86f, 0.68f, 0.27f);
+
+                float curY = y + 42f;
+                void Section(string header, (string title, System.Action action)[] items)
+                {
+                    GUI.Label(new Rect(x + 18f, curY, w - 36f, 16f), header.ToUpperInvariant(), headerStyle);
+                    Fill(new Rect(x + 18f, curY + 16f, w - 36f, 1f), new Color(0.42f, 0.31f, 0.12f, 0.6f));
+                    curY += 20f;
+                    for (int i = 0; i < items.Length; i++)
+                    {
+                        float btnX = x + 18f + (i % 2) * 194f;
+                        float btnY = curY + (i / 2) * 32f;
+                        if (GUI.Button(new Rect(btnX, btnY, 190f, 28f), items[i].title, questButton))
+                        {
+                            MenuOpen = false;
+                            items[i].action();
+                            AudioEffects.PlayClick();
+                        }
+                    }
+                    curY += Mathf.CeilToInt(items.Length / 2f) * 32f + 6f;
+                }
+
+                int talentPoints = TalentSystem.GetUnspentTalentPoints(player);
+                string talentLabel = talentPoints > 0 ? $"Talents [N] ({talentPoints})" : "Talents [N]";
+
+                Section("Character & Abilities", new[]
+                {
+                    ("Character [C]", (System.Action)(() => { if (CharacterSheetSystem.Instance) CharacterSheetSystem.Instance.ToggleSheet(); })),
+                    ("Bags [B / I]", () => player.InventoryOpen = !player.InventoryOpen),
+                    (talentLabel, () => player.TalentsOpen = !player.TalentsOpen),
+                    ("Spellbook [P]", () => player.SpellbookOpen = !player.SpellbookOpen),
+                });
+
+                Section("World & Adventure", new[]
+                {
+                    ("World Map [M]", (System.Action)(() => player.MapOpen = !player.MapOpen)),
+                    ("Quests [J]", () => player.JournalOpen = !player.JournalOpen),
+                    ("Dungeon Finder", () => { if (DungeonFinderSystem.Instance) DungeonFinderSystem.Instance.ToggleWindow(); }),
+                    ("Companions", () => { if (PartySystem.Instance) PartySystem.Instance.IsCompanionMenuOpen = true; }),
+                });
+
+                Section("Social & Economy", new[]
+                {
+                    ("Guild [G]", (System.Action)(() => { if (GuildSystem.Instance) GuildSystem.Instance.IsOpen = !GuildSystem.Instance.IsOpen; })),
+                    ("Auction House", () => AuctionHouseSystem.AuctionOpen = !AuctionHouseSystem.AuctionOpen),
+                    ("Mailbox", () => { if (MailboxSystem.Instance) MailboxSystem.Instance.IsOpen = !MailboxSystem.Instance.IsOpen; }),
+                    ("Achievements [Y]", () => player.AchievementOpen = !player.AchievementOpen),
+                });
+
+                Section("System", new[]
+                {
+                    ("Settings [Esc]", (System.Action)(() => { if (SettingsSystem.Instance) SettingsSystem.Instance.OpenMenu(); })),
+                    ("Controls & Hotkeys", () => { showHelpOverlay = true; MenuOpen = true; }),
+                });
+            }
+            if (showHelpOverlay && MenuOpen)
+            {
+                float x = (width - 460f) * .5f, y = (height - 240f) * .5f;
+                Panel(new Rect(x, y, 460f, 240f));
+                GUI.Label(new Rect(x + 20f, y + 14f, 380f, 28f), "GAME CONTROLS & SHORTCUTS", title);
+                GUI.Label(new Rect(x + 20f, y + 50f, 420f, 130f),
+                    "<b>Movement:</b> WASD to Move · Space to Jump · C to Slow Walk\n" +
+                    "<b>Camera:</b> Hold Right-Click to steer · Left-Click to orbit · Wheel to zoom\n" +
+                    "<b>Combat:</b> 1-3 Abilities · 4 Health Potion · F Interrupt · Q Shield Block\n" +
+                    "<b>World:</b> E to Interact/Talk · Z Mount · V Cycle Mount · H Hearthstone\n" +
+                    "<b>Panels:</b> C Character · B/I Bags · J Quests · M Map · N Talents · P Spells", small);
+                if (GUI.Button(new Rect(x + 170f, y + 192f, 120f, 30f), "Close", questButton)) { showHelpOverlay = false; MenuOpen = false; AudioEffects.PlayClick(); }
+            }
+        }
+
         void DrawQuestWindow(float height)
         {
             var npc = player.ActiveQuestGiver;
@@ -536,7 +601,7 @@ namespace Riftbound
         }
         void Fill(Rect rect, Color color) { GUI.color = color; GUI.DrawTexture(rect, white); GUI.color = Color.white; }
         string Cooldown(float end) => end <= Time.time ? "READY" : $"{Mathf.CeilToInt(end - Time.time)}s";
-        void Panel(Rect rect) { GUI.color = new Color(.035f, .065f, .065f, .9f); GUI.DrawTexture(rect, white); GUI.color = Color.white; }
+        void Panel(Rect rect) { WowTheme.Panel(rect); }
         void Bar(Rect rect, float fill, Color color)
         {
             GUI.color = new Color(.1f, .12f, .12f); GUI.DrawTexture(rect, white);
@@ -544,3 +609,5 @@ namespace Riftbound
         }
     }
 }
+
+

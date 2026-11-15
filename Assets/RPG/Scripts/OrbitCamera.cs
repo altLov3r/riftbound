@@ -17,6 +17,16 @@ namespace Riftbound
         public bool IsFreeLooking { get; private set; }
         public bool BothMouseButtonsPressed { get; private set; }
         PlayerController player;
+        static OrbitCamera activeInstance;
+        float shakeIntensity, shakeRemaining, shakeDuration;
+        void Awake() { activeInstance = this; }
+        public static void Shake(float intensity, float duration)
+        {
+            if (!activeInstance || activeInstance.Paused) return;
+            activeInstance.shakeIntensity = Mathf.Max(activeInstance.shakeIntensity, intensity);
+            activeInstance.shakeDuration = Mathf.Max(0.01f, duration);
+            activeInstance.shakeRemaining = Mathf.Max(activeInstance.shakeRemaining, duration);
+        }
         void Start()
         {
             if (target)
@@ -31,6 +41,8 @@ namespace Riftbound
             var keyboard = Keyboard.current;
             if (keyboard != null && keyboard.escapeKey.wasPressedThisFrame)
             {
+                if (PartySystem.Instance && PartySystem.Instance.IsCompanionMenuOpen) { PartySystem.Instance.CloseCompanionMenu(); return; }
+                if (PrototypeHUD.MenuOpen) { PrototypeHUD.MenuOpen = false; return; }
                 if (player && player.DialogueOpen) { player.CloseDialogue(); return; }
                 if (FlightMaster.IsAnyTaxiMapOpen) { FlightMaster.CloseActiveTaxiWindow(); return; }
                 if (player && player.ShopOpen) { player.CloseShop(); return; }
@@ -74,6 +86,7 @@ namespace Riftbound
             if (!target || FrontendMenu.IsOpen) return;
             var mouse = Mouse.current;
             bool uiBlocking = FlightMaster.IsAnyTaxiMapOpen || (player && (player.DialogueOpen || player.ShopOpen || player.MapOpen || player.JournalOpen || player.EncounterJournalOpen || player.InventoryOpen || player.TalentsOpen || player.SpellbookOpen || player.AchievementOpen || player.ReputationOpen || ProfessionSystem.IsOpen || AuctionHouseSystem.AuctionOpen || (GuildSystem.Instance && GuildSystem.Instance.IsOpen) || (MailboxSystem.Instance && MailboxSystem.Instance.IsOpen) || (BattlegroundSystem.Instance && BattlegroundSystem.Instance.IsWindowOpen) || (CharacterSheetSystem.Instance && CharacterSheetSystem.Instance.IsOpen) || (MacroSystem.Instance && MacroSystem.Instance.IsOpen) || (SettingsSystem.Instance && SettingsSystem.Instance.IsMenuOpen) || (DungeonFinderSystem.Instance && DungeonFinderSystem.Instance.IsWindowOpen) || (ArchaeologySystem.Instance && ArchaeologySystem.Instance.IsWindowOpen) || (TransmogSystem.Instance && TransmogSystem.Instance.IsWindowOpen) || (FishingSystem.Instance && FishingSystem.Instance.IsWindowOpen) || (CalendarEventSystem.Instance && CalendarEventSystem.Instance.IsWindowOpen) || (BarberShopSystem.Instance && BarberShopSystem.Instance.IsWindowOpen) || (WorldPvPSystem.Instance && WorldPvPSystem.Instance.IsOverviewOpen) || (EquipmentSetSystem.Instance && EquipmentSetSystem.Instance.IsWindowOpen) || (GlyphSystem.Instance && GlyphSystem.Instance.IsWindowOpen) || (GemSocketSystem.Instance && GemSocketSystem.Instance.IsWindowOpen) || (PetBattleSystem.Instance && (PetBattleSystem.Instance.IsJournalOpen || PetBattleSystem.Instance.IsBattleActive))));
+            uiBlocking |= PrototypeHUD.MenuOpen || (PartySystem.Instance && PartySystem.Instance.IsCompanionMenuOpen);
             if (!Paused && !uiBlocking && mouse != null)
             {
                 bool rightDown = mouse.rightButton.isPressed;
@@ -105,7 +118,16 @@ namespace Riftbound
             float actual = distance;
             if (Physics.SphereCast(pivot, .2f, backwards, out var hit, distance, ~ (1 << 2), QueryTriggerInteraction.Ignore))
                 actual = Mathf.Max(.6f, hit.distance - .15f);
-            transform.SetPositionAndRotation(pivot + backwards * actual, rotation);
+            Vector3 shakeOffset = Vector3.zero;
+            if (shakeRemaining > 0f)
+            {
+                shakeRemaining -= Time.unscaledDeltaTime;
+                float falloff = Mathf.Clamp01(shakeRemaining / shakeDuration);
+                float mag = shakeIntensity * falloff;
+                shakeOffset = (transform.right * Random.Range(-1f, 1f) + transform.up * Random.Range(-1f, 1f)) * mag;
+                if (shakeRemaining <= 0f) shakeIntensity = 0f;
+            }
+            transform.SetPositionAndRotation(pivot + backwards * actual + shakeOffset, rotation);
         }
         void OnDisable() { Time.timeScale = 1; }
         public void SetPaused(bool paused) { Paused = paused; Time.timeScale = paused ? 0 : 1; }
