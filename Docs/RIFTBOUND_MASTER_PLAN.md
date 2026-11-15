@@ -4,6 +4,8 @@ Revision 1 · 2026-11-15 · Planning document, not a completion report.
 
 > Expanded production backlog: **Docs/RIFTBOUND_FEATURE_BACKLOG.md** adds detailed feature tickets, region briefs, campaign/encounter manifests, release gates and future systems. This master document retains architecture and overall design; the online work order remains the immediate implementation priority.
 
+> Next bounded development shift: **Docs/OVERNIGHT_8_HOUR_PLAN.md**, with separate Codex/Antigravity ownership, eight elapsed-hour work packets and release gates. Copyable start/continuation prompts: **Docs/OVERNIGHT_PROMPTS.md**. These files do not start or schedule a run by themselves.
+
 ## 1. Purpose, authority and how to use this plan
 
 Build an original, stylized fantasy RPG with two factions, distinct playable races/classes, an authored world and private online cooperative play. Keep the scope approachable in its first release while mapping the larger game's full development path.
