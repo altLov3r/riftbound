@@ -197,16 +197,24 @@ namespace Riftbound
             }
         }
 
+        bool enteringWorld;
+
         public void EnterWorld()
         {
-            if (Selected == null) return;
-            if (Network.CoopSessionConfig.Mode == Network.CoopSessionMode.JoinOnline && string.IsNullOrWhiteSpace(Network.CoopSessionConfig.JoinCode))
+            if (Selected == null || enteringWorld || Network.OnlineSessionService.IsBusy) return;
+            if (Network.CoopSessionConfig.Mode == Network.CoopSessionMode.JoinOnline)
             {
-                error = "Enter a session join code to join Online Co-op.";
-                return;
+                string norm = Network.OnlineSessionService.NormalizeJoinCode(Network.CoopSessionConfig.JoinCode);
+                if (string.IsNullOrWhiteSpace(norm) || norm.Length < 4)
+                {
+                    error = "Enter a valid session join code (at least 4 characters) to join Online Co-op.";
+                    return;
+                }
+                Network.CoopSessionConfig.JoinCode = norm;
             }
             if (!SaveRoster()) return;
 
+            enteringWorld = true;
             enteringCharacter = Selected;
             IsOpen = false;
             Time.timeScale = 1;
@@ -832,7 +840,8 @@ namespace Riftbound
 
         void DrawActionButtonsBottomRight(Rect rect)
         {
-            bool canInteract = GUI.enabled;
+            bool canInteract = GUI.enabled && !enteringWorld && !Network.OnlineSessionService.IsBusy;
+            GUI.enabled = canInteract;
             // Enter World (Giant Red/Gold WoW Button)
             GUI.backgroundColor = Color.white;
             string enterLabel = Network.CoopSessionConfig.Mode == Network.CoopSessionMode.HostOnline

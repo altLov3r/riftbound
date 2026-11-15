@@ -283,7 +283,7 @@ namespace Riftbound
             {
                 pendingDamage = false;
                 CastBarSystem.CancelTargetCast(stats);
-                if (targetAlive && ranged && range < attackRange + 2 && (targetIsRemote || ClearSight()))
+                if (targetAlive && ranged && range < attackRange + 2 && (targetIsRemote || ClearSightForTarget(targetTransform)))
                 {
                     if (targetIsRemote)
                         Network.RiftboundCoopPlayer.DispatchEnemyHitToPlayer(targetClientId, attackDamage, NetworkKey);
@@ -292,7 +292,7 @@ namespace Riftbound
                         EnemyProjectile.Launch(transform.position + Vector3.up * 1.25f, player, attackDamage);
                     }
                 }
-                else if (targetAlive && !ranged && range < 2.8f && (targetIsRemote || ClearSight()))
+                else if (targetAlive && !ranged && range < 2.8f && (targetIsRemote || ClearSightForTarget(targetTransform)))
                 {
                     if (targetIsRemote)
                     {
@@ -372,14 +372,17 @@ namespace Riftbound
             if (!animator || (!force && state == value)) return;
             animator.CrossFadeInFixedTime(value, .18f, 0, 0); state = value;
         }
-        bool ClearSight()
+        bool ClearSight() => ClearSightForTarget(player ? player.transform : null);
+        bool ClearSightForTarget(Transform target)
         {
+            Transform t = target ? target : (player ? player.transform : null);
+            if (!t) return false;
             Vector3 origin = transform.position + Vector3.up * 1.1f;
-            Vector3 delta = player.transform.position + Vector3.up - origin;
+            Vector3 delta = t.position + Vector3.up - origin;
             Vector3 heading = Vector3.ProjectOnPlane(delta, Vector3.up);
             if (heading.sqrMagnitude >= .01f && Vector3.Dot(transform.forward, heading.normalized) <= .25f) return false;
             return !Physics.Raycast(origin, delta.normalized, out var hit, delta.magnitude, ~(1 << 2), QueryTriggerInteraction.Ignore) ||
-                hit.collider.GetComponentInParent<PlayerController>() == player;
+                hit.collider.GetComponentInParent<PlayerController>() != null || hit.collider.transform.IsChildOf(t);
         }
         void FacePlayer()
         {

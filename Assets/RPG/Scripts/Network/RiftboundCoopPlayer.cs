@@ -421,11 +421,19 @@ namespace Riftbound.Network
             if (!stats || !stats.Alive) return;
 
             string key = string.IsNullOrEmpty(abilityId) ? "melee" : abilityId.ToLowerInvariant();
-            float cd = key == "melee" ? 0.35f : 0.8f;
-            if (serverAbilityCooldowns.TryGetValue(key, out float readyAt) && Time.time < readyAt) return;
-            serverAbilityCooldowns[key] = Time.time + cd;
+            string cls = ClassName.Value.ToString();
+            if ((key == "fireball" || key == "frostnova") && cls != "Mage") return;
+            if (key == "eviscerate" && cls != "Rogue") return;
+            if (key == "consecration" && cls != "Paladin") return;
+            if (key == "whirlwind" && cls != "Warrior") return;
 
-            float maxRange = key == "fireball" ? 30f : (key == "frostnova" || key == "whirlwind" || key == "consecration" ? 8.5f : 5.0f);
+            bool isAoe = key == "frostnova" || key == "consecration" || key == "whirlwind";
+            string cdKey = isAoe ? $"{key}:{enemy.NetworkKey}" : key;
+            float cd = key == "melee" ? 0.35f : 0.8f;
+            if (serverAbilityCooldowns.TryGetValue(cdKey, out float readyAt) && Time.time < readyAt) return;
+            serverAbilityCooldowns[cdKey] = Time.time + cd;
+
+            float maxRange = key == "fireball" ? 30f : (isAoe ? 8.5f : 5.0f);
             if (Vector3.Distance(transform.position, enemy.transform.position) > maxRange) return;
 
             // LOS check (ignore triggers/characters)
@@ -448,8 +456,9 @@ namespace Riftbound.Network
             {
                 "fireball" => 34f,
                 "frostnova" => 24f,
-                "consecration" => 22f,
+                "consecration" => 24f,
                 "whirlwind" => 28f,
+                "eviscerate" => 46f,
                 _ => 18f
             };
             float computedDamage = baseDmg + (Level.Value - 1) * 4f;
@@ -458,6 +467,32 @@ namespace Riftbound.Network
             stats.Damage(computedDamage);
             BroadcastActionAnimClientRpc(key == "fireball" || key == "frostnova" || key == "consecration" ? "Cast" : "Attack");
             BroadcastEnemyState(enemy);
+        }
+
+        public void RequestAbilityHeal(int amount, string abilityId)
+        {
+            if (!CoopSessionConfig.IsMultiplayer || !IsSpawned || amount <= 0) return;
+            if (IsServer) ApplyServerAbilityHeal(amount, abilityId);
+            else RequestAbilityHealServerRpc(amount, abilityId);
+        }
+
+        [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Owner)]
+        void RequestAbilityHealServerRpc(int amount, string abilityId) => ApplyServerAbilityHeal(amount, abilityId);
+
+        void ApplyServerAbilityHeal(int amount, string abilityId)
+        {
+            if (!IsServer || Health.Value <= 0) return;
+            string key = string.IsNullOrEmpty(abilityId) ? "heal" : abilityId.ToLowerInvariant();
+            string cls = ClassName.Value.ToString();
+            if (key == "arcane_ward" && cls != "Mage") return;
+            if (key == "holy_light" && cls != "Paladin") return;
+            if (key == "second_wind" && cls != "Warrior") return;
+
+            if (serverAbilityCooldowns.TryGetValue("heal:" + key, out float readyAt) && Time.time < readyAt) return;
+            serverAbilityCooldowns["heal:" + key] = Time.time + 8.0f;
+
+            int clamped = Mathf.Clamp(amount, 1, 65);
+            Health.Value = Mathf.Min(MaxHealth.Value, Health.Value + clamped);
         }
 
         public void BroadcastEnemyState(EnemyController enemy)
@@ -784,6 +819,47 @@ namespace Riftbound.Network
                     SendEnemySnapshotClientRpc(enemy.NetworkKey, c.Health, c.maxHealth, c.Alive, enemy.transform.position, enemy.transform.eulerAngles.y, rpcParams);
                 }
             }
+            if (CoopWorldManager.Instance != null && CoopWorldManager.Instance.TryGetActiveReadyCheck(out string rcInitiator))
+            {
+                SendReadyCheckSnapshotClientRpc(rcInitiator, rpcParams);
+            }
+            if (LivingWorldEvents.Instance != null)
+            {
+                LivingWorldEvents.Instance.SendEventSnapshotToClient(this, rpcParams);
+            }
+        }
+
+        [Rpc(SendTo.SpecifiedInParams)]
+        void SendReadyCheckSnapshotClientRpc(string initiatorName, RpcParams rpcParams = default)
+        {
+            if (CoopWorldManager.Instance) CoopWorldManager.Instance.OpenReadyCheck(initiatorName);
+        }
+
+        public void SendEventSnapshotRpc(string eventId, bool active, Vector3 pos, RpcParams rpcParams)
+        {
+            SendEventSnapshotClientRpc(eventId, active, pos, rpcParams);
+        }
+
+        [Rpc(SendTo.SpecifiedInParams)]
+        void SendEventSnapshotClientRpc(string eventId, bool active, Vector3 pos, RpcParams rpcParams = default)
+        {
+            if (IsServer) return;
+            var lwe = LivingWorldEvents.Instance ? LivingWorldEvents.Instance : FindFirstObjectByType<LivingWorldEvents>();
+            if (lwe) lwe.ApplyClientEventState(eventId, active, pos);
+        }
+
+        public static void BroadcastWorldEventState(string eventId, bool active, Vector3 pos)
+        {
+            if (LocalOwner && LocalOwner.IsServer && LocalOwner.IsSpawned)
+                LocalOwner.BroadcastWorldEventStateClientRpc(eventId, active, pos);
+        }
+
+        [Rpc(SendTo.Everyone)]
+        void BroadcastWorldEventStateClientRpc(string eventId, bool active, Vector3 pos)
+        {
+            if (IsServer) return;
+            var lwe = LivingWorldEvents.Instance ? LivingWorldEvents.Instance : FindFirstObjectByType<LivingWorldEvents>();
+            if (lwe) lwe.ApplyClientEventState(eventId, active, pos);
         }
 
         [Rpc(SendTo.SpecifiedInParams)]
@@ -815,22 +891,29 @@ namespace Riftbound.Network
         {
             if (!IsOwner || !localPlayer) return;
             localPlayer.AddExperience(xp);
-            localPlayer.AddGold(gold);
+            localPlayer.SetAuthoritativeGold(Gold.Value);
             string tag = firstClear ? "Event Complete" : "Bounty Repeat";
             localPlayer.Message = $"{tag}: +{xp} XP, +{gold} Gold!";
         }
 
         // ── Deliverables #5: Map Pings, Ready Check & Ally Revive ───────────────────────
 
+        float lastServerPingTime = -10f;
+        float lastLocalPingTime = -10f;
+
         public void RequestMapPing(Vector3 worldPos)
         {
-            if (!CoopSessionConfig.IsMultiplayer || !IsSpawned) return;
+            if (!CoopSessionConfig.IsMultiplayer || !IsSpawned || Health.Value <= 0) return;
+            if (Time.time < lastLocalPingTime + 2.0f) return;
+            lastLocalPingTime = Time.time;
             RequestMapPingServerRpc(worldPos);
         }
 
         [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Owner)]
         void RequestMapPingServerRpc(Vector3 worldPos)
         {
+            if (Health.Value <= 0 || Time.time < lastServerPingTime + 2.0f) return;
+            lastServerPingTime = Time.time;
             BroadcastMapPingClientRpc(PlayerName.Value.ToString(), worldPos);
         }
 

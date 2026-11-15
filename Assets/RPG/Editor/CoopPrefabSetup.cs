@@ -113,5 +113,32 @@ namespace Riftbound.Editor
             Debug.Log($"[CoopPrefabSetup] Release build succeeded: {exePath} ({report.summary.totalSize} bytes)");
             if (Application.isBatchMode) EditorApplication.Exit(0);
         }
+
+        [MenuItem("Riftbound/Multiplayer/Build Overnight Antigravity Online")]
+        public static void BuildOvernightAntigravityOnline()
+        {
+            string buildDir = "Builds/OvernightAntigravityOnline";
+            Directory.CreateDirectory(buildDir);
+            string exePath = Path.Combine(buildDir, "Riftbound.exe");
+
+            var opts = new BuildPlayerOptions
+            {
+                scenes = new[] { OutpostScene },
+                locationPathName = exePath,
+                target = BuildTarget.StandaloneWindows64,
+                options = BuildOptions.None
+            };
+
+            BuildReport report = BuildPipeline.BuildPlayer(opts);
+            if (report.summary.result != BuildResult.Succeeded)
+            {
+                Debug.LogError("[CoopPrefabSetup] Overnight build failed: " + report.summary.result);
+                if (Application.isBatchMode) EditorApplication.Exit(1);
+                return;
+            }
+
+            Debug.Log($"[CoopPrefabSetup] Overnight build succeeded: {exePath} ({report.summary.totalSize} bytes, warnings={report.summary.totalWarnings}, errors={report.summary.totalErrors})");
+            if (Application.isBatchMode) EditorApplication.Exit(0);
+        }
     }
 }

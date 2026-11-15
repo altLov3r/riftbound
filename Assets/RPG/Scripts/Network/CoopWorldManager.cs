@@ -25,6 +25,23 @@ namespace Riftbound.Network
         string activePingSender = "";
         Vector3 activePingWorldPos;
         float activePingExpires;
+        bool hostDisconnected;
+        string hostDisconnectMessage = "";
+
+        public bool HasActivePingForTest => Time.time < activePingExpires;
+        public bool IsReadyCheckOpenForTest => readyCheckOpen && Time.time < readyCheckExpires;
+        public bool IsHostDisconnectedForTest => hostDisconnected;
+
+        public bool TryGetActiveReadyCheck(out string initiator)
+        {
+            if (readyCheckOpen && Time.time < readyCheckExpires && !string.IsNullOrEmpty(readyCheckInitiator))
+            {
+                initiator = readyCheckInitiator;
+                return true;
+            }
+            initiator = "";
+            return false;
+        }
 
         public void ShowMapPing(string sender, Vector3 pos)
         {
@@ -47,11 +64,17 @@ namespace Riftbound.Network
             var keys = Keyboard.current;
             if (keys == null) return;
 
-            if (keys.pKey.wasPressedThisFrame)
+            if (readyCheckOpen && Time.time > readyCheckExpires) readyCheckOpen = false;
+
+            var localPc = FindFirstObjectByType<PlayerController>();
+            bool uiBlocking = localPc != null && (localPc.ChatOpen || localPc.DialogueOpen || localPc.ShopOpen || localPc.InventoryOpen || localPc.MapOpen || localPc.JournalOpen || localPc.TalentsOpen || localPc.SpellbookOpen || localPc.AchievementOpen || localPc.ReputationOpen);
+            if (uiBlocking || RiftboundCoopPlayer.LocalOwner.Health.Value <= 0) return;
+
+            if (keys.f6Key.wasPressedThisFrame)
             {
                 RiftboundCoopPlayer.LocalOwner.RequestMapPing(RiftboundCoopPlayer.LocalOwner.transform.position);
             }
-            if (keys.yKey.wasPressedThisFrame)
+            if (keys.f7Key.wasPressedThisFrame)
             {
                 RiftboundCoopPlayer.LocalOwner.RequestReadyCheck();
             }
@@ -67,7 +90,6 @@ namespace Riftbound.Network
                     }
                 }
             }
-            if (readyCheckOpen && Time.time > readyCheckExpires) readyCheckOpen = false;
         }
 
         readonly Dictionary<ulong, HashSet<string>> claimedChestsByClient = new Dictionary<ulong, HashSet<string>>();
@@ -315,6 +337,10 @@ namespace Riftbound.Network
                 string reason = string.IsNullOrEmpty(nm.DisconnectReason) ? "Host closed the session" : nm.DisconnectReason;
                 CoopSessionConfig.LastDisconnectReason = reason;
                 statusText = $"Disconnected: {reason}";
+                hostDisconnected = true;
+                hostDisconnectMessage = $"{reason}. Host exit ends the session (no host migration).";
+                readyCheckOpen = false;
+                activePingExpires = 0f;
                 Debug.LogWarning($"[CoopWorldManager] {statusText}");
             }
         }
@@ -370,9 +396,15 @@ namespace Riftbound.Network
                 return;
             }
 
+            if (hostDisconnected)
+            {
+                DrawCenteredStatusBox("SESSION ENDED", hostDisconnectMessage, showRetry: false, cancelLabel: "Back to Menu");
+                return;
+            }
+
             int count = RiftboundCoopPlayer.AllPlayers.Count;
             float w = 265f;
-            float h = CoopSessionConfig.IsOnlineMode && !string.IsNullOrEmpty(OnlineSessionService.ActiveJoinCode) ? 104f : 78f;
+            float h = CoopSessionConfig.IsOnlineMode && !string.IsNullOrEmpty(OnlineSessionService.ActiveJoinCode) ? 132f : 106f;
             float x = Screen.width - w - 16f;
             float y = 16f;
 
@@ -393,6 +425,17 @@ namespace Riftbound.Network
                 }
                 btnY += 26f;
             }
+
+            float halfW = (w - 26f) * 0.5f;
+            if (GUI.Button(new Rect(x + 10f, btnY, halfW, 22f), "Ping [F6]"))
+            {
+                RiftboundCoopPlayer.LocalOwner?.RequestMapPing(RiftboundCoopPlayer.LocalOwner.transform.position);
+            }
+            if (GUI.Button(new Rect(x + 16f + halfW, btnY, halfW, 22f), "Ready [F7]"))
+            {
+                RiftboundCoopPlayer.LocalOwner?.RequestReadyCheck();
+            }
+            btnY += 26f;
 
             if (GUI.Button(new Rect(x + 10f, btnY, w - 20f, 24f), "Leave Session"))
             {
@@ -461,7 +504,7 @@ namespace Riftbound.Network
             }
         }
 
-        void DrawCenteredStatusBox(string title, string message, bool showRetry)
+        void DrawCenteredStatusBox(string title, string message, bool showRetry, string cancelLabel = "Cancel")
         {
             float w = 440f;
             float h = 150f;
@@ -489,11 +532,19 @@ namespace Riftbound.Network
             }
             else
             {
-                if (GUI.Button(new Rect(x + 130f, y + 104f, 180f, 30f), "Cancel"))
+                if (GUI.Button(new Rect(x + 130f, y + 104f, 180f, 30f), cancelLabel))
                 {
                     DisconnectAndReturnToMenu();
                 }
             }
+        }
+
+        static RiftboundCoopPlayer GetFirstRemotePlayer()
+        {
+            foreach (var p in RiftboundCoopPlayer.AllPlayers)
+                if (p && p.IsSpawned && p != RiftboundCoopPlayer.LocalOwner)
+                    return p;
+            return null;
         }
 
         IEnumerator FinishClientLeaveSmokeRoutine()
@@ -629,6 +680,22 @@ namespace Riftbound.Network
 
             bool combatPass = true;
             string combatInfo = "";
+            if (minPlayers >= 4 && players >= 4)
+            {
+                var frameSamples = new List<float>(30);
+                for (int s = 0; s < 30; s++)
+                {
+                    yield return null;
+                    frameSamples.Add(Time.unscaledDeltaTime * 1000f);
+                }
+                frameSamples.Sort();
+                float sumMs = 0f;
+                for (int s = 0; s < frameSamples.Count; s++) sumMs += frameSamples[s];
+                float avgMs = frameSamples.Count > 0 ? sumMs / frameSamples.Count : 0f;
+                float p95Ms = frameSamples.Count > 0 ? frameSamples[Mathf.Clamp((int)(frameSamples.Count * 0.95f), 0, frameSamples.Count - 1)] : 0f;
+                int netCount = FindObjectsByType<NetworkObject>(FindObjectsSortMode.None).Length;
+                combatInfo += $", telemetry(avgMs={avgMs:F2}, p95Ms={p95Ms:F2}, enemies={EnemyController.AllByKey.Count}, netObjs={netCount})";
+            }
             if (CoopSessionConfig.CombatSmoke && players >= 2 && RiftboundCoopPlayer.LocalOwner != null)
             {
                 EnemyController targetEnemy = null;
@@ -664,7 +731,8 @@ namespace Riftbound.Network
                     else
                     {
                         yield return new WaitForSeconds(0.6f);
-                        RiftboundCoopPlayer.LocalOwner.RequestAbilityAttack(enemyStats, "fireball");
+                        string ab = RiftboundCoopPlayer.LocalOwner.ClassName.Value.ToString() == "Mage" ? "fireball" : "melee";
+                        RiftboundCoopPlayer.LocalOwner.RequestAbilityAttack(enemyStats, ab);
                     }
 
                     float waitStart = Time.realtimeSinceStartup;
@@ -721,7 +789,7 @@ namespace Riftbound.Network
                 {
                     if (isHost)
                     {
-                        var clientAvatar = RiftboundCoopPlayer.FindByClientId(1);
+                        var clientAvatar = GetFirstRemotePlayer();
                         if (clientAvatar != null)
                             clientAvatar.AuthorizeHostTeleport(targetEnemy.transform.position + new Vector3(4f, 0f, 0f));
 
@@ -753,8 +821,9 @@ namespace Riftbound.Network
                         float waitKill = Time.realtimeSinceStartup;
                         while (Time.realtimeSinceStartup - waitKill < 14f && enemyStats.Alive && RiftboundCoopPlayer.LocalOwner != null)
                         {
-                            RiftboundCoopPlayer.LocalOwner.RequestAbilityAttack(enemyStats, "fireball");
-                            yield return new WaitForSeconds(1.45f);
+                            string ab = RiftboundCoopPlayer.LocalOwner.ClassName.Value.ToString() == "Mage" ? "fireball" : "melee";
+                            RiftboundCoopPlayer.LocalOwner.RequestAbilityAttack(enemyStats, ab);
+                            yield return new WaitForSeconds(0.55f);
                         }
                         yield return new WaitForSeconds(0.8f);
                         if (RiftboundCoopPlayer.LocalOwner == null)
@@ -816,7 +885,7 @@ namespace Riftbound.Network
                 var giver = FindFirstObjectByType<TownNPC>();
                 if (isHost)
                 {
-                    var clientAvatar = RiftboundCoopPlayer.FindByClientId(1);
+                    var clientAvatar = GetFirstRemotePlayer();
                     if (clientAvatar != null && giver != null)
                         clientAvatar.AuthorizeHostTeleport(giver.transform.position + new Vector3(1.5f, 0f, 0f));
 
@@ -858,7 +927,250 @@ namespace Riftbound.Network
                 }
             }
 
-            bool pass = players >= minPlayers && RiftboundCoopPlayer.LocalOwner != null && activeCams == 1 && activeListeners == 1 && sep >= 1.0f && combatPass && lateJoinPass && progPass && clientLeavePass;
+            bool fullAcceptPass = true;
+            if (CoopSessionConfig.FullAcceptanceSmoke && players >= 2 && RiftboundCoopPlayer.LocalOwner != null)
+            {
+                var giver = FindFirstObjectByType<TownNPC>();
+                var lp = FindFirstObjectByType<PlayerController>();
+                var enemies = new List<EnemyController>();
+                foreach (var kv in EnemyController.AllByKey)
+                {
+                    if (kv.Value && !kv.Value.trainingDummy)
+                    {
+                        var st = kv.Value.GetComponent<Combatant>();
+                        if (st && st.Alive && st.maxHealth <= 110f && kv.Value.gameObject.activeInHierarchy) enemies.Add(kv.Value);
+                    }
+                }
+                enemies.Sort((a, b) => Vector3.Distance(giver.transform.position, a.transform.position).CompareTo(Vector3.Distance(giver.transform.position, b.transform.position)));
+
+                if (giver && enemies.Count >= 3 && lp)
+                {
+                    if (isHost)
+                    {
+                        var clientAvatar = GetFirstRemotePlayer();
+                        ulong remoteCid = clientAvatar != null ? clientAvatar.OwnerClientId : 1UL;
+                        if (clientAvatar != null)
+                            clientAvatar.AuthorizeHostTeleport(giver.transform.position + new Vector3(1.5f, 0f, 0f));
+
+                        float waitAcc = Time.realtimeSinceStartup;
+                        while (Time.realtimeSinceStartup - waitAcc < 10f && (clientAvatar == null || !clientAvatar.QuestAccepted.Value))
+                            yield return new WaitForSeconds(0.2f);
+
+                        if (clientAvatar != null)
+                            clientAvatar.AuthorizeHostTeleport(enemies[0].transform.position + new Vector3(2.2f, 0f, 0f));
+
+                        yield return new WaitForSeconds(2.2f);
+                        RiftboundCoopPlayer.DispatchEnemyHitToPlayer(remoteCid, 30f, enemies[0].NetworkKey);
+                        yield return new WaitForSeconds(1.2f);
+
+                        float wait3Kills = Time.realtimeSinceStartup;
+                        int lastIdx = 0;
+                        while (Time.realtimeSinceStartup - wait3Kills < 26f && clientAvatar != null && clientAvatar.QuestKills.Value < 3)
+                        {
+                            if (lastIdx < 3)
+                            {
+                                var e = enemies[lastIdx];
+                                var est = e ? e.GetComponent<Combatant>() : null;
+                                if (est && !est.Alive)
+                                {
+                                    lastIdx++;
+                                    if (lastIdx < 3)
+                                        clientAvatar.AuthorizeHostTeleport(enemies[lastIdx].transform.position + new Vector3(2.2f, 0f, 0f));
+                                }
+                            }
+                            yield return new WaitForSeconds(0.2f);
+                        }
+
+                        if (clientAvatar != null)
+                            clientAvatar.AuthorizeHostTeleport(giver.transform.position + new Vector3(1.5f, 0f, 0f));
+
+                        // Wait for QuestIndex == 1 + Ping + ReadyCheck (give generous synchronized window)
+                        float waitSocial = Time.realtimeSinceStartup;
+                        while (Time.realtimeSinceStartup - waitSocial < 16f && (clientAvatar == null || clientAvatar.QuestIndex.Value < 1 || !HasActivePingForTest || !IsReadyCheckOpenForTest))
+                            yield return new WaitForSeconds(0.2f);
+
+                        bool pingOk = HasActivePingForTest;
+                        bool rcOpen = IsReadyCheckOpenForTest;
+                        RiftboundCoopPlayer.LocalOwner.RespondReadyCheck(true);
+                        yield return new WaitForSeconds(0.4f);
+                        bool rcResponded = RiftboundCoopPlayer.LocalOwner.ReadyStatus.Value == 1;
+
+                        // Wait briefly so client reaches waitDown before downing
+                        yield return new WaitForSeconds(0.8f);
+                        RiftboundCoopPlayer.DispatchEnemyHitToPlayer(remoteCid, 500f, enemies[0].NetworkKey);
+                        float waitDown = Time.realtimeSinceStartup;
+                        while (Time.realtimeSinceStartup - waitDown < 4f && clientAvatar != null && clientAvatar.Health.Value > 0)
+                            yield return new WaitForSeconds(0.15f);
+
+                        if (clientAvatar != null)
+                        {
+                            RiftboundCoopPlayer.LocalOwner.AuthorizeHostTeleport(clientAvatar.transform.position + new Vector3(1.5f, 0f, 0f));
+                            yield return new WaitForSeconds(0.4f);
+                            RiftboundCoopPlayer.LocalOwner.RequestReviveAlly(remoteCid);
+                        }
+                        float waitRev = Time.realtimeSinceStartup;
+                        while (Time.realtimeSinceStartup - waitRev < 4f && clientAvatar != null && clientAvatar.Health.Value <= 0)
+                            yield return new WaitForSeconds(0.15f);
+                        bool reviveOk = clientAvatar != null && clientAvatar.Health.Value > 0;
+
+                        yield return new WaitForSeconds(0.6f);
+                        var lwe = LivingWorldEvents.Instance ? LivingWorldEvents.Instance : FindFirstObjectByType<LivingWorldEvents>();
+                        if (lwe)
+                        {
+                            lwe.TriggerCaravanEvent();
+                            lwe.TriggerAmbushEvent();
+                        }
+                        yield return new WaitForSeconds(0.8f);
+                        if (clientAvatar != null)
+                            RiftboundCoopPlayer.BroadcastWorldEventReward("smoke_event_test", clientAvatar.transform.position, 40, 20);
+                        yield return new WaitForSeconds(2.5f);
+
+                        fullAcceptPass = pingOk && rcOpen && rcResponded && reviveOk && clientAvatar != null && clientAvatar.QuestIndex.Value == 1;
+                        combatInfo += $", hostAccept={(fullAcceptPass ? "PASS" : "FAIL")}(cid={(clientAvatar ? (long)remoteCid : -1)},ping={pingOk},rc={rcOpen}/{rcResponded},revive={reviveOk},kills={(clientAvatar ? clientAvatar.QuestKills.Value : -1)},qIdx={(clientAvatar ? clientAvatar.QuestIndex.Value : -1)})";
+                        string hostMsg = $"{(fullAcceptPass ? "PASS" : "FAIL")} {role}: players={players}, localOwner=True, cams={activeCams}, listeners={activeListeners}, sep={sep:F2}m{combatInfo}";
+                        Debug.Log(hostMsg);
+                        System.Console.WriteLine(hostMsg);
+
+                        yield return new WaitForSeconds(0.6f);
+                        if (OnlineSessionService.HasActiveSession)
+                        {
+                            var leaveTask = OnlineSessionService.LeaveSessionAsync();
+                            float lw = Time.realtimeSinceStartup;
+                            while (!leaveTask.IsCompleted && Time.realtimeSinceStartup - lw < 5f)
+                                yield return new WaitForSeconds(0.1f);
+                        }
+                        if (nm != null && nm.IsListening) nm.Shutdown();
+                        yield return new WaitForSeconds(0.3f);
+                        Application.Quit(fullAcceptPass ? 0 : 1);
+                        yield break;
+                    }
+                    else
+                    {
+                        var me = RiftboundCoopPlayer.LocalOwner;
+                        string myClass = me.ClassName.Value.ToString();
+                        string wrongAb = myClass == "Mage" ? "consecration" : "fireball";
+                        string rightAb = myClass == "Mage" ? "fireball" : (myClass == "Warrior" ? "whirlwind" : (myClass == "Rogue" ? "eviscerate" : "consecration"));
+                        string healAb = myClass == "Mage" ? "arcane_ward" : (myClass == "Paladin" ? "holy_light" : "second_wind");
+
+                        float waitGiver1 = Time.realtimeSinceStartup;
+                        while (Time.realtimeSinceStartup - waitGiver1 < 10f && Vector3.Distance(lp.transform.position, giver.transform.position) > 5.5f)
+                            yield return new WaitForSeconds(0.2f);
+                        me.RequestAcceptQuest();
+                        float waitAcc = Time.realtimeSinceStartup;
+                        while (Time.realtimeSinceStartup - waitAcc < 5f && !me.QuestAccepted.Value)
+                            yield return new WaitForSeconds(0.15f);
+                        bool questAccepted = me.QuestAccepted.Value;
+
+                        var e0Stats = enemies[0].GetComponent<Combatant>();
+                        float waitTp0 = Time.realtimeSinceStartup;
+                        while (Time.realtimeSinceStartup - waitTp0 < 10f && Vector3.Distance(lp.transform.position, enemies[0].transform.position) > 6f)
+                            yield return new WaitForSeconds(0.2f);
+
+                        float hpBeforeSpoof = e0Stats.Health;
+                        me.RequestAbilityAttack(e0Stats, wrongAb);
+                        yield return new WaitForSeconds(0.55f);
+                        bool spoofBlocked = Mathf.Approximately(e0Stats.Health, hpBeforeSpoof);
+
+                        me.RequestAbilityAttack(e0Stats, rightAb);
+                        float waitHit = Time.realtimeSinceStartup;
+                        while (Time.realtimeSinceStartup - waitHit < 3f && e0Stats.Health >= hpBeforeSpoof)
+                            yield return new WaitForSeconds(0.15f);
+                        bool validAbHit = e0Stats.Health < hpBeforeSpoof;
+
+                        float waitDmg = Time.realtimeSinceStartup;
+                        while (Time.realtimeSinceStartup - waitDmg < 8f && me.Health.Value >= me.MaxHealth.Value)
+                            yield return new WaitForSeconds(0.15f);
+                        int hpDamaged = me.Health.Value;
+                        me.RequestAbilityHeal(40, healAb);
+                        float waitHeal = Time.realtimeSinceStartup;
+                        while (Time.realtimeSinceStartup - waitHeal < 3f && me.Health.Value <= hpDamaged)
+                            yield return new WaitForSeconds(0.15f);
+                        bool abHealOk = me.Health.Value > hpDamaged;
+
+                        me.RequestSetMount(true, "horse");
+                        float waitMnt = Time.realtimeSinceStartup;
+                        while (Time.realtimeSinceStartup - waitMnt < 3f && !me.IsMounted.Value)
+                            yield return new WaitForSeconds(0.15f);
+                        bool mountedOk = me.IsMounted.Value;
+                        me.RequestSetMount(false, "");
+                        float waitDism = Time.realtimeSinceStartup;
+                        while (Time.realtimeSinceStartup - waitDism < 3f && me.IsMounted.Value)
+                            yield return new WaitForSeconds(0.15f);
+                        bool dismountOk = !me.IsMounted.Value;
+
+                        for (int k = 0; k < 3; k++)
+                        {
+                            var ek = enemies[k];
+                            var eks = ek.GetComponent<Combatant>();
+                            float wt = Time.realtimeSinceStartup;
+                            while (Time.realtimeSinceStartup - wt < 10f && Vector3.Distance(lp.transform.position, ek.transform.position) > 6f)
+                                yield return new WaitForSeconds(0.15f);
+                            float wk = Time.realtimeSinceStartup;
+                            while (Time.realtimeSinceStartup - wk < 10f && eks.Alive && RiftboundCoopPlayer.LocalOwner != null && me.Health.Value > 0)
+                            {
+                                if (me.Health.Value < 35 && lp.Potions > 0)
+                                    me.RequestUsePotion();
+                                me.RequestAbilityAttack(eks, "melee");
+                                yield return new WaitForSeconds(0.42f);
+                            }
+                        }
+
+                        float waitGiver2 = Time.realtimeSinceStartup;
+                        while (Time.realtimeSinceStartup - waitGiver2 < 10f && Vector3.Distance(lp.transform.position, giver.transform.position) > 5.5f)
+                            yield return new WaitForSeconds(0.2f);
+                        me.RequestCompleteQuestServerValidated(0);
+                        float waitQ1 = Time.realtimeSinceStartup;
+                        while (Time.realtimeSinceStartup - waitQ1 < 5f && me.QuestIndex.Value < 1)
+                            yield return new WaitForSeconds(0.15f);
+                        int goldAfterQuest = me.Gold.Value;
+                        me.RequestCompleteQuestServerValidated(0); // Repeat claim must fail
+                        yield return new WaitForSeconds(0.5f);
+                        bool questCompletedOnce = me.QuestIndex.Value == 1 && me.Gold.Value == goldAfterQuest && goldAfterQuest >= 25;
+
+                        me.RequestMapPing(lp.transform.position);
+                        me.RequestReadyCheck();
+
+                        float waitDownCli = Time.realtimeSinceStartup;
+                        while (Time.realtimeSinceStartup - waitDownCli < 10f && me.Health.Value > 0)
+                            yield return new WaitForSeconds(0.15f);
+                        float waitRevCli = Time.realtimeSinceStartup;
+                        while (Time.realtimeSinceStartup - waitRevCli < 8f && me.Health.Value <= 0)
+                            yield return new WaitForSeconds(0.15f);
+                        bool clientRevived = me.Health.Value > 0;
+
+                        int goldBeforeEvt = me.Gold.Value;
+                        float waitEvt = Time.realtimeSinceStartup;
+                        var lweCli = LivingWorldEvents.Instance ? LivingWorldEvents.Instance : FindFirstObjectByType<LivingWorldEvents>();
+                        while (Time.realtimeSinceStartup - waitEvt < 10f && (lweCli == null || lweCli.CaravanState != LivingWorldEvents.EventState.Active || lweCli.AmbushState != LivingWorldEvents.EventState.Active || lp.Gold <= goldBeforeEvt))
+                        {
+                            lweCli = LivingWorldEvents.Instance ? LivingWorldEvents.Instance : FindFirstObjectByType<LivingWorldEvents>();
+                            yield return new WaitForSeconds(0.2f);
+                        }
+                        bool eventSeen = lweCli != null && lweCli.CaravanState == LivingWorldEvents.EventState.Active && lweCli.AmbushState == LivingWorldEvents.EventState.Active;
+                        bool noDoubleGold = lp.Gold == goldBeforeEvt + 20;
+
+                        float waitHostDisc = Time.realtimeSinceStartup;
+                        while (Time.realtimeSinceStartup - waitHostDisc < 12f && !hostDisconnected)
+                            yield return new WaitForSeconds(0.2f);
+                        bool hostExitDetected = hostDisconnected;
+
+                        fullAcceptPass = spoofBlocked && validAbHit && abHealOk && mountedOk && dismountOk && questAccepted && questCompletedOnce && clientRevived && eventSeen && noDoubleGold && hostExitDetected;
+                        string cliMsg = $"{(fullAcceptPass ? "PASS" : "FAIL")} {role}: clientAccept={(fullAcceptPass ? "PASS" : "FAIL")}(spoofRej={spoofBlocked},abHit={validAbHit},abHeal={abHealOk},dismount={dismountOk},qAcc={questAccepted},qComp={questCompletedOnce},rev={clientRevived},evt={eventSeen},noDblG={noDoubleGold},hostDisc={hostExitDetected})";
+                        Debug.Log(cliMsg);
+                        System.Console.WriteLine(cliMsg);
+                        yield return new WaitForSeconds(0.2f);
+                        Application.Quit(fullAcceptPass ? 0 : 1);
+                        yield break;
+                    }
+                }
+                else
+                {
+                    fullAcceptPass = false;
+                    combatInfo += ", fullAccept=FAIL(missingEntity)";
+                }
+            }
+
+            bool pass = players >= minPlayers && RiftboundCoopPlayer.LocalOwner != null && activeCams == 1 && activeListeners == 1 && sep >= 1.0f && combatPass && lateJoinPass && progPass && clientLeavePass && fullAcceptPass;
             string msg = $"{(pass ? "PASS" : "FAIL")} {role}: players={players}, localOwner={(RiftboundCoopPlayer.LocalOwner != null)}, cams={activeCams}, listeners={activeListeners}, sep={sep:F2}m ({posInfo}){combatInfo}";
             Debug.Log(msg);
             System.Console.WriteLine(msg);

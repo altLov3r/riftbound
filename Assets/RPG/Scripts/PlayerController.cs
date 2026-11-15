@@ -604,7 +604,7 @@ namespace Riftbound
                 {
                     if (Vector3.Distance(transform.position, enemy.transform.position) < 6.5f) {
                         var eCombatant = enemy.GetComponent<Combatant>();
-                        Hit(eCombatant, dmg);
+                        Hit(eCombatant, dmg, "frostnova");
                         BuffSystem.ApplyTargetDebuff(eCombatant, "frostbite", "Frostbite", "Movement slowed by 60%.", "❄", new Color(0.3f, 0.8f, 1f), 5f, 0f); }
                 }
                 Message = "Frost Nova: Freezing blast!";
@@ -622,7 +622,7 @@ namespace Riftbound
                 attackReady = Time.time + 0.6f;
                 busyUntil = Time.time + 0.5f;
                 Play("Cleave", true);
-                Hit(Target, 52);
+                Hit(Target, 52, "eviscerate");
                 Message = "Eviscerate! Critical finisher!";
             }
             else if (CharacterClass == "Paladin")
@@ -639,7 +639,7 @@ namespace Riftbound
                 {
                     if (Vector3.Distance(transform.position, enemy.transform.position) < 5.5f) {
                         var eCombatant = enemy.GetComponent<Combatant>();
-                        Hit(eCombatant, dmg);
+                        Hit(eCombatant, dmg, "consecration");
                         BuffSystem.ApplyTargetDebuff(eCombatant, "frostbite", "Frostbite", "Movement slowed by 60%.", "❄", new Color(0.3f, 0.8f, 1f), 5f, 0f); }
                 }
                 Message = "Consecration: Holy ground!";
@@ -661,6 +661,8 @@ namespace Riftbound
                 HealReady = Time.time + 10f;
                 motor.Move(transform.forward * 7.5f);
                 Stats.Heal(40);
+                if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner != null)
+                    Network.RiftboundCoopPlayer.LocalOwner.RequestAbilityHeal(40, "arcane_ward");
                 SpellFX.CreateArcaneBurst(transform.position);
                 Message = "Blink & Arcane Ward: Teleported & shielded 40 HP!";
             }
@@ -679,6 +681,8 @@ namespace Riftbound
                 ClassResource -= 3;
                 HealReady = Time.time + 12f;
                 Stats.Heal(60);
+                if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner != null)
+                    Network.RiftboundCoopPlayer.LocalOwner.RequestAbilityHeal(60, "holy_light");
                 SpellFX.CreateConsecration(transform.position, 2f);
                 Message = "Holy Light: restored 60 health.";
             }
@@ -686,6 +690,8 @@ namespace Riftbound
             {
                 HealReady = Time.time + 12f;
                 Stats.Heal(45);
+                if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner != null)
+                    Network.RiftboundCoopPlayer.LocalOwner.RequestAbilityHeal(45, "second_wind");
                 Message = "Second Wind: restored 45 health.";
             }
         }
@@ -714,13 +720,13 @@ namespace Riftbound
                 SpellFX.CreateCleaveArc(transform.position, 3.8f, CharacterClass);
                 OrbitCamera.Shake(0.16f, 0.16f);
                 foreach (var enemy in FindObjectsByType<EnemyController>(FindObjectsSortMode.None))
-                    if (Vector3.Distance(transform.position, enemy.transform.position) < 3.8f) Hit(enemy.GetComponent<Combatant>(), damage);
+                    if (Vector3.Distance(transform.position, enemy.transform.position) < 3.8f) Hit(enemy.GetComponent<Combatant>(), damage, "whirlwind");
                 Message = string.IsNullOrEmpty(message) ? "Whirlwind!" : message;
             }
             else if (victim && Vector3.Distance(transform.position, victim.transform.position) < 3.5f && Vector3.Dot(transform.forward, (victim.transform.position - transform.position).normalized) > .1f)
             {
                 SpellFX.CreateSlashArc(transform.position, transform.forward, CharacterClass);
-                Hit(victim, damage);
+                Hit(victim, damage, "melee");
                 if (!string.IsNullOrEmpty(message)) Message = message;
             }
         }
@@ -743,7 +749,7 @@ namespace Riftbound
             }
             sprintTrail.emitting = active;
         }
-        void Hit(Combatant enemy, float damage)
+        void Hit(Combatant enemy, float damage, string abilityId = "melee")
         {
             if (!enemy || !enemy.Alive) return;
             float finalDmg = damage + (Level - 1) * 3 + WeaponBonus;
@@ -762,7 +768,7 @@ namespace Riftbound
             string critMsg = isCrit ? " [CRITICAL!]" : "";
             ChatSystem.LogCombat($"Your strike hits {enemy.displayName} for {Mathf.RoundToInt(finalDmg)} Physical damage{critMsg}.");
             if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner != null)
-                Network.RiftboundCoopPlayer.LocalOwner.RequestAbilityAttack(enemy, "melee");
+                Network.RiftboundCoopPlayer.LocalOwner.RequestAbilityAttack(enemy, abilityId);
             else
                 enemy.Damage(finalDmg);
             if (CharacterClass == "Warrior")
