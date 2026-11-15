@@ -103,15 +103,21 @@ namespace Riftbound.Editor
             report.AppendLine($"Interpolated tree-grounding review: affected={affected}, centres within 1.25m of trail={nearTrail}. Not a collider/radius/gameplay verdict; prototype meshes require live-project review.");
         }
 
-        public static void VerifyPreservedData(TerrainData current, TerrainData candidate, StringBuilder report)
+        public static void VerifyPreservedData(TerrainData current, TerrainData candidate, StringBuilder report, Rect? authorizedFootprint = null)
         {
             VerifyTrees(current, candidate);
             int n = current.heightmapResolution;
             var a = current.GetHeights(0, 0, n, n); var b = candidate.GetHeights(0, 0, n, n);
             for (int z = 0; z < n; z++)
                 for (int x = 0; x < n; x++)
-                    if (!InsideFootprint(x, z, n) && a[z, x] != b[z, x])
-                        throw new InvalidOperationException("Height changed outside approved footprint.");
+                {
+                    float wx = -320 + x * current.size.x / (n - 1), wz = -160 + z * current.size.z / (n - 1);
+                    bool inside = authorizedFootprint.HasValue
+                        ? wx >= authorizedFootprint.Value.xMin && wx <= authorizedFootprint.Value.xMax
+                            && wz >= authorizedFootprint.Value.yMin && wz <= authorizedFootprint.Value.yMax
+                        : InsideFootprint(x, z, n);
+                    if (!inside && a[z, x] != b[z, x]) throw new InvalidOperationException("Height changed outside approved footprint.");
+                }
             var layers = current.terrainLayers; var copies = candidate.terrainLayers;
             if (layers.Length != copies.Length) throw new InvalidOperationException("Terrain layers lost.");
             for (int i = 0; i < layers.Length; i++)
