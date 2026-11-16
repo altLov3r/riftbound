@@ -68,7 +68,7 @@ namespace Riftbound
         void Update()
         {
             age += Time.deltaTime; transform.position += Vector3.up * (Time.deltaTime * .65f);
-            if (Camera.main) transform.rotation = Camera.main.transform.rotation * Quaternion.Euler(0f, 180f, 0f);
+            if (Camera.main) transform.rotation = Camera.main.transform.rotation;
             var color = text.color; color.a = Mathf.Clamp01((.9f - age) * 3); text.color = color;
             if (age >= .9f) Destroy(gameObject);
         }

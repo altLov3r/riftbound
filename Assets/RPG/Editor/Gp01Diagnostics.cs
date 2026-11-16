@@ -63,6 +63,7 @@ namespace Riftbound.Editor
             if (!SessionState.GetBool(PlayKey, false)) return;
             if (change == PlayModeStateChange.EnteredPlayMode)
             {
+                UIArtSetup.PrepareGameView();
                 playStage = 0;
                 dueAt = EditorApplication.timeSinceStartup + 2.0;
                 timeoutAt = dueAt + 60.0;
@@ -372,6 +373,105 @@ namespace Riftbound.Editor
                     PlayerPrefs.SetFloat("Riftbound.SfxVolume", oldSfx);
                     PlayerPrefs.Save();
                     ss.LoadSettings();
+
+                    // GP05: MinimapRadar Main Quest tracking
+                    Assert(MinimapRadar.Instance != null, "GP05 MinimapRadar active");
+                    MinimapRadar.Instance.TrackMainQuest();
+                    Assert(MinimapRadar.Instance.TrackingMainQuest && MinimapRadar.Instance.customWaypoint.HasValue, "GP05 TrackMainQuest sets active objective waypoint");
+                    MinimapRadar.ClearWaypoint();
+
+                    // GP09: PartySystem opt-in companion spawn & dismiss
+                    Assert(PartySystem.Instance != null && PartySystem.Instance.Members.Count == 0, "GP09 PartySystem starts empty until opt-in");
+                    PartySystem.Instance.SeedInitialParty(false);
+                    bool compOk = PartySystem.Instance.Members.Count == 1 && PartySystem.Instance.Members[0].companionObject != null && PartySystem.Instance.Members[0].companionObject.GetComponentInChildren<Animator>() != null;
+                    Assert(compOk, "GP09 Opt-in companion spawns real visual follower");
+                    PartySystem.Instance.KickMember(PartySystem.Instance.Members[0].name);
+                    Assert(PartySystem.Instance.Members.Count == 0, "GP09 KickMember cleanly removes companion");
+
+                    // GP10: Class abilities, non-doubled scaling, dead-corpse guard, and Paladin Consecration debuff
+                    var liveGo = new GameObject("Gp10TempLiveEnemy");
+                    liveGo.transform.position = pc.transform.position + pc.transform.forward * 2.5f;
+                    var liveCbt = liveGo.AddComponent<Combatant>();
+                    liveCbt.displayName = "TestDummy";
+                    liveCbt.ConfigureVitals(500f, 0f);
+                    liveCbt.Restore();
+                    var liveCtrl = liveGo.AddComponent<EnemyController>();
+                    liveCtrl.trainingDummy = true;
+
+                    var deadGo = new GameObject("Gp10TempDeadEnemy");
+                    deadGo.transform.position = pc.transform.position + pc.transform.forward * 2.5f;
+                    var deadCbt = deadGo.AddComponent<Combatant>();
+                    deadCbt.displayName = "DeadDummy";
+                    deadCbt.ConfigureVitals(100f, 0f);
+                    deadCbt.Restore();
+                    deadCbt.Damage(9999f);
+                    deadGo.AddComponent<EnemyController>();
+
+                    string origClass = pc.CharacterClass;
+                    var resProp = typeof(PlayerController).GetProperty("ClassResource");
+                    var cleaveProp = typeof(PlayerController).GetProperty("CleaveReady");
+                    var atkReadyField = typeof(PlayerController).GetField("attackReady", BindingFlags.NonPublic | BindingFlags.Instance);
+
+                    pc.CharacterClass = "Paladin";
+                    resProp.SetValue(pc, 5f);
+                    cleaveProp.SetValue(pc, 0f);
+                    atkReadyField.SetValue(pc, 0f);
+                    pc.CastAbility2Public();
+                    float consDmg = 500f - liveCbt.Health;
+                    Assert(BuffSystem.HasTargetDebuff(liveCbt, "consecration") && !BuffSystem.HasTargetDebuff(liveCbt, "frostbite"), "GP10 Paladin Consecration applies Holy Consecrated debuff (not Frostbite)");
+                    Assert(!BuffSystem.HasTargetDebuff(deadCbt, "consecration"), "GP10 Dead enemy ignored by Consecration AOE");
+                    Assert(consDmg >= 35f && consDmg <= 85f, $"GP10 Consecration avoids double Weapon/Level scaling (dmg={consDmg:F1})");
+
+                    pc.CharacterClass = "Mage";
+                    resProp.SetValue(pc, 100f);
+                    cleaveProp.SetValue(pc, 0f);
+                    atkReadyField.SetValue(pc, 0f);
+                    pc.CastAbility2Public();
+                    Assert(BuffSystem.HasTargetDebuff(liveCbt, "frostbite") && !BuffSystem.HasTargetDebuff(deadCbt, "frostbite"), "GP10 Mage Frost Nova hits live foe and skips dead foe");
+
+                    var targetProp = typeof(PlayerController).GetProperty("Target");
+                    pc.CharacterClass = "Rogue";
+                    resProp.SetValue(pc, 100f);
+                    cleaveProp.SetValue(pc, 0f);
+                    atkReadyField.SetValue(pc, 0f);
+                    targetProp.SetValue(pc, liveCbt);
+                    float hpPreEvis = liveCbt.Health;
+                    pc.CastAbility2Public();
+                    Assert(pc.ClassResource <= 65.01f && liveCbt.Health < hpPreEvis, "GP10 Rogue Eviscerate consumes 35 Energy and damages target");
+
+                    pc.CharacterClass = origClass;
+                    targetProp.SetValue(pc, null);
+                    UnityEngine.Object.Destroy(liveGo);
+                    UnityEngine.Object.Destroy(deadGo);
+
+                    // GP11: Shop purchase & Leather Vest equip
+                    var merchant = UnityEngine.Object.FindFirstObjectByType<Merchant>();
+                    Assert(merchant != null, "GP11 Scene Merchant present");
+                    Vector3 savedPos = pc.transform.position;
+                    var cc11 = pc.GetComponent<CharacterController>();
+                    if (cc11) cc11.enabled = false;
+                    pc.transform.position = merchant.transform.position + new Vector3(0f, 0f, -1.8f);
+                    if (cc11) cc11.enabled = true;
+                    bool gotMerch = pc.TryGetBestInteraction(out var merchCand, out _);
+                    Assert(gotMerch && merchCand.text.Contains("Trade with"), $"GP11 Merchant prompt resolved ('{merchCand.text}')");
+                    merchCand.execute?.Invoke();
+                    pc.AddGoldDirect(50);
+                    int potBefore = pc.Potions;
+                    pc.BuyPotion();
+                    pc.BuyVest();
+                    pc.CloseShop();
+                    pc.InventoryOpen = true;
+                    pc.EquipItem("leather-vest");
+                    pc.InventoryOpen = false;
+                    Assert(pc.Potions == Mathf.Min(10, potBefore + 1) && pc.ArmorRating >= 2, $"GP11 Merchant buy + equip succeeded (pot={pc.Potions}, armor={pc.ArmorRating})");
+                    if (cc11) cc11.enabled = false;
+                    pc.transform.position = savedPos;
+                    if (cc11) cc11.enabled = true;
+
+                    // GP12: LivingWorldEvents Caravan trigger
+                    Assert(LivingWorldEvents.Instance != null, "GP12 LivingWorldEvents active");
+                    LivingWorldEvents.Instance.TriggerCaravanEvent();
+                    Assert(LivingWorldEvents.Instance.CaravanState == LivingWorldEvents.EventState.Active && GameObject.Find("WorldEvent_SupplyCaravan") != null, "GP12 Supply Caravan event spawns cleanly");
 
                     FinishPlay(false);
                 }

@@ -684,14 +684,15 @@ namespace Riftbound
                     Network.RiftboundCoopPlayer.LocalOwner.TriggerActionAnim("Cleave");
                 AudioEffects.PlaySpellCast();
                 SpellFX.CreateFrostNova(transform.position, 6.5f);
-                float dmg = 32 + (Level - 1) * 3 + WeaponBonus;
-                if (CharacterRace == "Brute") dmg *= 1.15f;
                 foreach (var enemy in FindObjectsByType<EnemyController>(FindObjectsSortMode.None))
                 {
-                    if (Vector3.Distance(transform.position, enemy.transform.position) < 6.5f) {
+                    if (Vector3.Distance(transform.position, enemy.transform.position) < 6.5f)
+                    {
                         var eCombatant = enemy.GetComponent<Combatant>();
-                        Hit(eCombatant, dmg, "frostnova");
-                        BuffSystem.ApplyTargetDebuff(eCombatant, "frostbite", "Frostbite", "Movement slowed by 60%.", "❄", new Color(0.3f, 0.8f, 1f), 5f, 0f); }
+                        if (!eCombatant || !eCombatant.Alive) continue;
+                        Hit(eCombatant, 32f, "frostnova");
+                        BuffSystem.ApplyTargetDebuff(eCombatant, "frostbite", "Frostbite", "Movement slowed by 60%.", "❄", new Color(0.3f, 0.8f, 1f), 5f, 0f);
+                    }
                 }
                 Message = "Frost Nova: Freezing blast!";
             }
@@ -707,11 +708,14 @@ namespace Riftbound
                 CleaveReady = Time.time + 4f;
                 attackReady = Time.time + 0.6f;
                 busyUntil = Time.time + 0.5f;
+                var evisDir = Target.transform.position - transform.position; evisDir.y = 0;
+                if (evisDir.sqrMagnitude > .01f) transform.rotation = Quaternion.LookRotation(evisDir);
                 visualYawOffset = 0f;
                 if (animator && hasVisualBaseRotation) animator.transform.localRotation = visualBaseRotation;
                 Play("Cleave", true);
                 if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner != null)
                     Network.RiftboundCoopPlayer.LocalOwner.TriggerActionAnim("Cleave");
+                AudioEffects.PlaySpellCast();
                 Hit(Target, 52, "eviscerate");
                 Message = "Eviscerate! Critical finisher!";
             }
@@ -728,14 +732,15 @@ namespace Riftbound
                     Network.RiftboundCoopPlayer.LocalOwner.TriggerActionAnim("Cleave");
                 AudioEffects.PlaySpellCast();
                 SpellFX.CreateConsecration(transform.position, 5.5f);
-                float dmg = 40 + (Level - 1) * 3 + WeaponBonus;
-                if (CharacterRace == "Brute") dmg *= 1.15f;
                 foreach (var enemy in FindObjectsByType<EnemyController>(FindObjectsSortMode.None))
                 {
-                    if (Vector3.Distance(transform.position, enemy.transform.position) < 5.5f) {
+                    if (Vector3.Distance(transform.position, enemy.transform.position) < 5.5f)
+                    {
                         var eCombatant = enemy.GetComponent<Combatant>();
-                        Hit(eCombatant, dmg, "consecration");
-                        BuffSystem.ApplyTargetDebuff(eCombatant, "frostbite", "Frostbite", "Movement slowed by 60%.", "❄", new Color(0.3f, 0.8f, 1f), 5f, 0f); }
+                        if (!eCombatant || !eCombatant.Alive) continue;
+                        Hit(eCombatant, 40f, "consecration");
+                        BuffSystem.ApplyTargetDebuff(eCombatant, "consecration", "Consecrated", "Sacred flame scorches the target.", "☼", new Color(1f, 0.85f, 0.35f), 5f, 0f);
+                    }
                 }
                 Message = "Consecration: Holy ground!";
             }
@@ -832,7 +837,10 @@ namespace Riftbound
                 SpellFX.CreateCleaveArc(transform.position, 3.8f, CharacterClass);
                 OrbitCamera.Shake(0.16f, 0.16f);
                 foreach (var enemy in FindObjectsByType<EnemyController>(FindObjectsSortMode.None))
-                    if (Vector3.Distance(transform.position, enemy.transform.position) < 3.8f) Hit(enemy.GetComponent<Combatant>(), damage, "whirlwind");
+                {
+                    var ec = enemy.GetComponent<Combatant>();
+                    if (ec && ec.Alive && Vector3.Distance(transform.position, enemy.transform.position) < 3.8f) Hit(ec, damage, "whirlwind");
+                }
                 Message = string.IsNullOrEmpty(message) ? "Whirlwind!" : message;
             }
             else if (victim && victim.Alive && Vector3.Distance(transform.position, victim.transform.position) < 3.5f && Vector3.Dot(transform.forward, (victim.transform.position - transform.position).normalized) > .1f)
