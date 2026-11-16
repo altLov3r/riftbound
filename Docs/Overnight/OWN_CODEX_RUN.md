@@ -13,7 +13,7 @@
 
 ## Current checkpoint
 
-C00 in progress: separate clone complete at the published base, assigned branch created, all 632 LFS files materialized (Git LFS fsck passed). Fresh Unity baseline underway; no scene changes yet. Run start/deadline remain fixed above.
+C00 complete: separate clone at the published base, assigned branch created, all 632 LFS files materialized (Git LFS fsck passed). Fresh Unity compilation and geometry baseline complete after the documented Adobe bootstrap fix.
 
 Latest checkpoint at 01:10 Europe/Sofia: **C00 geometry baseline complete; C01 cache placement applied; C02 bank repair underway.** GPU capture limitation remains separate. Same fixed deadline, no restart of the shift.
 
@@ -68,3 +68,26 @@ Added an explicit no-graphics capture skip and relaunched the baseline headlessl
 - Local affected tree/prop review and restrained scenery polish.
 - Actual scene collision/camera/navigation checks, relevant regressions and new standalone.
 - Commit/push validated branch checkpoints and final own handoff.
+
+## Feature-freeze checkpoint — 07:11 Europe/Sofia
+
+- Original deadline unchanged: 08:36:39 Sofia. Current elapsed approximately 6h34. Tool execution resumed following the user's new message; no claim of continuous work during the intervening gap. Feature freeze is active: no new scenery/features will be added.
+- C03 applied: retained but deactivated exactly two west fence segments at (-19,-2.42) and (-19,0.75) in X/Z; new narrow ground-conforming departure path. Major architecture unchanged.
+- Highspire north footway follows surveyed clear points (-200,-60), (-202.5,-57.5), (-204,-15), (-225,0) in X/Z. Well, houses and curtain walls retained; route uses the north gate.
+- Greenhollow arrival footway ends at (-36,395), beside the existing scout marker; discovery IDs and mount unlock rules unchanged.
+- Saved-scene real-physics probes: **20 REACHED / 0 BLOCKED** across Emberwatch–Highspire, Highspire–Westbank, bridge, Reaver approach and Greenhollow arrival. Each tested walk/mount and both directions. Mounted probes include the existing predictive box sweep. These are geometry checks; no normal-input full-route/camera or visual acceptance claim.
+- C05 decorative additions deferred at feature freeze; no unnecessary prop expansion. C04 remaining tree visual disposition and C06 camera/normal-input gaps must be reported honestly.
+- C07 underway: existing QuestRouteSmokeTest launched once against current branch scene at 07:12, PID 40340, headless, isolated saves; expected existing assertions unchanged. Its internal 90-second Play Mode timeout is retained. Next: preservation/seam audit, fresh unique standalone, checkpoint/push and final handoff.
+- Last pushed commit: ad8e019. Current uncommitted scope: settlement paths/meshes, two fence active flags, traversal helper route updates. Six Brute FBX metadata and URP settings show fresh-import normalization; exclude/restore those unrelated changes before delivery.
+
+### Final verification / planning checkpoint — 07:26 Europe/Sofia
+
+- Current saved-scene QuestRouteSmokeTest completed: **145 PASS / 0 FAIL**, including the unmodified separate-terrain assertion, quest/reward/save route and queued W-input movement. This is not a complete normal-input route or rendered animation review. Headless RenderTexture warnings occurred; zero RPG runtime exceptions were reported by the suite.
+- Final after-save protection passed against Reaver approach preserved final.asset: all 813 trees, 15 prototypes, 8 layers, every paint texel/detail density/hole and outside bridge-footprint height preserved. Terrain/Collider share the new protected bridge data; Reaver grade remains 27.92 degrees.
+- Six original terrain assets compared byte-for-byte via their published-base Git/LFS SHA256 values: all match. Receipt: .code-check/overnight/original-assets-verification.json.
+- Four shared seams sampled at 129 points each: worst delta 0.0000 m. These are samples, not exhaustive mesh/gameplay proof.
+- Affected tree review: exactly 26 interpolated Reaver candidates, zero additional bridge candidates over 0.1 m. Maximum stored root-to-interpolated-ground offset is 0.000 m. Individual rendered bases, mesh direction and collider disposition remain NOT RUN; no trees changed. Tilted bush prototype roots are review candidates, not demonstrated errors.
+- Current audit covers 872 classified renderers, zero missing terrain, nine elevated part candidates: seven supported chest lids and two Willow Rest iron chest bands. Terrain-relative AABBs do not account for the new footing, so those part candidates are not nine floating objects. No buried renderer candidate reported within the audited categories; tree instances/unclassified assets are outside that claim.
+- Serialized scene review against published base: existing-field replacements are six supports' position/scale, the cache root position, Terrain/Collider data refs and two fence active flags. Additions are the footing and three route meshes/root. No major architecture, actor, persistent ID, reward or chest hinge changed.
+- Standalone attempt 1 launched PID 26548 at 07:23. Hypothesis: current branch scene builds to unique Builds/OvernightCodexWorld/Riftbound.exe without network-prefab regeneration. Compilation and final audit completed; shader compilation is progressing. Ten-minute no-new-evidence limit remains; build/import progress is measured, not assumed.
+- User-requested larger planning update published separately in **93d1423**: six documentation files, GP00–GP15, CW00–CW15, 72 feature slices and a design-only fifth-tile proposal. No new runtime/world feature started after freeze. Antigravity's finished handoff inspected read-only at f415f351da708b065c3cc1b65d1c1769c48cf577; reported online passes preserved, manual GUI/two-PC gaps retained. Current deadline unchanged.

@@ -187,6 +187,69 @@ namespace Riftbound.Editor
             catch (Exception e) { Fail("bridge", e); }
         }
 
+        public static void FinalChecksAndBuild()
+        {
+            try
+            {
+                OpenWorld();
+                var terrain = WorldRegions.TerrainAt(RiverReaverCamp.Position);
+                var data = terrain.terrainData;
+                var original = AssetDatabase.LoadAssetAtPath<TerrainData>("Assets/RPG/Terrain/ReaverCamp/Reaver approach preserved final.asset");
+                var report = new StringBuilder($"FINAL WORLD CHECKS UTC={DateTime.UtcNow:O}\n");
+                if (data == original || data.treeInstanceCount != 813 || data.treePrototypes.Length != 15
+                    || terrain.GetComponent<TerrainCollider>().terrainData != data)
+                    throw new InvalidOperationException("Protected bridge terrain assignment/vegetation baseline mismatch.");
+                ReaverRepairPreparation.VerifyPreservedData(original, data, report, new Rect(-274, 45, 37, 10));
+                float grade = ReaverCampTerrainSetup.CheckApproach();
+                if (grade > 35) throw new InvalidOperationException("Reaver approach grade regression.");
+                report.AppendLine($"PASS protected Terrain/Collider match; 15 prototypes; Reaver grade={grade:F2} degrees.");
+                Phase1WorldAudit.AuditCurrentScene();
+                ReviewAffectedTrees(terrain, report);
+                report.AppendLine("No scene saved. NOT RUN: individual rendered tree-base/collider review, full normal-input route/mounted-camera acceptance, live NavMesh and rendered performance comparison.");
+                File.WriteAllText(Evidence + "final-world-checks.txt", report.ToString());
+
+                const string output = "Builds/OvernightCodexWorld/Riftbound.exe";
+                if (Directory.Exists("Builds/OvernightCodexWorld"))
+                    throw new InvalidOperationException("Build output already exists; inspect rather than overwrite.");
+                var result = BuildPipeline.BuildPlayer(new BuildPlayerOptions
+                {
+                    scenes = new[] { WorldRegions.ScenePath }, locationPathName = output,
+                    target = BuildTarget.StandaloneWindows64, options = BuildOptions.None
+                });
+                File.WriteAllText(Evidence + "build-result.txt", $"UTC={DateTime.UtcNow:O}\nPath={output}\nResult={result.summary.result}\nErrors={result.summary.totalErrors}\nWarnings={result.summary.totalWarnings}\nDuration={result.summary.totalTime}\nBytes={result.summary.totalSize}\n");
+                EditorApplication.Exit(result.summary.result == UnityEditor.Build.Reporting.BuildResult.Succeeded ? 0 : 1);
+            }
+            catch (Exception e) { Fail("final-checks-build", e); }
+        }
+
+        static void ReviewAffectedTrees(Terrain terrain, StringBuilder report)
+        {
+            var before = AssetDatabase.LoadAssetAtPath<TerrainData>("Assets/RPG/Terrain/WorldExpansion/World tile 0-0.asset");
+            var reaver = AssetDatabase.LoadAssetAtPath<TerrainData>("Assets/RPG/Terrain/ReaverCamp/Reaver approach preserved final.asset");
+            var current = terrain.terrainData;
+            int reaverCount = 0, bridgeCount = 0;
+            float largestRootOffset = 0;
+            var trees = current.treeInstances;
+            for (int i = 0; i < trees.Length; i++)
+            {
+                var tree = trees[i];
+                float baseHeight = before.GetInterpolatedHeight(tree.position.x, tree.position.z);
+                float reaverHeight = reaver.GetInterpolatedHeight(tree.position.x, tree.position.z);
+                float height = current.GetInterpolatedHeight(tree.position.x, tree.position.z);
+                bool affectedReaver = Mathf.Abs(reaverHeight - baseHeight) > .1f;
+                bool affectedBridge = Mathf.Abs(height - reaverHeight) > .1f;
+                if (!affectedReaver && !affectedBridge) continue;
+                if (affectedReaver) reaverCount++;
+                if (affectedBridge) bridgeCount++;
+                float offset = tree.position.y * current.size.y - height;
+                largestRootOffset = Mathf.Max(largestRootOffset, Mathf.Abs(offset));
+                var point = terrain.transform.position + Vector3.Scale(tree.position, current.size);
+                var prefab = current.treePrototypes[tree.prototypeIndex].prefab;
+                report.AppendLine($"TREE REVIEW instance={i} x={point.x:F2} z={point.z:F2} prototype={tree.prototypeIndex} prefab={(prefab ? prefab.name : "MISSING")} reaverDelta={reaverHeight-baseHeight:F3} bridgeDelta={height-reaverHeight:F3} storedRootAboveInterpolatedGround={offset:F3} rootUp={(prefab ? Vector3.Dot(prefab.transform.up,Vector3.up) : 0):F3}; rendered base/mesh/collision disposition unresolved.");
+            }
+            report.AppendLine($"Tree review totals: Reaver affected={reaverCount}, bridge affected={bridgeCount}, maximum stored-root offset={largestRootOffset:F3}m. Tree normalized Y is a diagnostic, not a rendered-base verdict; intentional mesh offsets and terrain rendering require visual review. No vegetation changed.");
+        }
+
         static void Capture(string stage)
         {
             if (SystemInfo.graphicsDeviceType == UnityEngine.Rendering.GraphicsDeviceType.Null)

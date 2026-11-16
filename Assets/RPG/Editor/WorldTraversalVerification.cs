@@ -20,14 +20,22 @@ namespace Riftbound.Editor
             internal Route(string name, params Vector3[] points) { this.name = name; this.points = points; }
         }
 
-        internal static Route[] Routes => new[]
+        internal static Route[] Routes
         {
-            new Route("Emberwatch to Highspire", new Vector3(-18,0,0), new Vector3(-70,7,-35), new Vector3(-135,12,-55), new Vector3(-200,12,-60)),
-            new Route("Highspire to Westbank", new Vector3(-200,12,-60), new Vector3(-225,9,0), new Vector3(-240,6,50), new Vector3(-260,6,50), new Vector3(-285,6,50)),
-            new Route("Bridge crossing", new Vector3(-278,6,50), new Vector3(-235,6,50)),
-            new Route("Reaver approach", new Vector3(-285,6,50), RiverReaverCamp.Position),
-            new Route("Greenhollow arrival", new Vector3(-17,11,368), new Vector3(-40,13,400))
-        };
+            get
+            {
+                var north = SettlementRoutePass.ReadPath("Highspire north footway") ?? new[] { new Vector3(-200,12,-60), new Vector3(-225,9,0) };
+                var green = SettlementRoutePass.ReadPath("Greenhollow arrival footway") ?? new[] { new Vector3(-17,11,368), new Vector3(-40,13,400) };
+                return new[]
+                {
+                    new Route("Emberwatch to Highspire", new Vector3(-18,0,0), new Vector3(-70,7,-35), new Vector3(-135,12,-55), new Vector3(-200,12,-60)),
+                    new Route("Highspire to Westbank", north.Concat(new[] { new Vector3(-240,6,50), new Vector3(-260,6,50), new Vector3(-285,6,50) }).ToArray()),
+                    new Route("Bridge crossing", new Vector3(-278,6,50), new Vector3(-235,6,50)),
+                    new Route("Reaver approach", new Vector3(-285,6,50), RiverReaverCamp.Position),
+                    new Route("Greenhollow arrival", green)
+                };
+            }
+        }
 
         public static void Run()
         {
