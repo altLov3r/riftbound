@@ -47,3 +47,13 @@ Maximum two unchanged failed attempts; stop after ten minutes without new eviden
 - Existing QuestRouteSmokeTest completed after final scene/material/code changes: **145 PASS / 0 FAIL**, unchanged assertions. Runtime files, package versions and project settings unchanged.
 - CW01 fixes validated; CW02 has native geometry plus16 queued movement passes and cache interaction pass, with strict mounted Reaver encounter outcome retained as a limitation. CW03 individual data classifications complete, sampled visual evidence available, full per-instance/camera acceptance pending. Broader settlement work remains a review brief, not applied content.
 - Next: checkpoint/push source, new unique Builds/CodexWorldProduction01/Riftbound.exe and final own handoff. Old overnight branch/build remain preserved.
+
+## Delivery — approximately 09:00 Sofia
+
+- Tested source **237039052ea015476418a4f7436f9fcb0521ef90** pushed to production/codex-world-20261116; upstream set. No main merge. Finished overnight ref still bef0420.
+- Build attempt1 PID3828: **Succeeded / 0 errors / 560 warnings**,26.475s,542,389,611 reported bytes, completed08:51:31 Sofia. Protected data/grade and current read-only seams checked during build. Unique output Builds/CodexWorldProduction01/Riftbound.exe.
+- Exact executable/DLL/global manager/level0/sharedassets0 files checked and hashed. New scene/sharedassets differ from overnight; new material name present in sharedassets0. Runtime DLL is unchanged, as expected for world/editor-only changes. Full identities in OWN_CODEX_WORLD_HANDOFF.md.
+- Fresh standalone title rendered after explicit foreground activation; no character entered. Closed and confirmed own window gone. No background work/process remains.
+- Source/docs whitespace check passed; all seven terrain hashes match overnight; original Road.mat restored after one automatic float normalization, not committed as an unrelated edit. Source working state clean before final documentation.
+- Result boundaries preserved:145 existing regression passes;36 geometry reaches;17 queued-input pass lines and one retained strict Reaver encounter failure; GPU samples/foliage limits described honestly. No complete manual/online/performance/per-instance-tree acceptance claim.
+- **SCENE RELEASED**, own production checkout only. Current assignment complete with reviewed source/build/handoff and remaining user/Gemini acceptance. No new eight-hour timer was created.
