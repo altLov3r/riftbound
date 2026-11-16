@@ -67,6 +67,7 @@ namespace Riftbound.Network
         readonly HashSet<string> serverDefeatedEnemyKeys = new HashSet<string>();
         readonly HashSet<string> serverCompletedEvents = new HashSet<string>();
         readonly HashSet<string> serverDiscoveredLandmarks = new HashSet<string>();
+        readonly HashSet<string> serverCompletedFactionQuests = new HashSet<string>();
         int serverPotions = 3;
         bool serverTemperedWeapon;
         float lastServerPotionTime = -10f;
@@ -874,6 +875,86 @@ namespace Riftbound.Network
         {
             if (!IsOwner || !localPlayer) return;
             localPlayer.ApplyAuthorizedCompleteQuest(questIndex);
+        }
+
+        public bool RequestCompleteFactionQuestServerValidated(string questId)
+        {
+            if (!CoopSessionConfig.IsMultiplayer || !IsSpawned || string.IsNullOrEmpty(questId)) return false;
+            if (IsServer)
+            {
+                if (TryValidateFactionQuestOnServer(questId, out int goldGain, out int xpGain))
+                {
+                    if (FactionQuestSystem.Instance && localPlayer)
+                        FactionQuestSystem.Instance.ApplyAuthorizedComplete(localPlayer, questId, Gold.Value, goldGain, xpGain);
+                    return true;
+                }
+                return false;
+            }
+            RequestCompleteFactionQuestServerRpc(questId);
+            return false;
+        }
+
+        [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Owner)]
+        void RequestCompleteFactionQuestServerRpc(string questId)
+        {
+            if (TryValidateFactionQuestOnServer(questId, out int goldGain, out int xpGain))
+            {
+                ApproveCompleteFactionQuestClientRpc(questId, Gold.Value, goldGain, xpGain, RpcTarget.Single(OwnerClientId, RpcTargetUse.Temp));
+            }
+        }
+
+        bool TryValidateFactionQuestOnServer(string questId, out int goldGain, out int xpGain)
+        {
+            goldGain = 0;
+            xpGain = 0;
+            if (!IsServer || Health.Value <= 0 || string.IsNullOrEmpty(questId)) return false;
+
+            var q = FactionQuestSystem.GetQuest(questId);
+            if (q == null || serverCompletedFactionQuests.Contains(questId)) return false;
+            if (!string.IsNullOrEmpty(q.prerequisiteQuestId) && !serverCompletedFactionQuests.Contains(q.prerequisiteQuestId))
+                return false;
+
+            string targetNpc = q.targetType == "talk_npc" ? q.targetId : q.giverNpc;
+            bool nearNpc = false;
+            foreach (var npc in FindObjectsByType<TownNPC>(FindObjectsSortMode.None))
+            {
+                if (npc && string.Equals(npc.npcName, targetNpc, System.StringComparison.OrdinalIgnoreCase) &&
+                    Vector3.Distance(transform.position, npc.transform.position) <= 7.0f)
+                {
+                    nearNpc = true;
+                    break;
+                }
+            }
+            if (!nearNpc) return false;
+
+            if (q.id == "frontier_cartography")
+            {
+                if (!serverDiscoveredLandmarks.Contains("westbank-overlook") ||
+                    !serverDiscoveredLandmarks.Contains("bloodrock-vista") ||
+                    !serverDiscoveredLandmarks.Contains("wyrmcrest-lookout"))
+                    return false;
+            }
+            else if (q.targetType == "defeat_enemy")
+            {
+                bool exactBoss = q.targetId == RiverReaverCamp.CaptainId || q.targetId == "redridge-outcast-boss" || q.targetId == "vermithrax-boss";
+                if (exactBoss ? !serverDefeatedEnemyKeys.Contains(q.targetId) : serverDefeatedEnemyKeys.Count < q.requiredCount)
+                    return false;
+            }
+
+            if (!serverCompletedFactionQuests.Add(questId)) return false;
+
+            goldGain = Race.Value.ToString() == "Human" ? Mathf.RoundToInt(q.rewardGold * 1.25f) : q.rewardGold;
+            xpGain = q.rewardXP;
+            GrantAuthoritativeProgress(xpGain, goldGain);
+            Health.Value = MaxHealth.Value;
+            return true;
+        }
+
+        [Rpc(SendTo.SpecifiedInParams)]
+        void ApproveCompleteFactionQuestClientRpc(string questId, int newServerGold, int goldGain, int xpGain, RpcParams rpcParams = default)
+        {
+            if (!IsOwner || !localPlayer || !FactionQuestSystem.Instance) return;
+            FactionQuestSystem.Instance.ApplyAuthorizedComplete(localPlayer, questId, newServerGold, goldGain, xpGain);
         }
 
         // ── O-01 Shared World Events & Late-Join Snapshot ───────────────────────────────

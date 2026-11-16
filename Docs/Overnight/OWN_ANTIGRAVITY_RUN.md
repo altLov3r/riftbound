@@ -116,3 +116,31 @@
   - **`-coopProgressionSmoke` (2p Relay):** `H=0 C=0` (`hostProg=PASS(dead=True, chest=True)`, `clientProg=PASS(kill=True,qRej=True,c1=True,cDup=True,txRej=True,txBuy=True,resp=True)`)
   - **`-coopCombatSmoke` (2p Relay):** `H=0 C=0` (`enemy=road-raider-1 hp=36/70, clientDamaged=True`)
   - **4-Player Relay + 5th Rejection + Frame Telemetry:** `H=0 C1=0 C2=0 C3=0 C4=1` (`players=4, cams=1, listeners=1`, Host `avgMs=6.23/p95Ms=11.13, enemies=54, netObjs=4`, Clients `avgMs=5.84-7.45/p95Ms=7.53-13.00, enemies=52, netObjs=4`; C4 `[OnlineSessionService] Join failed: session is full`)
+
+
+### Checkpoint 02:03 — Wave 4 Optional Bounty Server Validation & Offline Faction Save Isolation Verified
+- **UTC:** `2026-11-16T00:40:33Z` | **Sofia:** `2026-11-16T02:40:33+02:00`
+- **Elapsed:** `02:03:02` (ahead of feature freeze `05:07:31Z` and deadline `06:37:31Z`)
+- **Current Ticket:** A07 — Branch Verification & Final Delivery (Wave 4 Hardening + Full Post-Final-Edit Suite Complete)
+- **Additional Wave 4 Modified Files:**
+  - `Assets/RPG/Scripts/FactionQuestSystem.cs`
+  - `Assets/RPG/Scripts/Network/RiftboundCoopPlayer.cs`
+  - `Assets/RPG/Scripts/Network/CoopWorldManager.cs`
+- **Wave 4 Bugs Found & Fixed:**
+  - **Offline Faction Save Isolation (`FactionQuestSystem.cs`):** Added `if (Network.CoopSessionConfig.IsMultiplayer) return;` guards to both `SaveData()` and `LoadData()` so multiplayer sessions remain strictly session-only without reading or overwriting `faction-quests-<id>.json`.
+  - **Optional Bounty Server Authority (`FactionQuestSystem.cs` + `RiftboundCoopPlayer.cs`):** Routed multiplayer `CompleteQuest(PlayerController)` through `RequestCompleteFactionQuestServerValidated` / `RequestCompleteFactionQuestServerRpc` -> `TryValidateFactionQuestOnServer` (validates alive player `Health > 0`, prerequisite, Town NPC proximity `<= 7.0f`, objective completion such as `frontier_cartography` 3 survey landmarks in `serverDiscoveredLandmarks` or `defeat_enemy`, and duplicate turn-in dedup via `serverCompletedFactionQuests`), granting server-authoritative gold (with Human `1.25x` bonus), XP/level, and full heal via `ApproveCompleteFactionQuestClientRpc` + `ApplyAuthorizedComplete`.
+  - **Extended Automated Regression (`CoopWorldManager.cs`):** Extended `-coopProgressionSmoke` to test `Cartographer Elara` `frontier_cartography` bounty accept -> premature turn-in rejection -> 3 overlook surveys (`westbank-overlook`, `bloodrock-vista`, `wyrmcrest-lookout`) -> server-validated completion (`>= +75g`) -> duplicate turn-in rejection (`bounty=True`).
+- **Post-Final-Edit Build & Full Regression Matrix (100% Re-Run After Wave 4 Final C# Edit):**
+  - **Standalone Build (`BuildOvernightAntigravityOnline`):** `Builds/OvernightAntigravityOnline/Riftbound.exe` (`228 files`, `542,430,960 bytes` / `517.30 MB`, `Assembly-CSharp.dll` `863,232 bytes` at `2026-11-16T00:32:45Z`, `errors=0`, `BUILD_EXIT=0`)
+  - **`Riftbound.Editor.QuestRouteSmokeTest.Run` (Play Mode):** `UNITY_EXIT=0` — `RESULT_PASS=145, RESULT_FAIL=0, TOTAL=150`, `UGS_INIT_IN_OFFLINE_LOG=0`
+  - **`-coopUiSmoke` (without `-coopSmoke`):** `EXIT=0` (`PASS UiFlow: menuOpen=True, state=Offline, mode=Offline, nm=0, cams=2, listeners=1`)
+  - **`-coopInvalidCodeSmoke`:** `EXIT=0` (`PASS InvalidCode: state=Failed, err=Join code is invalid or expired.`)
+  - **`-coopResilienceSmoke`:** `EXIT=0` (`PASS Resilience: cancelOk=True, codes=[redacted]->[redacted], nmDuringHost=1, nmAfterLeave=0, finalState=Offline`)
+  - **`-coopProgressionSmoke -coopSmoke 60` (2p Relay):** `H=0 C=0` (`hostProg=PASS(dead=True, chest=True)`, `clientProg=PASS(kill=True,qRej=True,c1=True,cDup=True,txRej=True,txBuy=True,resp=True,bounty=True)`)
+  - **`-coopAuthoritySmoke -coopSmoke 45` (2p Relay):** `H=0 C=0` (`hostAuth=PASS(chest=True,zebra=True,farRevRej=True,nearRev=True)`, `clientAuth=PASS(clamp=True,rngRej=True,cdRej=True,restRej=True,dupLmRej=True,zEarly=True,zOk=True,temper=True,deadRej=True,rev=True,restOk=True[g=75->70,h=60->120/120])`)
+  - **`-coopLateJoinSmoke -coopSmoke 35` (2p Relay, 3s delay):** `H=0 C=0` (`lateJoin=PASS(40/70,evt=True,rcDecline=True)` on Host; `lateJoin=PASS(40/70,evt=True,rcSnap=True)` on Client)
+  - **`-coopFullAcceptanceSmoke -coopSmoke 65` (2p Relay):** `H=0 C=0` (`hostAccept=PASS(cid=1,ping=True,rc=True/True,revive=True,kills=0,qIdx=1)`, `clientAccept=PASS(spoofRej=True,abHit=True,abHeal=True,dismount=True,qAcc=True,qComp=True,rev=True,evt=True,noDblG=True,hostDisc=True)`)
+  - **`-coopClientLeaveSmoke -coopSmoke 35` (2p Relay):** `H=0 C=0` (`hostDisconnectRecovery=PASS(mounted=True,quest=True,playersAfter=1)`, `PASS ClientLeave: questAccepted=True, mounted=True, nmAfterLeave=0, finalState=Offline`)
+  - **`-coopCombatSmoke -coopSmoke 25` (2p Relay):** `H=0 C=0` (`enemy=road-raider-1 hp=36/70, clientDamaged=True`)
+  - **4-Player Relay + 5th Rejection + Frame Telemetry (`-coopMinPlayers 4 -coopSmoke 25`):** `H=0 C1=0 C2=0 C3=0 C5=1` (`players=4, cams=1, listeners=1`, Host `avgMs=5.11/p95Ms=7.68, enemies=54, netObjs=4`, Clients `avgMs=4.42-5.67/p95Ms=5.44-9.39, enemies=52, netObjs=4`; C5 `[OnlineSessionService] Join failed: session is full`)
+- **Invocation Note Discovered During Batch Run:** Passing `-coopSmoke <N>` alongside `-coopUiSmoke` causes `FrontendMenu.Start()` (`AutoSmokeExitSeconds > 0f`) to bypass menu creation; `-coopUiSmoke` must be launched without `-coopSmoke`.

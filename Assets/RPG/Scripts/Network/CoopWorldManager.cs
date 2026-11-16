@@ -882,7 +882,18 @@ namespace Riftbound.Network
 
                 var enemyStats = targetEnemy ? targetEnemy.GetComponent<Combatant>() : null;
                 var lp = FindFirstObjectByType<PlayerController>();
-                if (targetEnemy && enemyStats && targetChest && lp)
+                TownNPC elara = null;
+                foreach (var n in FindObjectsByType<TownNPC>(FindObjectsSortMode.None))
+                    if (n && n.npcName == ExplorationSites.CartographerName) { elara = n; break; }
+                Landmark sv0 = null, sv1 = null, sv2 = null;
+                foreach (var lm in FindObjectsByType<Landmark>(FindObjectsSortMode.None))
+                {
+                    if (!lm) continue;
+                    if (lm.landmarkId == "westbank-overlook") sv0 = lm;
+                    else if (lm.landmarkId == "bloodrock-vista") sv1 = lm;
+                    else if (lm.landmarkId == "wyrmcrest-lookout") sv2 = lm;
+                }
+                if (targetEnemy && enemyStats && targetChest && lp && elara && sv0 && sv1 && sv2)
                 {
                     if (isHost)
                     {
@@ -901,6 +912,28 @@ namespace Riftbound.Network
                         while (Time.realtimeSinceStartup - waitLoot < 8f && (clientAvatar == null || clientAvatar.Gold.Value < 18))
                             yield return new WaitForSeconds(0.25f);
                         yield return new WaitForSeconds(4.5f);
+
+                        // Teleport Client to Cartographer Elara -> 3 survey sites -> Elara for optional bounty test
+                        Landmark[] svs = { sv0, sv1, sv2 };
+                        if (clientAvatar != null)
+                        {
+                            clientAvatar.AuthorizeHostTeleport(elara.transform.position + new Vector3(1.5f, 0f, 0f));
+                            yield return new WaitForSeconds(1.2f);
+                            for (int s = 0; s < 3; s++)
+                            {
+                                int gBefore = clientAvatar.Gold.Value;
+                                clientAvatar.AuthorizeHostTeleport(svs[s].transform.position + new Vector3(1.5f, 0f, 0f));
+                                float wSv = Time.realtimeSinceStartup;
+                                while (Time.realtimeSinceStartup - wSv < 6f && clientAvatar.Gold.Value < gBefore + 15)
+                                    yield return new WaitForSeconds(0.2f);
+                            }
+                            int gBeforeTurnIn = clientAvatar.Gold.Value;
+                            clientAvatar.AuthorizeHostTeleport(elara.transform.position + new Vector3(1.5f, 0f, 0f));
+                            float wBounty = Time.realtimeSinceStartup;
+                            while (Time.realtimeSinceStartup - wBounty < 8f && clientAvatar.Gold.Value < gBeforeTurnIn + 75)
+                                yield return new WaitForSeconds(0.2f);
+                            yield return new WaitForSeconds(0.8f);
+                        }
 
                         Vector3 hostChestSpot = targetChest.transform.position + new Vector3(1.5f, 0f, 0f);
                         RiftboundCoopPlayer.LocalOwner.AuthorizeHostTeleport(hostChestSpot);
@@ -964,8 +997,54 @@ namespace Riftbound.Network
                             yield return new WaitForSeconds(0.8f);
                             bool respawnOk = RiftboundCoopPlayer.LocalOwner.Health.Value == RiftboundCoopPlayer.LocalOwner.MaxHealth.Value;
 
-                            progPass = killCreditOk && questRejectOk && chest1Ok && chestDupRejectOk && txRejectOk && txBuyOk && respawnOk;
-                            combatInfo += $", clientProg={(progPass ? "PASS" : "FAIL")}(kill={killCreditOk},qRej={questRejectOk},c1={chest1Ok},cDup={chestDupRejectOk},txRej={txRejectOk},txBuy={txBuyOk},resp={respawnOk})";
+                            // Optional Bounty (Cartographer frontier_cartography): premature reject -> 3 surveys -> turn in once -> duplicate reject
+                            bool bountyOk = false;
+                            var fq = FactionQuestSystem.Instance;
+                            if (fq != null)
+                            {
+                                float wElara = Time.realtimeSinceStartup;
+                                while (Time.realtimeSinceStartup - wElara < 10f && Vector3.Distance(lp.transform.position, elara.transform.position) > 5f)
+                                    yield return new WaitForSeconds(0.15f);
+                                var qDef = fq.GetAvailableQuestForNPC(ExplorationSites.CartographerName, lp);
+                                if (qDef != null && qDef.id == "frontier_cartography")
+                                {
+                                    fq.AcceptQuest(qDef, lp);
+                                    int gPre = RiftboundCoopPlayer.LocalOwner.Gold.Value;
+                                    RiftboundCoopPlayer.LocalOwner.RequestCompleteFactionQuestServerValidated("frontier_cartography");
+                                    yield return new WaitForSeconds(0.55f);
+                                    bool preRej = !fq.IsQuestCompleted("frontier_cartography") && RiftboundCoopPlayer.LocalOwner.Gold.Value == gPre;
+
+                                    Landmark[] svs = { sv0, sv1, sv2 };
+                                    for (int s = 0; s < 3; s++)
+                                    {
+                                        float wS = Time.realtimeSinceStartup;
+                                        while (Time.realtimeSinceStartup - wS < 8f && Vector3.Distance(lp.transform.position, svs[s].transform.position) > 5f)
+                                            yield return new WaitForSeconds(0.15f);
+                                        int gS = RiftboundCoopPlayer.LocalOwner.Gold.Value;
+                                        lp.DiscoverLandmark(svs[s].landmarkId);
+                                        float wGs = Time.realtimeSinceStartup;
+                                        while (Time.realtimeSinceStartup - wGs < 5f && RiftboundCoopPlayer.LocalOwner.Gold.Value < gS + 15)
+                                            yield return new WaitForSeconds(0.15f);
+                                    }
+
+                                    float wRet = Time.realtimeSinceStartup;
+                                    while (Time.realtimeSinceStartup - wRet < 8f && Vector3.Distance(lp.transform.position, elara.transform.position) > 5f)
+                                        yield return new WaitForSeconds(0.15f);
+                                    int gBeforeTurn = RiftboundCoopPlayer.LocalOwner.Gold.Value;
+                                    fq.CompleteQuest(lp);
+                                    float wDone = Time.realtimeSinceStartup;
+                                    while (Time.realtimeSinceStartup - wDone < 5f && !fq.IsQuestCompleted("frontier_cartography"))
+                                        yield return new WaitForSeconds(0.15f);
+                                    int gAfterTurn = RiftboundCoopPlayer.LocalOwner.Gold.Value;
+                                    RiftboundCoopPlayer.LocalOwner.RequestCompleteFactionQuestServerValidated("frontier_cartography");
+                                    yield return new WaitForSeconds(0.55f);
+                                    bool dupBountyRej = RiftboundCoopPlayer.LocalOwner.Gold.Value == gAfterTurn;
+                                    bountyOk = preRej && fq.IsQuestCompleted("frontier_cartography") && gAfterTurn >= gBeforeTurn + 75 && dupBountyRej;
+                                }
+                            }
+
+                            progPass = killCreditOk && questRejectOk && chest1Ok && chestDupRejectOk && txRejectOk && txBuyOk && respawnOk && bountyOk;
+                            combatInfo += $", clientProg={(progPass ? "PASS" : "FAIL")}(kill={killCreditOk},qRej={questRejectOk},c1={chest1Ok},cDup={chestDupRejectOk},txRej={txRejectOk},txBuy={txBuyOk},resp={respawnOk},bounty={bountyOk})";
                         }
                     }
                 }
