@@ -1,0 +1,150 @@
+PASS Player, health and animator survive startup
+PASS Camera follows the player
+PASS HUD references the live player
+Initial frame=424, background=True, focused=False, editorPaused=False
+PASS Frontend exists
+PASS Startup opens the title screen
+PASS Painted ability atlas is packaged as a square texture
+PASS Class and shared actions map to sixteen distinct icon cells
+PASS Player, health and animator survive startup
+PASS Camera follows the player
+PASS HUD references the live player
+Initial frame=611, background=True, focused=False, editorPaused=False
+PASS Frontend exists
+PASS Play opens character selection while gameplay stays gated
+PASS Player, health and animator survive startup
+PASS Camera follows the player
+PASS HUD references the live player
+Initial frame=801, background=True, focused=False, editorPaused=False
+PASS Frontend exists
+PASS Menu or direct-play controls are available
+Initial character selection shown: True
+PASS Character-entry handoff is available
+PASS Player, health and animator survive startup
+PASS Camera follows the player
+PASS HUD references the live player
+PASS Player, health and animator survive startup
+PASS Camera follows the player
+PASS HUD references the live player
+World state: menu=False, paused=False, timeScale=1, name=BuildCheck, frames=1447
+PASS Entering the world restores gameplay time and camera control
+PASS Selected character is applied after scene reload
+PASS Fresh test character retains its selected race
+PASS Expanded world has four active terrain tiles
+PASS World footprint is 768 by 768 metres
+PASS Characters start solo without companions
+PASS An ally can be called explicitly
+PASS Called allies can be dismissed
+PASS Recorded UI and footstep audio is packaged
+PASS Terrain exists below region (-220.00, 18.00, 260.00)
+PASS Grounding supports all tiles and high-elevation regions
+PASS Terrain exists below region (280.00, 18.00, 210.00)
+PASS Grounding supports all tiles and high-elevation regions
+PASS Terrain exists below region (250.00, 75.00, 510.00)
+PASS Grounding supports all tiles and high-elevation regions
+PASS Terrain exists below region (-40.00, 13.00, 400.00)
+PASS Grounding supports all tiles and high-elevation regions
+PASS Terrain exists below region (-240.00, 12.00, 180.00)
+PASS Grounding supports all tiles and high-elevation regions
+PASS Legacy Horde save positions migrate to the expanded eastern region
+PASS Underground save positions stay in the dungeon
+PASS Flight destinations use separated eastern and northern zones
+PASS Exploration site grounded: westbank-overlook
+PASS Exploration rewards pay once: westbank-overlook
+PASS Exploration site grounded: bloodrock-vista
+PASS Exploration rewards pay once: bloodrock-vista
+PASS Exploration site grounded: wyrmcrest-lookout
+PASS Exploration rewards pay once: wyrmcrest-lookout
+PASS Other discoveries cannot unlock the Greenhollow mount
+PASS Two Greenhollow sites keep zebra locked
+PASS All three Greenhollow sites unlock zebra
+PASS New discoveries and mount unlock survive reload
+PASS New exploration supply cache can be collected
+PASS Exploration cache cannot pay twice
+PASS Unrelated captain cannot complete bloodrock_warlord
+PASS Correct regional boss completes bloodrock_warlord
+PASS Unrelated captain cannot complete gorkresh_apex_clash
+PASS Correct regional boss completes gorkresh_apex_clash
+PASS Unrelated captain cannot complete alliance_wyrmcrest_summit
+PASS Correct regional boss completes alliance_wyrmcrest_summit
+PASS Character without a faction save starts with empty quest progress
+PASS Cartographer has an animated character model
+PASS Cartographer opens the existing NPC dialogue
+PASS Cartographer offers the survey quest
+PASS Survey advances when a site is discovered
+PASS Survey ignores repeated discoveries
+PASS Survey progress survives reload
+PASS All sites make the survey ready for hand-in
+PASS Completed survey waypoint returns to the cartographer
+PASS Survey completion is recorded
+PASS Survey hand-in rewards cannot repeat
+PASS Survey completion survives reload
+PASS River Reaver captain has a complete boss rig and vitals
+PASS Camp uses a separate terrain asset
+PASS Camp approach supports walking and mounted travel below35 degrees
+PASS River Reaver camp has exactly one captain and two guards
+PASS Leashing cancels a queued melee hit without damaging the player
+PASS Enemy cannot reaggro midway through its return home
+PASS Leashing cancels the heavy telegraph and cast bar
+PASS An evading enemy fully recovers on reaching home
+PASS Reload reset restores enemy position, health and motor
+PASS A solid wall blocks enemy line of sight
+PASS Enemy sight accepts the player collider when the path is clear
+PASS Cartography unlocks the River Reaver bounty
+PASS Reaver lockbox is unavailable before the captain's defeat
+PASS A guard does not satisfy the captain bounty
+PASS Captain death advances the bounty through the real damage event
+PASS Optional captain does not alter Abe's campaign
+PASS Captain unlocks a one-time camp lockbox
+PASS Defeated captain stays defeated and is hidden after reload
+PASS Claimed lockbox survives reload
+PASS Bounty awards Riverwarden's Signet and completes
+PASS Bounty hand-in cannot award twice
+PASS Defeating the captain before accepting the bounty still counts
+PASS Sites discovered before quest acceptance count toward the survey
+PASS Loading an earlier character restores enemies it has not defeated
+PASS Character has a visible model
+PASS Player, health and animator survive startup
+PASS Camera follows the player
+PASS HUD references the live player
+PASS W moves the player (7.01m)
+PASS No RPG runtime exceptions during startup and movement
+PASS World boss is available independently of Abe's quest
+PASS Abe dialogue opens through interaction (current loot: none)
+PASS Abe's road mission is accepted
+PASS Journal navigation can start live tracking
+PASS Road objective targets a real raider instead of a dummy or unrelated enemy
+PASS Unrelated mobs and bosses grant no main-quest credit
+PASS Three road raiders complete the road objective
+PASS Enemy loot is not awarded before collection
+PASS Unclaimed loot can be saved
+PASS Reloading cannot bypass corpse looting
+PASS Human gold bonus applies exactly once (received 4, race Human)
+PASS Claimed coins stay claimed after reload
+PASS Looting grants valid gear and shards once
+PASS Claimed item and corpse removal persist
+PASS Legacy automatic-loot saves retain earned equipment
+PASS New-format saves do not auto-grant enemy equipment
+PASS Player, health and animator survive startup
+PASS Camera follows the player
+PASS HUD references the live player
+PASS Live quest tracking returns to Abe when the objective is ready
+PASS Abe dialogue opens through interaction (current loot: none)
+PASS Hand-in reports the completed quest and its reward
+PASS Road quest turns in and advances exactly once
+PASS Abe dialogue opens through interaction (current loot: none)
+PASS Supply quest collects the three actual crates
+PASS Abe dialogue opens through interaction (current loot: none)
+PASS Hand-in reports the completed quest and its reward
+PASS Supply hand-in unlocks the captain mission
+PASS Captain remains locked until his quest is accepted
+PASS Abe dialogue opens through interaction (current loot: none)
+PASS Accepting the captain quest activates him
+PASS Only the captain completes the captain objective
+PASS Abe dialogue opens through interaction (current loot: none)
+PASS Hand-in reports the completed quest and its reward
+PASS Full campaign grants the final equipment
+PASS Repeated hand-in cannot duplicate rewards
+PASS Campaign completion survives save/load
+PASS Quest and loot route produces no RPG runtime exceptions
+PASS Quest navigation clears after campaign completion

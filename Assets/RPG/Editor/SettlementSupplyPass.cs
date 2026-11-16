@@ -292,6 +292,9 @@ namespace Riftbound.Editor
                 }
                 BeginView(player,cameras,targets);return false;
             }
+            // Fresh imports can render cyan placeholders while visible shader variants compile.
+            if(ShaderUtil.anythingCompiling)
+            {startFrame=Time.renderedFrameCount;frameTimes.Clear();return false;}
             if(Time.renderedFrameCount==lastFrame) return false;
             lastFrame=Time.renderedFrameCount;
             if(Time.renderedFrameCount-startFrame<=20) return false;

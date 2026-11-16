@@ -8,6 +8,8 @@ Revision 1 · 2026-11-15 · Planning document, not a completion report.
 
 > **2026-11-16 production update:** Read **Docs/POST_ONLINE_EXPANSION_PLAN.md** for the inspected overnight baseline, GP00–GP15 gameplay queue, CW00–CW15 world queue, expanded regional/system deliveries and ownership contracts. Antigravity's handoff reports broad automated online verification; manual GUI adventure and two-PC cross-network acceptance remain NOT RUN. Do not restart online foundation work or redo the applied Reaver repair because older snapshots below describe them as pending.
 
+> **Current integration ordering, 2026-11-16:** The user authorized combining Codexfc35bc8 and Gemini3935340 in the third checkout on **integration/combined-20261116** (merge56df479). **Docs/Integration/POST_INTEGRATION_PLAN.md** now orders integration gates and the remaining80 production packets. The integration owner's current handoff owns actual compiler/test/build results; combined verification is PENDING when this note is authored. The historical §3 snapshot below is retained, but its77-pass Reaver failure and two-process-only online snapshot are superseded by the production handoffs'145 offline passes, protected terrain repair and automated four-player Relay results. Full ordinary-input/visual/two-PC acceptance still requires actual evidence. Do not redo delivered network/terrain foundations or treat the larger roadmap as shipped content.
+
 ## 1. Purpose, authority and how to use this plan
 
 Build an original, stylized fantasy RPG with two factions, distinct playable races/classes, an authored world and private online cooperative play. Keep the scope approachable in its first release while mapping the larger game's full development path.
