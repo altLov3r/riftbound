@@ -909,14 +909,17 @@ namespace Riftbound
             ApplyAuthorizedRespawn(ClampAboveGround(spawn, 0.25f));
         }
 
-        public void ApplyAuthorizedRespawn(Vector3 safeSpawn)
+        public void ApplyAuthorizedRespawn(Vector3 safeSpawn, int serverHp = -1)
         {
             Dismount();
             CloseDialogue();
             CloseShop(); MapOpen = false; JournalOpen = false; EncounterJournalOpen = false; InventoryOpen = false; TalentsOpen = false; SpellbookOpen = false; AchievementOpen = false; ReputationOpen = false; ChatOpen = false; ProfessionSystem.IsOpen = false; AuctionHouseSystem.AuctionOpen = false; AuctionHouseSystem.MailboxOpen = false; if (GuildSystem.Instance) GuildSystem.Instance.IsOpen = false; if (CharacterSheetSystem.Instance) CharacterSheetSystem.Instance.IsOpen = false;
             StopGuard(); ReturningHome = false;
             StopAllCoroutines(); motor.enabled = false; transform.position = safeSpawn; motor.enabled = true;
-            vertical = 0; moveVelocity = Vector3.zero; Stats.Restore(); Target = null; busyUntil = 0;
+            vertical = 0; moveVelocity = Vector3.zero;
+            if (serverHp >= 0) Stats.SetReplicatedHealth(serverHp, Stats.maxHealth);
+            else Stats.Restore();
+            Target = null; busyUntil = 0;
             if (animator) animator.speed = 1;
             Play("Idle", true);
             Message = "Recovered at the outpost. Your mission progress is kept for this session.";

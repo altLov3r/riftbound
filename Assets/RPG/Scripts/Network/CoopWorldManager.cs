@@ -134,6 +134,8 @@ namespace Riftbound.Network
         static int clientLeaveStage = 0;
         static bool clientLeaveQuestAccepted = false;
         static bool clientLeaveMounted = false;
+        static string clientLeaveRejoinCode = "";
+        static bool clientLeaveRejoinOk = false;
 
         static void EnsureManagerForActiveScene()
         {
@@ -141,7 +143,7 @@ namespace Riftbound.Network
             string sceneName = SceneManager.GetActiveScene().name;
             if (!sceneName.Contains("Outpost")) return;
             bool resilienceActive = CoopSessionConfig.ResilienceSmoke && (resilienceStage == -2 || resilienceStage == 1 || resilienceStage == 3);
-            bool clientLeaveActive = CoopSessionConfig.ClientLeaveSmoke && clientLeaveStage == 1;
+            bool clientLeaveActive = CoopSessionConfig.ClientLeaveSmoke && (clientLeaveStage == 1 || clientLeaveStage == 3);
             bool uiSmokeActive = CoopSessionConfig.UiSmoke && UiSmokeStage == 2;
             if (!CoopSessionConfig.IsMultiplayer && !resilienceActive && !clientLeaveActive && !uiSmokeActive) return;
             if (Instance != null) return;
@@ -185,7 +187,7 @@ namespace Riftbound.Network
                 }
             }
 
-            if (CoopSessionConfig.ClientLeaveSmoke && clientLeaveStage == 1)
+            if (CoopSessionConfig.ClientLeaveSmoke && (clientLeaveStage == 1 || clientLeaveStage == 3))
             {
                 StartCoroutine(FinishClientLeaveSmokeRoutine());
                 return;
@@ -625,12 +627,34 @@ namespace Riftbound.Network
         {
             yield return new WaitForSeconds(0.5f);
             int remainingNm = FindObjectsByType<NetworkManager>(FindObjectsSortMode.None).Length;
-            bool pass = OnlineSessionService.State == OnlineSessionState.Offline &&
-                        CoopSessionConfig.Mode == CoopSessionMode.Offline &&
-                        remainingNm == 0 &&
+            bool offlineClean = OnlineSessionService.State == OnlineSessionState.Offline &&
+                                CoopSessionConfig.Mode == CoopSessionMode.Offline &&
+                                remainingNm == 0;
+
+            if (clientLeaveStage == 1)
+            {
+                if (!offlineClean || string.IsNullOrEmpty(clientLeaveRejoinCode))
+                {
+                    string failMsg = $"FAIL ClientLeave(stage1): questAccepted={clientLeaveQuestAccepted}, mounted={clientLeaveMounted}, nmAfterLeave={remainingNm}, finalState={OnlineSessionService.State}";
+                    Debug.Log(failMsg);
+                    System.Console.WriteLine(failMsg);
+                    yield return new WaitForSeconds(0.2f);
+                    Application.Quit(1);
+                    yield break;
+                }
+
+                clientLeaveStage = 2;
+                CoopSessionConfig.Mode = CoopSessionMode.JoinOnline;
+                CoopSessionConfig.JoinCode = clientLeaveRejoinCode;
+                SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+                yield break;
+            }
+
+            bool pass = offlineClean &&
                         clientLeaveQuestAccepted &&
-                        clientLeaveMounted;
-            string msg = $"{(pass ? "PASS" : "FAIL")} ClientLeave: questAccepted={clientLeaveQuestAccepted}, mounted={clientLeaveMounted}, nmAfterLeave={remainingNm}, finalState={OnlineSessionService.State}";
+                        clientLeaveMounted &&
+                        clientLeaveRejoinOk;
+            string msg = $"{(pass ? "PASS" : "FAIL")} ClientLeave: questAccepted={clientLeaveQuestAccepted}, mounted={clientLeaveMounted}, rejoined={clientLeaveRejoinOk}, nmAfterLeave={remainingNm}, finalState={OnlineSessionService.State}";
             Debug.Log(msg);
             System.Console.WriteLine(msg);
             yield return new WaitForSeconds(0.2f);
@@ -911,7 +935,21 @@ namespace Riftbound.Network
                         float waitLoot = Time.realtimeSinceStartup;
                         while (Time.realtimeSinceStartup - waitLoot < 8f && (clientAvatar == null || clientAvatar.Gold.Value < 18))
                             yield return new WaitForSeconds(0.25f);
-                        yield return new WaitForSeconds(4.5f);
+                        yield return new WaitForSeconds(1.8f);
+
+                        if (clientAvatar != null)
+                        {
+                            int peakGold = clientAvatar.Gold.Value;
+                            float waitBuy = Time.realtimeSinceStartup;
+                            while (Time.realtimeSinceStartup - waitBuy < 4f && clientAvatar.Gold.Value > peakGold - 10)
+                                yield return new WaitForSeconds(0.15f);
+
+                            RiftboundCoopPlayer.DispatchEnemyHitToPlayer(clientAvatar.OwnerClientId, 999f, "smoke-test");
+                            yield return new WaitForSeconds(0.2f);
+                            float waitRespH = Time.realtimeSinceStartup;
+                            while (Time.realtimeSinceStartup - waitRespH < 5f && clientAvatar.Health.Value < clientAvatar.MaxHealth.Value)
+                                yield return new WaitForSeconds(0.15f);
+                        }
 
                         // Teleport Client to Cartographer Elara -> 3 survey sites -> Elara for optional bounty test
                         Landmark[] svs = { sv0, sv1, sv2 };
@@ -993,9 +1031,20 @@ namespace Riftbound.Network
                             yield return new WaitForSeconds(0.8f);
                             bool txBuyOk = RiftboundCoopPlayer.LocalOwner.Gold.Value == goldAfterChest1 - 10 && lp.Potions == Mathf.Min(10, potsBefore + 1);
 
-                            RiftboundCoopPlayer.LocalOwner.RequestRespawn();
-                            yield return new WaitForSeconds(0.8f);
-                            bool respawnOk = RiftboundCoopPlayer.LocalOwner.Health.Value == RiftboundCoopPlayer.LocalOwner.MaxHealth.Value;
+                            float waitDie = Time.realtimeSinceStartup;
+                            while (Time.realtimeSinceStartup - waitDie < 6f && RiftboundCoopPlayer.LocalOwner.Health.Value > 0)
+                                yield return new WaitForSeconds(0.15f);
+                            bool didDie = RiftboundCoopPlayer.LocalOwner.Health.Value <= 0;
+                            if (didDie)
+                                RiftboundCoopPlayer.LocalOwner.RequestRespawn();
+                            float waitResp = Time.realtimeSinceStartup;
+                            while (Time.realtimeSinceStartup - waitResp < 3f &&
+                                   (RiftboundCoopPlayer.LocalOwner.Health.Value < RiftboundCoopPlayer.LocalOwner.MaxHealth.Value ||
+                                    Vector3.Distance(lp.transform.position, targetChest.transform.position) <= 5f))
+                                yield return new WaitForSeconds(0.15f);
+                            bool respawnOk = didDie &&
+                                             RiftboundCoopPlayer.LocalOwner.Health.Value == RiftboundCoopPlayer.LocalOwner.MaxHealth.Value &&
+                                             Vector3.Distance(lp.transform.position, targetChest.transform.position) > 5f;
 
                             // Optional Bounty (Cartographer frontier_cartography): premature reject -> 3 surveys -> turn in once -> duplicate reject
                             bool bountyOk = false;
@@ -1058,6 +1107,23 @@ namespace Riftbound.Network
             bool clientLeavePass = true;
             if (CoopSessionConfig.ClientLeaveSmoke && players >= 2 && RiftboundCoopPlayer.LocalOwner != null)
             {
+                if (!isHost && clientLeaveStage == 2)
+                {
+                    yield return new WaitForSeconds(0.4f);
+                    int rCams = 0;
+                    foreach (var c in FindObjectsByType<Camera>(FindObjectsSortMode.None)) if (c.enabled) rCams++;
+                    int rListeners = 0;
+                    foreach (var l in FindObjectsByType<AudioListener>(FindObjectsSortMode.None)) if (l.enabled) rListeners++;
+                    clientLeaveRejoinOk = RiftboundCoopPlayer.AllPlayers.Count >= 2 &&
+                                          RiftboundCoopPlayer.LocalOwner != null &&
+                                          rCams == 1 &&
+                                          rListeners == 1 &&
+                                          !FrontendMenu.IsOpen;
+                    clientLeaveStage = 3;
+                    DisconnectAndReturnToMenu();
+                    yield break;
+                }
+
                 var giver = FindFirstObjectByType<TownNPC>();
                 if (isHost)
                 {
@@ -1076,8 +1142,19 @@ namespace Riftbound.Network
                         yield return new WaitForSeconds(0.2f);
 
                     int afterPlayers = RiftboundCoopPlayer.AllPlayers.Count;
-                    clientLeavePass = sawMounted && sawQuest && afterPlayers == 1 && nm != null && nm.IsListening;
-                    combatInfo += $", hostDisconnectRecovery={(clientLeavePass ? "PASS" : "FAIL")}(mounted={sawMounted},quest={sawQuest},playersAfter={afterPlayers})";
+
+                    float waitRejoin = Time.realtimeSinceStartup;
+                    while (Time.realtimeSinceStartup - waitRejoin < 18f && RiftboundCoopPlayer.AllPlayers.Count < 2)
+                        yield return new WaitForSeconds(0.2f);
+                    bool rejoined = RiftboundCoopPlayer.AllPlayers.Count >= 2;
+
+                    float waitDisc2 = Time.realtimeSinceStartup;
+                    while (Time.realtimeSinceStartup - waitDisc2 < 12f && RiftboundCoopPlayer.AllPlayers.Count > 1)
+                        yield return new WaitForSeconds(0.2f);
+                    int finalPlayers = RiftboundCoopPlayer.AllPlayers.Count;
+
+                    clientLeavePass = sawMounted && sawQuest && afterPlayers == 1 && rejoined && finalPlayers == 1 && nm != null && nm.IsListening;
+                    combatInfo += $", hostDisconnectRecovery={(clientLeavePass ? "PASS" : "FAIL")}(mounted={sawMounted},quest={sawQuest},playersAfter={afterPlayers},rejoined={rejoined},finalPlayers={finalPlayers})";
                 }
                 else
                 {
@@ -1097,6 +1174,7 @@ namespace Riftbound.Network
 
                     clientLeaveQuestAccepted = RiftboundCoopPlayer.LocalOwner.QuestAccepted.Value;
                     clientLeaveMounted = RiftboundCoopPlayer.LocalOwner.IsMounted.Value;
+                    clientLeaveRejoinCode = OnlineSessionService.ActiveJoinCode;
                     clientLeaveStage = 1;
                     DisconnectAndReturnToMenu();
                     yield break;
@@ -1440,11 +1518,19 @@ namespace Riftbound.Network
                         yield return new WaitForSeconds(0.5f);
                         bool nearRevOk = revHp > 0 && clientAvatar != null && clientAvatar.Health.Value == revHp;
 
-                        // Client is at ~50% HP after revive; wait for Client to rest back to MaxHealth and verify repeat rest rejection
+                        // Client is at ~50% HP after revive; wait for alive-respawn check + rest + repeat-rest check, then deal 90 dmg for potion test
                         float waitRestH = Time.realtimeSinceStartup;
-                        while (Time.realtimeSinceStartup - waitRestH < 6f && clientAvatar != null && clientAvatar.Health.Value < clientAvatar.MaxHealth.Value)
+                        while (Time.realtimeSinceStartup - waitRestH < 8f && clientAvatar != null && clientAvatar.Health.Value < clientAvatar.MaxHealth.Value)
                             yield return new WaitForSeconds(0.2f);
                         yield return new WaitForSeconds(0.9f);
+                        if (clientAvatar != null)
+                        {
+                            RiftboundCoopPlayer.DispatchEnemyHitToPlayer(clientAvatar.OwnerClientId, 90f, "smoke-test");
+                            float waitPotH = Time.realtimeSinceStartup;
+                            while (Time.realtimeSinceStartup - waitPotH < 6f && clientAvatar.Health.Value < 100)
+                                yield return new WaitForSeconds(0.2f);
+                            yield return new WaitForSeconds(0.8f);
+                        }
 
                         authorityPass = hostChestOk && zebraSeenOnHost && farRevBlocked && nearRevOk;
                         combatInfo += $", hostAuth={(authorityPass ? "PASS" : "FAIL")}(chest={hostChestOk},zebra={zebraSeenOnHost},farRevRej={farRevBlocked},nearRev={nearRevOk})";
@@ -1558,9 +1644,18 @@ namespace Riftbound.Network
                             yield return new WaitForSeconds(0.15f);
                         bool restDmgOk = false;
                         bool restFullRej = false;
+                        bool aliveRespRej = false;
+                        bool potOk = false;
+                        bool potCdRej = false;
                         int restG0 = me.Gold.Value, restH0 = me.Health.Value;
                         if (me.Gold.Value >= 5 && me.Health.Value < me.MaxHealth.Value)
                         {
+                            Vector3 preRespPos = lp.transform.position;
+                            int preRespHp = me.Health.Value;
+                            me.RequestRespawn();
+                            yield return new WaitForSeconds(0.5f);
+                            aliveRespRej = me.Health.Value == preRespHp && me.Health.Value < me.MaxHealth.Value && Vector3.Distance(lp.transform.position, preRespPos) < 5f;
+
                             int gRest = me.Gold.Value;
                             me.RequestTransaction("rest");
                             float wtR = Time.realtimeSinceStartup;
@@ -1575,8 +1670,28 @@ namespace Riftbound.Network
                             restFullRej = me.Gold.Value == gAtFull;
                         }
 
-                        authorityPass = posClampOk && outRangeRej && cooldownRej && goldAfterChest > 0 && restFullRej && dupLmRej && zebraBlockedEarly && zebraUnlockedOk && temperOk && deadRejOk && revBackOk && restDmgOk;
-                        combatInfo += $", clientAuth={(authorityPass ? "PASS" : "FAIL")}(clamp={posClampOk},rngRej={outRangeRej},cdRej={cooldownRej},restRej={restFullRej},dupLmRej={dupLmRej},zEarly={zebraBlockedEarly},zOk={zebraUnlockedOk},temper={temperOk},deadRej={deadRejOk},rev={revBackOk},restOk={restDmgOk}[g={restG0}->{me.Gold.Value},h={restH0}->{me.Health.Value}/{me.MaxHealth.Value}])";
+                        // Wait for Host's -90 dmg hit -> verify server potion heal & cooldown reject without client desync
+                        float wtPotDmg = Time.realtimeSinceStartup;
+                        while (Time.realtimeSinceStartup - wtPotDmg < 6f && me.Health.Value > 50)
+                            yield return new WaitForSeconds(0.15f);
+                        if (me.Health.Value <= 50 && lp.Potions > 0)
+                        {
+                            int potsBeforeUse = lp.Potions;
+                            int hpLow = me.Health.Value;
+                            me.RequestUsePotion();
+                            float wtPotUse = Time.realtimeSinceStartup;
+                            while (Time.realtimeSinceStartup - wtPotUse < 3f && (me.Health.Value < hpLow + 70 || lp.Potions != potsBeforeUse - 1))
+                                yield return new WaitForSeconds(0.1f);
+                            potOk = me.Health.Value >= hpLow + 70 && lp.Potions == potsBeforeUse - 1;
+
+                            int hpAfterPot = me.Health.Value;
+                            me.RequestUsePotion(); // Within 1.5s server cooldown -> must reject with zero local potion/HP desync
+                            yield return new WaitForSeconds(0.5f);
+                            potCdRej = lp.Potions == potsBeforeUse - 1 && me.Health.Value == hpAfterPot;
+                        }
+
+                        authorityPass = posClampOk && outRangeRej && cooldownRej && goldAfterChest > 0 && aliveRespRej && restFullRej && dupLmRej && zebraBlockedEarly && zebraUnlockedOk && temperOk && deadRejOk && revBackOk && restDmgOk && potOk && potCdRej;
+                        combatInfo += $", clientAuth={(authorityPass ? "PASS" : "FAIL")}(clamp={posClampOk},rngRej={outRangeRej},cdRej={cooldownRej},aliveRespRej={aliveRespRej},restRej={restFullRej},dupLmRej={dupLmRej},zEarly={zebraBlockedEarly},zOk={zebraUnlockedOk},temper={temperOk},deadRej={deadRejOk},rev={revBackOk},restOk={restDmgOk}[g={restG0}->{me.Gold.Value},h={restH0}->{me.Health.Value}/{me.MaxHealth.Value}],potOk={potOk},potCdRej={potCdRej})";
                     }
                 }
                 else

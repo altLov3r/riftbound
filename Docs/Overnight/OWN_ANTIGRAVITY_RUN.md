@@ -144,3 +144,32 @@
   - **`-coopCombatSmoke -coopSmoke 25` (2p Relay):** `H=0 C=0` (`enemy=road-raider-1 hp=36/70, clientDamaged=True`)
   - **4-Player Relay + 5th Rejection + Frame Telemetry (`-coopMinPlayers 4 -coopSmoke 25`):** `H=0 C1=0 C2=0 C3=0 C5=1` (`players=4, cams=1, listeners=1`, Host `avgMs=5.11/p95Ms=7.68, enemies=54, netObjs=4`, Clients `avgMs=4.42-5.67/p95Ms=5.44-9.39, enemies=52, netObjs=4`; C5 `[OnlineSessionService] Join failed: session is full`)
 - **Invocation Note Discovered During Batch Run:** Passing `-coopSmoke <N>` alongside `-coopUiSmoke` causes `FrontendMenu.Start()` (`AutoSmokeExitSeconds > 0f`) to bypass menu creation; `-coopUiSmoke` must be launched without `-coopSmoke`.
+
+
+### Checkpoint 02:28 — Wave 5 Alive-Respawn Exploit Fix, Server Potion Sync & Client Rejoin Verified
+- **UTC:** `2026-11-16T01:06:14Z` | **Sofia:** `2026-11-16T03:06:14+02:00`
+- **Elapsed:** `02:28:43` (ahead of feature freeze `05:07:31Z` and deadline `06:37:31Z`)
+- **Current Ticket:** A07 — Branch Verification & Final Delivery (Wave 5 Hardening + Full Post-Final-Edit Suite Complete)
+- **Additional Wave 5 Modified Files:**
+  - `Assets/RPG/Scripts/PlayerProgress.cs`
+  - `Assets/RPG/Scripts/PlayerController.cs`
+  - `Assets/RPG/Scripts/Network/RiftboundCoopPlayer.cs`
+  - `Assets/RPG/Scripts/Network/CoopWorldManager.cs`
+- **Wave 5 Bugs Found & Fixed:**
+  - **Alive-Respawn Exploit & Under-World HP Sync (`RiftboundCoopPlayer.cs` + `PlayerController.cs`):** Added `bool fellOutOfWorld = transform.position.y < -10f; if (Health.Value > 0 && !fellOutOfWorld) return;` in `ExecuteAuthoritativeRespawn()` so living players cannot trigger free full-heals / safe-spawn teleports; only restores `Health.Value = MaxHealth.Value` when `Health.Value <= 0`, and passes `serverHp` through `ApproveRespawnClientRpc` -> `ApplyAuthorizedRespawn(Vector3 safeSpawn, int serverHp = -1)` so fall-through-world recovery preserves server HP.
+  - **Potion Cooldown / Zero-Potion Client Desync (`PlayerProgress.cs` + `RiftboundCoopPlayer.cs`):** Removed premature local `Potions--` / `Stats.Heal(70)` mutation in `PlayerProgress.UsePotion()` during multiplayer, routing exclusively through `RequestUsePotion()` and returning authoritative state via `ApproveUsePotionClientRpc` -> `ApplyAuthorizedPotionUse(remainingPotions, newHealth)`.
+  - **Delayed Ally-Revive Stale-HP Guard (`RiftboundCoopPlayer.cs`):** Guarded `ReceiveAllyReviveClientRpc` (`effectiveHp = Health.Value > 0 ? Mathf.Max(Health.Value, newHp) : newHp`) so an in-flight revive RPC cannot overwrite higher respawn HP.
+  - **Real Death-to-Respawn, Potion Authority & Client Rejoin Verification (`CoopWorldManager.cs`):** Extended `-coopAuthoritySmoke` (`aliveRespRej=True`, `potOk=True`, `potCdRej=True`), updated `-coopProgressionSmoke` so `resp=True` requires real death (`DispatchEnemyHitToPlayer(..., 999f, ...)` -> `Health <= 0` -> `RequestRespawn()` -> `MaxHealth`), and extended `-coopClientLeaveSmoke` to verify full `Join -> Leave -> Offline cleanup -> Rejoin same Relay code -> Leave -> Offline cleanup` on both Host and Client.
+- **Post-Final-Edit Build & Full Zero-Overlap Regression Matrix (100% Re-Run After Wave 5 Final C# Edit):**
+  - **Standalone Build (`BuildOvernightAntigravityOnline`):** `Builds/OvernightAntigravityOnline/Riftbound.exe` (`228 files`, `542,435,056 bytes` / `517.31 MB`, `Assembly-CSharp.dll` `867,328 bytes` at `2026-11-16T00:57:20Z`, `errors=0`, `BUILD_EXIT=0`)
+  - **`Riftbound.Editor.QuestRouteSmokeTest.Run` (Play Mode):** `UNITY_EXIT=0` — `RESULT_PASS=145, RESULT_FAIL=0, TOTAL=150`, `UGS_INIT_IN_OFFLINE_LOG=0`
+  - **`-coopUiSmoke`:** `EXIT=0` (`PASS UiFlow: menuOpen=True, state=Offline, mode=Offline, nm=0, cams=2, listeners=1`)
+  - **`-coopInvalidCodeSmoke`:** `EXIT=0` (`PASS InvalidCode: state=Failed, err=Join code is invalid or expired.`)
+  - **`-coopResilienceSmoke`:** `EXIT=0` (`PASS Resilience: cancelOk=True, codes=[redacted]->[redacted], nmDuringHost=1, nmAfterLeave=0, finalState=Offline`)
+  - **`-coopAuthoritySmoke -coopSmoke 50` (2p Relay):** `H=0 C=0` (`hostAuth=PASS(chest=True,zebra=True,farRevRej=True,nearRev=True)`, `clientAuth=PASS(clamp=True,rngRej=True,cdRej=True,aliveRespRej=True,restRej=True,dupLmRej=True,zEarly=True,zOk=True,temper=True,deadRej=True,rev=True,restOk=True[g=75->70,h=60->100/120],potOk=True,potCdRej=True)`)
+  - **`-coopProgressionSmoke -coopSmoke 65` (2p Relay):** `H=0 C=0` (`hostProg=PASS(dead=True, chest=True)`, `clientProg=PASS(kill=True,qRej=True,c1=True,cDup=True,txRej=True,txBuy=True,resp=True,bounty=True)`)
+  - **`-coopClientLeaveSmoke -coopSmoke 55` (2p Relay Join -> Leave -> Rejoin -> Leave):** `H=0 C=0` (`hostDisconnectRecovery=PASS(mounted=True,quest=True,playersAfter=1,rejoined=True,finalPlayers=1)`, `PASS ClientLeave: questAccepted=True, mounted=True, rejoined=True, nmAfterLeave=0, finalState=Offline`)
+  - **`-coopLateJoinSmoke -coopSmoke 35` (2p Relay, 3s delay):** `H=0 C=0` (`lateJoin=PASS(40/70,evt=True,rcDecline=True)` on Host; `lateJoin=PASS(40/70,evt=True,rcSnap=True)` on Client)
+  - **`-coopFullAcceptanceSmoke -coopSmoke 65` (2p Relay):** `H=0 C=0` (`hostAccept=PASS(cid=1,ping=True,rc=True/True,revive=True,kills=0,qIdx=1)`, `clientAccept=PASS(spoofRej=True,abHit=True,abHeal=True,dismount=True,qAcc=True,qComp=True,rev=True,evt=True,noDblG=True,hostDisc=True)`)
+  - **`-coopCombatSmoke -coopSmoke 25` (2p Relay):** `H=0 C=0` (`enemy=road-raider-1 hp=36/70, clientDamaged=True`)
+  - **4-Player Relay + 5th Rejection + Frame Telemetry (`-coopMinPlayers 4 -coopSmoke 25`):** `H=0 C1=0 C2=0 C3=0 C5=1` (`players=4, cams=1, listeners=1`, Host `avgMs=4.66/p95Ms=7.17, enemies=54, netObjs=4`, Clients `avgMs=3.86-4.90/p95Ms=4.42-7.08, enemies=52, netObjs=4`; C5 `[OnlineSessionService] Join failed: session is full`)

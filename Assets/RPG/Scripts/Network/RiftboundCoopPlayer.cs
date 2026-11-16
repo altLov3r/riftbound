@@ -560,22 +560,28 @@ namespace Riftbound.Network
         void ExecuteAuthoritativeRespawn()
         {
             if (!IsServer) return;
+            bool fellOutOfWorld = transform.position.y < -10f;
+            if (Health.Value > 0 && !fellOutOfWorld) return;
             if (Time.time < lastServerRespawnTime + 1.5f) return;
             lastServerRespawnTime = Time.time;
-            Health.Value = MaxHealth.Value;
+            if (Health.Value <= 0)
+                Health.Value = MaxHealth.Value;
             Vector3 baseSpawn = new Vector3(0f, 1f, 10f);
             var lp = FindFirstObjectByType<PlayerController>();
             if (lp) baseSpawn = lp.GetRacialSpawnPosition();
             Vector3 slotSpawn = ComputeSpawnPosition(baseSpawn, SpawnSlot.Value);
             AuthorizeHostTeleport(slotSpawn);
-            ApproveRespawnClientRpc(slotSpawn, RpcTarget.Single(OwnerClientId, RpcTargetUse.Temp));
+            if (IsOwner && localPlayer)
+                localPlayer.ApplyAuthorizedRespawn(slotSpawn, Health.Value);
+            else
+                ApproveRespawnClientRpc(slotSpawn, Health.Value, RpcTarget.Single(OwnerClientId, RpcTargetUse.Temp));
         }
 
         [Rpc(SendTo.SpecifiedInParams)]
-        void ApproveRespawnClientRpc(Vector3 safeSpawn, RpcParams rpcParams = default)
+        void ApproveRespawnClientRpc(Vector3 safeSpawn, int serverHp, RpcParams rpcParams = default)
         {
             if (!IsOwner || !localPlayer) return;
-            localPlayer.ApplyAuthorizedRespawn(safeSpawn);
+            localPlayer.ApplyAuthorizedRespawn(safeSpawn, serverHp);
         }
 
         public void RequestUsePotion()
@@ -595,6 +601,17 @@ namespace Riftbound.Network
             serverPotions--;
             lastServerPotionTime = Time.time;
             Health.Value = Mathf.Min(MaxHealth.Value, Health.Value + 70);
+            if (IsOwner && localPlayer)
+                localPlayer.ApplyAuthorizedPotionUse(serverPotions, Health.Value);
+            else
+                ApproveUsePotionClientRpc(serverPotions, Health.Value, RpcTarget.Single(OwnerClientId, RpcTargetUse.Temp));
+        }
+
+        [Rpc(SendTo.SpecifiedInParams)]
+        void ApproveUsePotionClientRpc(int remainingPotions, int newHealth, RpcParams rpcParams = default)
+        {
+            if (!IsOwner || !localPlayer) return;
+            localPlayer.ApplyAuthorizedPotionUse(remainingPotions, newHealth);
         }
 
         public void RequestTransaction(string txId)
@@ -1132,7 +1149,8 @@ namespace Riftbound.Network
         void ReceiveAllyReviveClientRpc(string reviverName, int newHp, RpcParams rpcParams = default)
         {
             if (!IsOwner || !localPlayer || !localPlayer.Stats) return;
-            localPlayer.Stats.SetReplicatedHealth(newHp, localPlayer.Stats.maxHealth);
+            int effectiveHp = Health.Value > 0 ? Mathf.Max(Health.Value, newHp) : newHp;
+            localPlayer.Stats.SetReplicatedHealth(effectiveHp, localPlayer.Stats.maxHealth);
             localPlayer.Message = $"Revived by {reviverName}!";
             SpellFX.CreateArcaneBurst(localPlayer.transform.position);
         }
