@@ -12,6 +12,8 @@ Revision 1 · 2026-11-15 · Planning document, not a completion report.
 
 ## 1. Purpose, authority and how to use this plan
 
+> **Lore/combat direction,16 November2026:** Read Docs/Lore/RIFTBOUND_LORE_BIBLE.md, Docs/Lore/NPC_STORY_CONTRACTS.md, Docs/Design/COMBAT_REFINEMENT_PLAN.md and sections13–14 of Docs/Integration/POST_INTEGRATION_PLAN.md. These supply original canon, NPC state/voice contracts and the next Codex-story/Antigravity-runtime ownership split. Current faction/NPC/quest/save identifiers remain unchanged. The authored lore is delivered documentation; runtime reactions, routines and combat refinements remain planned until implemented and verified. FinalCombined02 results/remaining interrupted online cases belong to Docs/Integration/INTEGRATION_HANDOFF.md.
+
 Build an original, stylized fantasy RPG with two factions, distinct playable races/classes, an authored world and private online cooperative play. Keep the scope approachable in its first release while mapping the larger game's full development path.
 
 This master plan is the complete design and delivery backlog. **The immediate implementation priority remains internet co-op:** execute ANTIGRAVITY_ONLINE_MULTIPLAYER_WORK_ORDER.md O-00 through O-05, then the milestones here. The retry limits in section 6 apply everywhere. Do not treat the number of planned systems as permission to add them simultaneously.

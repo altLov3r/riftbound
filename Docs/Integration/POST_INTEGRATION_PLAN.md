@@ -8,7 +8,7 @@ Integration merge56df479 combines Codexfc35bc8 and Gemini3935340 from their comm
 
 Initial combined candidate01 compiled with0 C# errors and built with0 errors/844 warnings. Its combined-source checks recorded145 offline quest passes,41 gameplay passes,36 geometry reaches,4 queued departure passes and10/10 automated Relay scenarios. Native1280x720 title/character-selection views showed readable session labels. These results are real but did not establish grounded multi-tile world entry: a later native check exposed a spawn-position defect outside the older smoke coverage. Candidate01 is therefore not the final release candidate.
 
-The integration owner added an independent TerrainCollider-based regression: the faulty baseline passed19/32 checks and failed13. A minimal ComputeSpawnPosition change selects the terrain through WorldRegions.TerrainAt; the new regression then passed32/32. This is native terrain/physics regression evidence, not a completed human adventure. Combined02 rebuild/final regressions are in progress at this update; its exact offline/online/build results and release decision belong in INTEGRATION_HANDOFF.md. Do not carry candidate01's results forward as if they tested a changed executable.
+The integration owner added an independent TerrainCollider-based regression: the faulty baseline passed19/32 checks and failed13. A minimal ComputeSpawnPosition change selects the terrain through WorldRegions.TerrainAt; the new regression then passed32/32. FinalCombined02 source76696a7 built with0 errors/815 warnings and passed145 quest/41 gameplay/32 spawn checks. Its online rerun completed4/10 scenarios before the user stopped desktop automation; authority was interrupted and5 later scenarios were not started. Candidate01's10/10 is not final02 proof. Exact receipts/limits: INTEGRATION_HANDOFF.md and ONLINE_TEST_RESULTS.md. No full human adventure/two-PC acceptance is inferred.
 
 | Area | Recorded evidence | Work still required |
 | --- | --- | --- |
@@ -216,6 +216,95 @@ These are future task prompts, not running jobs or an eight-hour timer. Continue
 - Any quest/event/dungeon packet shared between world/gameplay must state location/approach/clearance, stable IDs/stages, eligibility, fail/reset/reward, offline persistence, online session state/late join and exact files/owner before implementation.
 - Audit existing systems before adding alternatives. Guild/auction/profession/dungeon scripts can be prototypes; a source file or UI panel is not proof of a complete feature.
 - Stop after two unchanged failed attempts; ten minutes without new evidence requires another hypothesis/independent work. Carry failed-attempt counts across sessions and cap unchanged-blocker investigation at twenty minutes. Never weaken tests or fabricate graphical/gameplay passes.
-- Success for the next delivery is a reproducible combined build and a complete playable reference adventure, not completion of all80 packets at once. P2/P3 are the larger roadmap and have explicit dependencies.
+- Success for the next delivery is a reproducible combined build and a complete playable reference adventure, not completion of the whole backlog at once. P2/P3 are the larger roadmap and have explicit dependencies.
 
 Cross-reference the existing master/backlog epics and GP/CW/EX IDs rather than deleting them: IG→FND/ARC/AUTH/QA/SHIP; PQ→MOVE/ANIM/CAMERA/FIGHT/QUEST; AR→ART/ANIM/FX; WR→GROUND/NATURE/REGION/TOWN/TOOL; CQ→HERO/FACTION/CLASS/STORY/ENEMY/BOSS/CRYPT; SE→SAVE/EQUIP/LOOT/GOLD/CRAFT/EVENTS/ALLY/TRUST; UX→UI/ACCESS/LIGHT/SOUND/PERF; RD→QA/SHIP/DIPLOMA.
+
+## 13. Lore-led NPC and combat production — current next assignment
+
+User requested deep original lore, NPC consistency, better combat and an explicit Codex/Antigravity split. The concrete canon and authored lines are delivered in documentation by this update; runtime dialogue/routines/combat changes are still future work. No scene, save, model, reward or faction/quest identifier was changed while writing this plan.
+
+Read these together:
+
+- **../Lore/RIFTBOUND_LORE_BIBLE.md** — Veyr, Witness Lattice, history, faction philosophy, regional functions, antagonists and reveal ladder.
+- **../Lore/NPC_STORY_CONTRACTS.md** — actual NPC identities/quest keys, knowledge limits, authored voices/lines and state/behavior contracts.
+- **../Design/COMBAT_REFINEMENT_PLAN.md** — source-derived risks, combat feel/authority/encounter specifications, tuning hypotheses and CF packets.
+- **NEXT_WORK_PROMPTS.md** — two concrete start prompts, ownership and integration handoffs. This section supersedes section11's older immediate queue; older feature IDs remain valid.
+
+Narrative foundation: the Witness Lattice keeps incompatible histories from overlapping. Its institutions have abused testimony as fuel. Highspire's **Hearthward Compact** offers civic protection but confuses records with people; Gor'Kresh's **Ashen Pact** defends chosen obligations but tolerates coercive retaliation. Neither race nor faction determines morality. The Roadward Truce justifies mixed co-op parties.
+
+Current in-game `Alliance`/`Horde`, `Any`, race enums, NPC name keys, quest/enemy/chest IDs remain compatibility identifiers. Narrative display aliases require an explicit mapping. No mass string replacement or roster deletion. Replace copied organizations and obsolete directions in player-facing text through the catalog, not by erasing history or renaming save keys.
+
+### 13.1 The reference adventure
+
+First deliver one coherent route using current systems: **Abe → Rowan/Mira's supply context → Elara's existing three-site survey → Selvek's existing bounty → a witnessed return.** Players understand a practical problem, recognize different voices, fight readable opponents, obtain evidence and see an appropriate reaction. They do not need a new faction reputation system, fifth terrain tile or twenty new quests to understand it.
+
+Preserve current Abe stages/kill counts, the existing `frontier_cartography` targets, `river_reaver_bounty`, `westbank-reaver-captain`, `river-reaver-lockbox` and `willow-rest-cache`. Do not replace a defeat condition with capture/parley, create collectible rewards or move a giver without a separate reviewed outcome/placement contract. Authored optional lines can humanize Selvek without pretending a spare branch already exists.
+
+### 13.2 Story and NPC packets — SC00–SC15
+
+P1 unless markedP2. Owner identifies files, not permission to edit the other worker's live branch.
+
+| ID / owner | Concrete work | Dependencies and acceptance |
+| --- | --- | --- |
+| SC00 / Codex | Freeze canonv1 and a truth/claim/rumour/reveal matrix | Lore bible+actual source. Nine anchors/history/faction policy agree; secrets have an evidence/reveal condition; copied universe-specific claims identified. No unresolved faction/race enum migration disguised as copywriting. |
+| SC01 / Codex | Inventory live NPC identity and story surfaces | SC00. Exact npcName/giverNpc/targetId, actor presence, service, dialogue source, quest/save keys and authority scope. Read both serialized and runtime-created NPCs; classify missing prototypes instead of inventing actor totals. |
+| SC02 / Codex+Antigravity | Lock one minimal versioned dialogue schema | SC01. Explicit profile→legacy identity mapping, line ID/channel/priority/conditions/scope/fallback. Typed read-only game-state conditions; no arbitrary code in content, paid LLM service or runtime text generation. One schema owner after agreement. |
+| SC03 / Codex | Author first-five-NPC catalog and fixture rows | SC02. Abe/Rowan/Mira/Elara/Selvek voices and pre/active/ready/completed states; baseline source fields mapped exactly. Text does not promise unimplemented choices, durable online progress or new objectives. New data files only in assigned narrative-content paths. |
+| SC04 / Antigravity | Add state-aware catalog adapter to existing gossip/quest UI | SC02–03. Reuse current windows/E resolver. Exact identity lookup and safe unknown-profile fallback; no broad name/role substring lore. Abe's PlayerProgress text path included. Services/cursor/eligibility remain unchanged. |
+| SC05 / Antigravity | Define dialogue priority and speaker knowledge | SC04. Quest-ready/active/initial/optional/history/ambient order explicit; NPC cannot reveal future-stage evidence. Personal story text does not advance or overwrite another party member's progression. |
+| SC06 / Codex | Rewrite current first-adventure quest copy coherently | SC03–05. Proposal patches keyed by existing IDs; operational target/count/reward/turn-in unchanged. AG owns FactionQuestSystem.cs and applies approved content through its adapter; Codex does not parallel-edit that mixed runtime file. |
+| SC07 / Antigravity | Add transient conversation/ambient cooldown memory | SC04–05. Stop repeated greetings, pause ambient lines during a dialogue/cast/death/modal. Start with derived current state and transient cooldowns; no save migration merely to prevent repeated barks. |
+| SC08 / Codex | Specify believable stationary work for reference NPCs | SC01–03. Rowan checks cargo, Mira prepares supplies, Abe watches the route, Elara compares maps. Approved model/action availability and source positions recorded; no attack-loop pretending to be an unsupported work animation. |
+| SC09 / Antigravity | Implement interruptible work/attention behavior | SC08. Begin stationary with existing validated actions. Yield to interaction, multiple nearby players, combat and NPC death; resume without drift or moving the service root. No new navigation framework. |
+| SC10 / Codex | Prepare localized clue/settlement staging | SC06,WR02–05. Seventh Wagon tally/map/receipt concepts tied to existing route/workplace; exact existing assets/transforms/provenance/support/clearance and preview. Scene application only within current specific approval or after new reviewed scope. No collectible/reward flags invented. |
+| SC11 / Antigravity | Make NPC/world shared-state policy explicit | SC04–09,IG06. Public location/availability host-controlled; local cosmetic gestures/individual lines cannot grant rewards. Late join/disconnect/rejoin yields truthful dialogue with no silent offline-save writes. |
+| SC12 / Codex | Extend profiles to other existing regional givers | SC03–06. Ronald/Mor'gok/Lucian/Alyssa/Morzan/Thalorien/Kaelen/Baelor/Torvald/Gundrak/Griznak/Fizzlebang/Gorgash etc follow dossiers and actual actor inventory; service access remains useful after story beats. |
+| SC13 / Both | Verify story states and no duplicate consequences | SC04–12. Fresh/accepted/in-progress/ready/completed, reload, advanced visitor/new host, declined/unknown content and simultaneous interaction. Preserve145/41/32 regressions and relevant online checks; authored fixture tables are not gameplay proof. |
+| SC14 / Codex / P2 | Design regional arcs and optional original readables | SC13,CQ04–05,WR08. Each arc has local need, disagreement, evidence, playable action, consequence and return. No giant required exposition wall, empty expansion or omniscient NPC. |
+| SC15 / Antigravity / P2 | Add only approved persistent story memory/choices | SC13–14,SE00–02. New namespaced/versioned flags, defaults/migration and explicit offline/personal/party/session ownership. Capture/parley/faction ending requires new authoritative objective/reward/late-join rules before exposure. |
+
+### 13.3 Combat priorities and delivery gate
+
+Antigravity owns the detailed **CF** queue in COMBAT_REFINEMENT_PLAN.md. Its source observations are risk hypotheses until reproduced on current source; they do not retroactively invalidate recorded smoke results or prove an exploit without a test.
+
+Order:
+
+1. Finish the finalCombined02 interrupted online coverage, preserving existing receipts and failure counts. Do not use superseded01 passes as final proof.
+2. Reproduce and correct demonstrated server/local class cost, cooldown, range, hit acceptance, immunity and enemy LOS differences before increasing attack speed/damage. Add focused rejection/phase/one-hit-one-reward checks where the current suite misses behavior.
+3. Establish one current baseline encounter and measurable action timelines. Then tune input buffering, movement commitment, hit timing, dodge/block/interrupt rules and truthful accepted-hit feedback together.
+4. Deliver three readable enemy jobs and one Reaver champion with existing assets. Guard braces, raider rushes/withdraws, hexer channels; telegraph/recovery/LOS/leash and party spacing are visible and fair. Lore supplies intent; code supplies verifiable counterplay.
+5. Extend measured four-class identity, boss telegraphs, audio/VFX and accessibility. New class/weapon families follow stable core combat and animation support.
+
+Animation and numbers must agree. Use actual supported clips and measured contact/stride; no claim that playback compensation fixes a distorted imported rig. Proposed buffer/telegraph/cooldown/TTK/latency values are tuning hypotheses, not observed performance. Never make player damage/HP/resources authoritative on the client, pause the whole network simulation for hitstop, or weaken invalid-action checks to improve feel.
+
+### 13.4 World life and story presentation — WL00–WL07
+
+P1 for reference slice, P2 for broader simulation. Reuse rather than duplicate current services/events/UI.
+
+| ID / owner | Work | Completion evidence |
+| --- | --- | --- |
+| WL00 / Codex | Publish settlement purpose/flow/prop grammar | Each reference location shows work, relief, rest, service and travel functions; empty space is useful. Existing scene/terrain/trees/actor IDs preserved. |
+| WL01 / Antigravity | Show short contextual reactions to existing events | Current caravan/ambush/quest completion yields correct bounded barks and aftermath state; no duplicate event director/rewards/HUD spam. Host snapshot and personal narrative scopes explicit. |
+| WL02 / Codex | Prepare one route's environmental evidence | A visible repair, supply discrepancy and memorial clue support the first mystery. Native before/after and approach/camera/collider budget; no source asset replacement or visual clutter. |
+| WL03 / Antigravity | Make threat/warning text use live location contracts | Gossip/journal/directions agree with WorldRegions and actual markers. Existing obsolete cathedral/summit coordinates and unsupported flying-only claims removed from copy; no new waypoint model. |
+| WL04 / Codex | Author regional sound/light mood brief | Hearth/refuge, river/work, grove/listening, archive/unease and summit/pressure have distinguishable restraint. Existing audio licenses/assets inventoried; proposals need later listening/render/performance verification. |
+| WL05 / Antigravity | Integrate minimal feedback and accessibility controls | Audio ducking/priorities, subtitles/cue shape, reduced shake/flash and readable telegraphs; local effects cannot alter simulation/authority. No audio-setting persistence regression. |
+| WL06 / Both / P2 | Stage limited routines or a public local consequence | Only after stationary services work. Host-owned approved waypoint routes, interaction pause, collision/path/fall recovery and late join. Never move a quest target away from a usable turn-in or permanently close service to a player. |
+| WL07 / Both | Package a lore-and-combat reference slice | Exact merged source/build, state matrix, native captures, old-save regression, invalid-action tests, grounded spawn, relevant Relay checks and manual NOT RUN. Deliver playable before/after, not a larger list of scripts. |
+
+## 14. Chosen ownership: Codex story/world, Antigravity runtime/combat
+
+| Area / files | Owner | Boundary |
+| --- | --- | --- |
+| Docs/Lore/**; authored NPC/quest copy, reveal tables and encounter briefs | Codex | Creative source of truth. Other worker proposes contradictions; no silent canon fork. |
+| New Assets/RPG/Resources/Narrative/** content data/metadata | Codex after SC02 | JSON/TextAsset only under agreed schema, stable keys, no code or reward mutation. These files are not created by this planning update. |
+| NPCGossipWindow.cs, TownNPC.cs, Merchant.cs, QuestGiver.cs, PrototypeHUD.cs, PlayerServices.cs, any new Scripts/Narrative/** adapter | Antigravity | All runtime dialogue/state/UI/interaction integration. Codex submits text/state tables instead of editing these files. |
+| FactionQuestSystem.cs and PlayerProgress.cs | Antigravity | Definitions and runtime share files; one owner. Preserve IDs/conditions/rewards/save migration; coordinate text changes with Codex. |
+| PlayerController/ClassSpells/EnemyController/Combatant/feedback/action-bar/boss runtime and Network/** | Antigravity | Combat timing/authority/AI/UI and relevant tests. No independent Codex runtime edits while this assignment owns them. |
+| World/editor read-only audits and proposed scene/environment staging | Codex | Existing narrow approvals only; explicit scene ownership/review before placements/terrain/prefabs. No wholesale regeneration or actor recreation. |
+| Shared catalog schema and integrated test build | Named integration owner after agreement | Schema/paths/conditions fixed before parallel data/adapter implementation. No parallel edits to the same file or main merge. |
+
+Next Codex packet: **SC00 → SC01 → SC02 agreement → SC03**, then SC08/SC10 preparation. Next Antigravity packet: **remaining IG06 → source-risk combat repro/authority corrections → SC04/SC05 adapter → one combat-feel encounter**. Use independent new branches from the same current integrated base. New fields/behaviors are not declared installed by these prompts.
+
+No automatic multi-hour shift or token-burning loop. Stop unchanged failures after two attempts, investigate new evidence after ten minutes, reserve time for regression/delivery. Current user request is fulfilled by the authored canon, concrete contracts, plan and chosen work split; start prompts explicitly activate subsequent implementation.

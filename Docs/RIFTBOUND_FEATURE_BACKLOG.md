@@ -8,6 +8,8 @@ This is the detailed expansion of RIFTBOUND_MASTER_PLAN.md. It maps a much large
 
 ## 1. What the finished game should offer
 
+> **Current lore/combat queue,17 November2026:** Docs/Integration/POST_INTEGRATION_PLAN.md sections13–14 adds SC00–SC15 story/NPC and WL00–WL07 world-life packets alongside CF00–CF23 in Docs/Design/COMBAT_REFINEMENT_PLAN.md. Docs/Lore/RIFTBOUND_LORE_BIBLE.md and NPC_STORY_CONTRACTS.md supply original canon and25 source-mapped NPC dossiers. Docs/Integration/NEXT_WORK_PROMPTS.md assigns Codex authored content/world contracts and Antigravity runtime combat/NPC adapters. This is authored planning; no runtime lore/routine/combat change is installed by the documents. Preserve existing identities, saves, quest outcomes and the integrated spawn fix.
+
 An original third-person fantasy RPG where a player chooses a faction, race and class, enters a coherent inhabited world, completes regional stories, earns equipment and unlocks, and explores with up to three friends through online join codes. The game should work offline, feel responsive, preserve progress according to its disclosed save policy and provide replayable cooperative encounters.
 
 The larger vision adds professions, class specializations, reputation, cosmetics, richer settlements, optional homes and more regions. Public persistent servers, competitive PvP and a global economy are separate future products of the architecture, not automatic consequences of Relay multiplayer.
