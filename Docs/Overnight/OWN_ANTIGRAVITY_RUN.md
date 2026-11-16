@@ -91,3 +91,28 @@
   - **4-Player Relay + 5th Rejection + Frame Telemetry:** `H=0 C1=0 C2=0 C3=0 C4=1` (`players=4, cams=1, listeners=1`, Host `avgMs=6.15/p95Ms=9.38, enemies=54, netObjs=4`, Clients `avgMs=5.17-5.46/p95Ms=7.48-8.14, enemies=52, netObjs=4`; C4 `[OnlineSessionService] Join failed: session is full`)
 - **Wave 2 Failures Fixed Cleanly (Under 2-Attempt Rule):**
   - First Wave 2 `AuthoritySmoke` failed `restOk` because deterministic chest order picked a 15g chest (`15 + 30 - 45 = 0g`, leaving `< 5g` for `rest`). Fixed by adding shared helper `FindDeterministicTestChest(int minGold, bool pickHighest)`: `AuthoritySmoke` picks highest-gold un-gated chest (`>= 20g`, leaving `>= 5g` for `rest` + duplicate `rest` rejection), while `ProgressionSmoke` picks lowest-gold un-gated chest (`>= 15g`, keeping total `< 45g` so `txRej` holds). Both re-verified cleanly after the final edit.
+
+### Checkpoint 01:50 — Wave 3 Async-Cancel Sign-In Race Fix & Active-Event Late-Join Verified
+- **UTC:** `2026-11-16T00:27:52Z` | **Sofia:** `2026-11-16T02:27:52+02:00`
+- **Elapsed:** `01:50:21` (well ahead of feature freeze `05:07:31Z` and deadline `06:37:31Z`)
+- **Current Ticket:** A07 — Branch Verification & Final Delivery (Wave 3 Hardening + Full Post-Final-Edit Matrix Complete)
+- **Additional Wave 3 Modified Files:**
+  - `Assets/RPG/Scripts/Network/OnlineSessionService.cs`
+  - `Assets/RPG/Scripts/Network/CoopWorldManager.cs`
+  - `Assets/RPG/Scripts/Network/CoopSessionConfig.cs`
+- **Wave 3 Bug Found & Fixed:**
+  - **UGS Async-Cancel Retry Crash (`OnlineSessionService.cs`):** Retrying `Host Online` / `Join Online` immediately after cancelling an in-flight sign-in/initialization attempt failed with `Invalid state for this operation. The player is already signing in.` AND stale async tasks' `finally { busy = false; }` could clear a newer attempt's busy flag. Fixed by deduplicating in-flight `pendingInitTask` / `pendingSignInTask` in `EnsureServicesAndAuthAsync` and guarding `if (token == attemptToken) busy = false;` in both `StartHostOnlineAsync` and `JoinOnlineByCodeAsync`.
+  - **Headless Ready Check Expiry & Expanded Coverage (`CoopWorldManager.cs` + `CoopSessionConfig.cs`):** Moved Ready Check `readyCheckExpires` timeout check before `Keyboard.current == null` in `Update()`, expanded `-coopResilienceSmoke` (`AutoSmokeExitSeconds = 60f`) to verify mid-flight async cancel recovery before `Host -> Leave -> Host`, and expanded `-coopLateJoinSmoke` to verify active Caravan World Event snapshot sync (`CaravanState == Active`), active Ready Check snapshot sync (`rcSnap=True`), and Ready Check decline (`RespondReadyCheck(false)` -> `ReadyStatus == 2`).
+- **Post-Final-Edit Build & Full Regression Matrix (100% Re-Run After Wave 3 Final C# Edit):**
+  - **Standalone Build (`BuildOvernightAntigravityOnline`):** `Builds/OvernightAntigravityOnline/Riftbound.exe` (`542,407,408 bytes`, `warnings=860`, `errors=0`, `BUILD_EXIT=0`)
+  - **`Riftbound.Editor.QuestRouteSmokeTest.Run` (Play Mode):** `QUEST_ROUTE_EXIT=0` — `145 PASS, 0 FAIL`, `UGS_INIT_IN_OFFLINE_LOG=0`
+  - **`-coopResilienceSmoke` (Mid-flight Cancel + `Host -> Leave -> Host`):** `EXIT=0` (`PASS Resilience: cancelOk=True, codes=[redacted]->[redacted], nmDuringHost=1, nmAfterLeave=0, finalState=Offline`)
+  - **`-coopUiSmoke`:** `EXIT=0` (`PASS UiFlow: menuOpen=True, state=Offline, mode=Offline, nm=0, cams=2, listeners=1`)
+  - **`-coopInvalidCodeSmoke`:** `EXIT=0` (`PASS InvalidCode: state=Failed, err=Join code is invalid or expired.`)
+  - **`-coopLateJoinSmoke` (2p Relay, 3s delay, Active Caravan + Ready Check + Decline):** `H=0 C=0` (`lateJoin=PASS(40/70,evt=True,rcDecline=True)` on Host; `lateJoin=PASS(40/70,evt=True,rcSnap=True)` on Client)
+  - **`-coopAuthoritySmoke` (2p Relay):** `H=0 C=0` (`hostAuth=PASS(chest=True,zebra=True,farRevRej=True,nearRev=True)`, `clientAuth=PASS(clamp=True,rngRej=True,cdRej=True,restRej=True,dupLmRej=True,zEarly=True,zOk=True,temper=True,deadRej=True,rev=True,restOk=True[g=75->70,h=60->120/120])`)
+  - **`-coopFullAcceptanceSmoke` (2p Relay):** `H=0 C=0` (`hostAccept=PASS(cid=1,ping=True,rc=True/True,revive=True,kills=0,qIdx=1)`, `clientAccept=PASS(spoofRej=True,abHit=True,abHeal=True,dismount=True,qAcc=True,qComp=True,rev=True,evt=True,noDblG=True,hostDisc=True)`)
+  - **`-coopClientLeaveSmoke` (2p Relay):** `H=0 C=0` (`hostDisconnectRecovery=PASS(mounted=True,quest=True,playersAfter=1)`, `PASS ClientLeave: questAccepted=True, mounted=True, nmAfterLeave=0, finalState=Offline`)
+  - **`-coopProgressionSmoke` (2p Relay):** `H=0 C=0` (`hostProg=PASS(dead=True, chest=True)`, `clientProg=PASS(kill=True,qRej=True,c1=True,cDup=True,txRej=True,txBuy=True,resp=True)`)
+  - **`-coopCombatSmoke` (2p Relay):** `H=0 C=0` (`enemy=road-raider-1 hp=36/70, clientDamaged=True`)
+  - **4-Player Relay + 5th Rejection + Frame Telemetry:** `H=0 C1=0 C2=0 C3=0 C4=1` (`players=4, cams=1, listeners=1`, Host `avgMs=6.23/p95Ms=11.13, enemies=54, netObjs=4`, Clients `avgMs=5.84-7.45/p95Ms=7.53-13.00, enemies=52, netObjs=4`; C4 `[OnlineSessionService] Join failed: session is full`)

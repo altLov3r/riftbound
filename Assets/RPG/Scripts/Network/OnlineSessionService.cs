@@ -31,6 +31,8 @@ namespace Riftbound.Network
 
         static IHostSession hostSession;
         static ISession clientSession;
+        static Task pendingInitTask;
+        static Task pendingSignInTask;
         static int attemptToken;
         static bool busy;
 
@@ -70,12 +72,19 @@ namespace Riftbound.Network
             {
                 State = OnlineSessionState.Initializing;
                 StatusMessage = "Initializing online services...";
-                var initOpts = new InitializationOptions();
-                if (!string.IsNullOrWhiteSpace(CoopSessionConfig.UgsProfile))
+                Task initTask = pendingInitTask;
+                if (initTask == null)
                 {
-                    initOpts.SetProfile(CoopSessionConfig.UgsProfile.Trim());
+                    var initOpts = new InitializationOptions();
+                    if (!string.IsNullOrWhiteSpace(CoopSessionConfig.UgsProfile))
+                    {
+                        initOpts.SetProfile(CoopSessionConfig.UgsProfile.Trim());
+                    }
+                    initTask = UnityServices.InitializeAsync(initOpts);
+                    pendingInitTask = initTask;
                 }
-                await UnityServices.InitializeAsync(initOpts);
+                try { await initTask; }
+                finally { if (ReferenceEquals(pendingInitTask, initTask)) pendingInitTask = null; }
                 if (token != attemptToken) return false;
             }
 
@@ -83,7 +92,14 @@ namespace Riftbound.Network
             {
                 State = OnlineSessionState.Authenticating;
                 StatusMessage = "Authenticating player session...";
-                await AuthenticationService.Instance.SignInAnonymouslyAsync();
+                Task signInTask = pendingSignInTask;
+                if (signInTask == null)
+                {
+                    signInTask = AuthenticationService.Instance.SignInAnonymouslyAsync();
+                    pendingSignInTask = signInTask;
+                }
+                try { await signInTask; }
+                finally { if (ReferenceEquals(pendingSignInTask, signInTask)) pendingSignInTask = null; }
                 if (token != attemptToken) return false;
             }
 
@@ -101,6 +117,7 @@ namespace Riftbound.Network
             try
             {
                 if (!await EnsureServicesAndAuthAsync(token)) return false;
+                if (token != attemptToken) return false;
 
                 State = OnlineSessionState.Creating;
                 StatusMessage = "Creating private 4-player Relay session...";
@@ -144,7 +161,7 @@ namespace Riftbound.Network
             }
             finally
             {
-                busy = false;
+                if (token == attemptToken) busy = false;
             }
         }
 
@@ -168,6 +185,7 @@ namespace Riftbound.Network
             try
             {
                 if (!await EnsureServicesAndAuthAsync(token)) return false;
+                if (token != attemptToken) return false;
 
                 State = OnlineSessionState.Joining;
                 StatusMessage = $"Joining session {code}...";
@@ -212,7 +230,7 @@ namespace Riftbound.Network
             }
             finally
             {
-                busy = false;
+                if (token == attemptToken) busy = false;
             }
         }
 

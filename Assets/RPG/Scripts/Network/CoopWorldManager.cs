@@ -61,10 +61,9 @@ namespace Riftbound.Network
         void Update()
         {
             if (!CoopSessionConfig.IsMultiplayer || FrontendMenu.IsOpen || RiftboundCoopPlayer.LocalOwner == null) return;
+            if (readyCheckOpen && Time.time > readyCheckExpires) readyCheckOpen = false;
             var keys = Keyboard.current;
             if (keys == null) return;
-
-            if (readyCheckOpen && Time.time > readyCheckExpires) readyCheckOpen = false;
 
             var localPc = FindFirstObjectByType<PlayerController>();
             bool uiBlocking = localPc != null && (localPc.ChatOpen || localPc.DialogueOpen || localPc.ShopOpen || localPc.InventoryOpen || localPc.MapOpen || localPc.JournalOpen || localPc.TalentsOpen || localPc.SpellbookOpen || localPc.AchievementOpen || localPc.ReputationOpen);
@@ -141,7 +140,7 @@ namespace Riftbound.Network
             CoopSessionConfig.ParseCommandLineOnce();
             string sceneName = SceneManager.GetActiveScene().name;
             if (!sceneName.Contains("Outpost")) return;
-            bool resilienceActive = CoopSessionConfig.ResilienceSmoke && (resilienceStage == 1 || resilienceStage == 3);
+            bool resilienceActive = CoopSessionConfig.ResilienceSmoke && (resilienceStage == -2 || resilienceStage == 1 || resilienceStage == 3);
             bool clientLeaveActive = CoopSessionConfig.ClientLeaveSmoke && clientLeaveStage == 1;
             bool uiSmokeActive = CoopSessionConfig.UiSmoke && UiSmokeStage == 2;
             if (!CoopSessionConfig.IsMultiplayer && !resilienceActive && !clientLeaveActive && !uiSmokeActive) return;
@@ -163,9 +162,10 @@ namespace Riftbound.Network
 
         public static int UiSmokeStage = 0;
 
-        static int resilienceStage = 0;
+        static int resilienceStage = -1;
         static string resilienceCode1 = "";
         static int resilienceNmCount = 0;
+        static bool resilienceCancelOk = false;
 
         void Start()
         {
@@ -193,7 +193,15 @@ namespace Riftbound.Network
 
             if (CoopSessionConfig.ResilienceSmoke)
             {
-                if (resilienceStage == 1)
+                if (resilienceStage == -2)
+                {
+                    resilienceCancelOk = OnlineSessionService.State == OnlineSessionState.Offline &&
+                                         !OnlineSessionService.IsBusy &&
+                                         FindObjectsByType<NetworkManager>(FindObjectsSortMode.None).Length == 0;
+                    resilienceStage = 0;
+                    CoopSessionConfig.Mode = CoopSessionMode.HostOnline;
+                }
+                else if (resilienceStage == 1)
                 {
                     resilienceStage = 2;
                     CoopSessionConfig.Mode = CoopSessionMode.HostOnline;
@@ -635,8 +643,9 @@ namespace Riftbound.Network
             int remainingNm = FindObjectsByType<NetworkManager>(FindObjectsSortMode.None).Length;
             bool pass = OnlineSessionService.State == OnlineSessionState.Offline &&
                         CoopSessionConfig.Mode == CoopSessionMode.Offline &&
-                        remainingNm == 0;
-            string msg = $"{(pass ? "PASS" : "FAIL")} Resilience: codes={resilienceCode1}, nmDuringHost={resilienceNmCount}, nmAfterLeave={remainingNm}, finalState={OnlineSessionService.State}";
+                        remainingNm == 0 &&
+                        resilienceCancelOk;
+            string msg = $"{(pass ? "PASS" : "FAIL")} Resilience: cancelOk={resilienceCancelOk}, codes={resilienceCode1}, nmDuringHost={resilienceNmCount}, nmAfterLeave={remainingNm}, finalState={OnlineSessionService.State}";
             Debug.Log(msg);
             System.Console.WriteLine(msg);
             yield return new WaitForSeconds(0.2f);
@@ -662,7 +671,17 @@ namespace Riftbound.Network
 
             if (CoopSessionConfig.ResilienceSmoke)
             {
-                if (resilienceStage == 0)
+                if (resilienceStage == -1)
+                {
+                    float waitBusy = Time.realtimeSinceStartup;
+                    while (Time.realtimeSinceStartup - waitBusy < 5f && !OnlineSessionService.IsBusy)
+                        yield return null;
+                    yield return new WaitForSeconds(0.05f);
+                    resilienceStage = -2;
+                    DisconnectAndReturnToMenu();
+                    yield break;
+                }
+                else if (resilienceStage == 0)
                 {
                     while (Time.realtimeSinceStartup - start < timeoutSeconds * 0.45f &&
                            (OnlineSessionService.State != OnlineSessionState.InWorld || string.IsNullOrEmpty(OnlineSessionService.ActiveJoinCode)))
@@ -716,6 +735,8 @@ namespace Riftbound.Network
                         Debug.Log($"[LateJoinSmoke] Host pre-damaged {preEnemy.NetworkKey} to {preStats.Health:F0}/{preStats.maxHealth:F0}");
                     }
                 }
+                if (LivingWorldEvents.Instance != null) LivingWorldEvents.Instance.TriggerCaravanEvent();
+                if (RiftboundCoopPlayer.LocalOwner != null) RiftboundCoopPlayer.LocalOwner.RequestReadyCheck();
             }
 
             while (Time.realtimeSinceStartup - start < timeoutSeconds)
@@ -828,11 +849,29 @@ namespace Riftbound.Network
             bool lateJoinPass = true;
             if (CoopSessionConfig.LateJoinSmoke && players >= 2)
             {
-                yield return new WaitForSeconds(2.0f);
+                yield return new WaitForSeconds(1.8f);
                 var ljEnemy = EnemyController.FindByKey("road-raider-1");
                 var ljStats = ljEnemy ? ljEnemy.GetComponent<Combatant>() : null;
-                lateJoinPass = ljStats != null && ljStats.Health < ljStats.maxHealth && (!isHost || hostPreDamaged);
-                combatInfo += $", lateJoin={(lateJoinPass ? "PASS" : "FAIL")}({(ljStats ? $"{ljStats.Health:F0}/{ljStats.maxHealth:F0}" : "none")})";
+                bool evtActive = LivingWorldEvents.Instance != null && LivingWorldEvents.Instance.CaravanState == LivingWorldEvents.EventState.Active;
+                if (isHost)
+                {
+                    var clientAvatar = GetFirstRemotePlayer();
+                    float wDecline = Time.realtimeSinceStartup;
+                    while (Time.realtimeSinceStartup - wDecline < 4f && (clientAvatar == null || clientAvatar.ReadyStatus.Value != 2))
+                        yield return new WaitForSeconds(0.15f);
+                    bool rcDeclineOk = clientAvatar != null && clientAvatar.ReadyStatus.Value == 2;
+                    lateJoinPass = ljStats != null && ljStats.Health < ljStats.maxHealth && hostPreDamaged && evtActive && rcDeclineOk;
+                    combatInfo += $", lateJoin={(lateJoinPass ? "PASS" : "FAIL")}({(ljStats ? $"{ljStats.Health:F0}/{ljStats.maxHealth:F0}" : "none")},evt={evtActive},rcDecline={rcDeclineOk})";
+                }
+                else
+                {
+                    bool rcOpen = IsReadyCheckOpenForTest;
+                    if (RiftboundCoopPlayer.LocalOwner != null)
+                        RiftboundCoopPlayer.LocalOwner.RespondReadyCheck(false);
+                    yield return new WaitForSeconds(0.6f);
+                    lateJoinPass = ljStats != null && ljStats.Health < ljStats.maxHealth && evtActive && rcOpen;
+                    combatInfo += $", lateJoin={(lateJoinPass ? "PASS" : "FAIL")}({(ljStats ? $"{ljStats.Health:F0}/{ljStats.maxHealth:F0}" : "none")},evt={evtActive},rcSnap={rcOpen})";
+                }
             }
 
             bool progPass = true;

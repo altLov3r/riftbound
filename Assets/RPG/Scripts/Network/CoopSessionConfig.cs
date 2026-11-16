@@ -111,7 +111,7 @@ namespace Riftbound.Network
                 {
                     ResilienceSmoke = true;
                     Mode = CoopSessionMode.HostOnline;
-                    AutoSmokeExitSeconds = 45f;
+                    AutoSmokeExitSeconds = 60f;
                 }
                 else if (args[i] == "-coopClientLeaveSmoke")
                 {
