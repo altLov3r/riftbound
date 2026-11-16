@@ -2,7 +2,7 @@
 
 ## Scope and identity
 
-Branch production/codex-world-20261116, continuing from e746638d7c8ccc024388995007a456841c951130. Production01 and the completed overnight branch/build/handoff are preserved. This is a user-activated continuation, not a new eight-hour timer. No main merge or edit to the shared/Gemini checkout.
+Branch production/codex-world-20261116, tested source **397fe49095b4b3fca7172044f7c6faa592718a15**, pushed. Continues from e746638d7c8ccc024388995007a456841c951130. Production01 and the completed overnight branch/build/handoff are preserved. This is a user-activated continuation, not a new eight-hour timer. No main merge or edit to the shared/Gemini checkout. Final documentation follows in a separate commit.
 
 CW04/narrow CW05: five existing, free FantasyProps scenery instances under the earlier C05 loading/rest authorization. Exact transforms, source hashes, support/clearance limits and native evidence: SETTLEMENT_SUPPLIES_CHANGESET.md and Evidence/Supplies02/.
 
@@ -32,8 +32,14 @@ Earlier strict mounted Reaver-centre test remains FAILED/encounter-limited in Pr
 
 Saved-scene native recapture completed: frames-20261116-081237, three1280x720 images inspected after reload. Props retain their intended scale, orientation, support and open exit; no source scene saved during capture. Editor p95 yard10.130ms/departure12.613ms/Willow10.625ms, batch counter unavailable. This is a paused native-editor verification, not a standalone benchmark. Seven terrain and all three source FBX hashes match their reviewed baselines.
 
-Unique Production02 build is pending at this source checkpoint; final identities/results will be appended after execution. Do not infer build completion from this draft status.
+**Builds/CodexWorldProduction02/Riftbound.exe** completed10:15:40 Sofia: **Succeeded,0 errors,560 warnings**,17.936s,542,578,667 reported bytes. Warnings remain; no broad cleanup claimed. Build protection again passed813 trees,15 prototypes,8 paint-layer references, preserved paint/detail/hole/outside-footprint data, matching Terrain/Collider and27.92-degree Reaver grade. All seven terrain files still byte-match the finished overnight delivery after packaging.
+
+Exact executable, UnityPlayer, globalgamemanagers, Assembly-CSharp, level0 and sharedassets0 files verified; hashes/lengths are in Evidence/Supplies02/build-artifacts.json. Packaged level0 contains the new supply root, Emberwatch crate and Willow bench names. Runtime DLL byte-identical to Production01, as expected for scenery/editor-only work. Scene/shared data changed. Build and protection receipts are alongside the hashes.
+
+Standalone startup: first process5764 launched hidden, initializedDirect3D11/scene but exposed no targetable window; closed only that recorded process. Relaunched visibly with Computer Use, observed the actual new title/background/model at1280x720, then closed normally withAlt+F4 and verified window/process exit. No character entered or save/roster changed. This is startup evidence, not standalone route acceptance. Native saved-scene world views were verified separately above.
 
 NOT RUN: continuous manual adventure, complete camera/foliage/animation/audio/NavMesh review, all26 individually identified tree colliders, standalone GPU profiling, complete mounted Reaver combat, real two-PC online or combined-branch compatibility. The world branch does not include Gemini's newer gameplay/runtime fixes.
 
 Once packaged, test this world build in Offline mode: inspect Emberwatch loading/departure, run and ride through the exit, then visit Willow Rest/cache and cross Westbank both ways. Broader building/fence/terrain/vegetation edits still require their specific approved scope. Integration with Gemini belongs in a third clean checkout when authorized, preserving this scene and rerunning dependent offline/online checks.
+
+**SCENE RELEASED — production checkout only, approximately10:18 Sofia.** Own test/build/preview processes closed. Completed overnight branch remainsbef0420f4117529647e22b8706ec6763d0c7199f. Original shared project, saves and Gemini files preserved.

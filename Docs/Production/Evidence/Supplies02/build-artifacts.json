@@ -1,0 +1,38 @@
+[
+  {
+    "file": "Riftbound.exe",
+    "bytes": 667136,
+    "sha256": "AF88B840E599661AC63FC10AE27AC77DD97CD46B44DF8A7CE60EB0DCFACFC99E",
+    "unchangedFrom01": true
+  },
+  {
+    "file": "UnityPlayer.dll",
+    "bytes": 38693808,
+    "sha256": "4F8EB2A1431FF69DE5AA8EA2C595CEB5D84D9F6EF8141646301F259FD86B9CAC",
+    "unchangedFrom01": true
+  },
+  {
+    "file": "Riftbound_Data/globalgamemanagers",
+    "bytes": 456372,
+    "sha256": "449B843D402655744E37F81C44814126067C2D03DEAA60DE821AB1C1FC638D1D",
+    "unchangedFrom01": false
+  },
+  {
+    "file": "Riftbound_Data/Managed/Assembly-CSharp.dll",
+    "bytes": 809984,
+    "sha256": "6DB7BC6BB19FCECA41304FAFBBCFBE060D9AF0A519F7F6FEF6D1F9E1E49546DB",
+    "unchangedFrom01": true
+  },
+  {
+    "file": "Riftbound_Data/level0",
+    "bytes": 5532752,
+    "sha256": "6DD2D5495E3C1E4BDEF783A8042B42DF5B8DDEE7304009AD2A9BB63220086B9D",
+    "unchangedFrom01": false
+  },
+  {
+    "file": "Riftbound_Data/sharedassets0.assets",
+    "bytes": 33006428,
+    "sha256": "8B79C3A0B4AC76BBA92445B3DA1CE241C0D281EF46966576EE4525EAE82B0B83",
+    "unchangedFrom01": false
+  }
+]

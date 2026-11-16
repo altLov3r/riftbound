@@ -38,4 +38,4 @@ The first legacy decorative-prefab proposal was rejected because it rendered as 
 
 ## Verification status
 
-Source placement/reload and preview passed. Focused actual-controller departure, full geometry, existing regression, original-asset hashes and fresh checkpoint02 build are being recorded in OWN_CODEX_WORLD_02_HANDOFF.md. Do not infer a pass from an unfilled status here. Broader settlement/lighting/vegetation changes remain outside this update.
+Source placement/reload, six-view preview and three saved-scene recaptures passed. Focused actual-controller departure:four queued-input passes. Full geometry:36 REACHED/0 BLOCKED. Existing regression:145 PASS/0 FAIL. Seven terrain/three source-model hashes unchanged. Production02 standalone succeeded with0 errors/560 warnings, and its title launched/rendered/closed normally. Exact identities, receipts, headless-tooling warnings and NOT RUN checks are in OWN_CODEX_WORLD_02_HANDOFF.md. No continuous manual, standalone-performance, combined-runtime or two-PC acceptance claimed. Broader settlement/lighting/vegetation changes remain outside this update.

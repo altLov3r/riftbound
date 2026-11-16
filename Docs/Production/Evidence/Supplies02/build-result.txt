@@ -1,0 +1,7 @@
+UTC=2026-11-16T08:15:40.3264347Z
+Path=Builds/CodexWorldProduction02/Riftbound.exe
+Result=Succeeded
+Errors=0
+Warnings=560
+Duration=00:00:17.9355068
+Bytes=542578667
