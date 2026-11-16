@@ -27,23 +27,42 @@ namespace Riftbound
         }
         public void DiscoverLandmark(string id)
         {
-            if (!Stats.Alive || FrontendMenu.IsOpen || MountWindowOpen || (orbit && orbit.Paused) || !ValidLandmark(id) || !landmarks.Add(id)) return;
+            if (!Stats.Alive || FrontendMenu.IsOpen || MountWindowOpen || (orbit && orbit.Paused) || !ValidLandmark(id) || landmarks.Contains(id)) return;
+            if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner != null)
+            {
+                Network.RiftboundCoopPlayer.LocalOwner.RequestDiscoverLandmark(id);
+                return;
+            }
+            if (!landmarks.Add(id)) return;
             Gold += 15; AddExperience(35);
+            ApplyDiscoveryPresentation(id, true);
+        }
+
+        public void ApplyAuthorizedDiscovery(string id, int newGold, int xpGranted)
+        {
+            if (!ValidLandmark(id) || !landmarks.Add(id)) return;
+            SetAuthoritativeGold(newGold);
+            AddExperience(xpGranted);
+            ApplyDiscoveryPresentation(id, false);
+        }
+
+        void ApplyDiscoveryPresentation(string id, bool grantOfflineBonusXp)
+        {
             if (id == "scarlet-crypts")
             {
                 Message = "Discovered: Scarlet Crypts! Cathedral dungeon entrance in the mists of Duskwood. +15 gold / +60 XP.";
-                AddExperience(25);
+                if (grantOfflineBonusXp) AddExperience(25);
             }
             else if (id == "redridge-frontier")
             {
                 Message = "Discovered: Redridge Frontier! Mountain pass to the Orc Badlands. +15 gold / +60 XP.";
-                AddExperience(25);
+                if (grantOfflineBonusXp) AddExperience(25);
             }
             else if (GreenhollowLandmark(id))
             {
                 bool complete = GreenhollowLandmarksFound == 3;
                 Message = complete ? "Greenhollow explored! Zebra mount unlocked. +15 gold / +85 XP. [V] Change mount / [Z] Summon" : $"Greenhollow landmark discovered: {GreenhollowLandmarksFound}/3. +15 gold / +35 XP.";
-                if (complete) AddExperience(50);
+                if (grantOfflineBonusXp && complete) AddExperience(50);
             }
             else
             {

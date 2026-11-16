@@ -66,6 +66,11 @@ namespace Riftbound.Network
         readonly Dictionary<string, float> serverAbilityCooldowns = new Dictionary<string, float>();
         readonly HashSet<string> serverDefeatedEnemyKeys = new HashSet<string>();
         readonly HashSet<string> serverCompletedEvents = new HashSet<string>();
+        readonly HashSet<string> serverDiscoveredLandmarks = new HashSet<string>();
+        int serverPotions = 3;
+        bool serverTemperedWeapon;
+        float lastServerPotionTime = -10f;
+        float lastServerRespawnTime = -10f;
         static GUIStyle nameplateStyle;
 
         public override void OnNetworkSpawn()
@@ -344,18 +349,31 @@ namespace Riftbound.Network
 
         // ── O-01 Authoritative Mounts & Animations ──────────────────────────────────────
 
+        public void SendSpoofedPositionForTest(Vector3 targetPos)
+        {
+            if (!CoopSessionConfig.IsMultiplayer || !IsSpawned || !IsOwner) return;
+            SubmitMoveStateServerRpc(targetPos, transform.eulerAngles.y, 10f);
+        }
+
         public void RequestSetMount(bool mounted, string mountId)
         {
             if (!CoopSessionConfig.IsMultiplayer || !IsSpawned) return;
             RequestSetMountServerRpc(mounted, string.IsNullOrEmpty(mountId) ? "horse" : mountId);
         }
 
+        int ServerGreenhollowCount() =>
+            (serverDiscoveredLandmarks.Contains("willow-crossing") ? 1 : 0) +
+            (serverDiscoveredLandmarks.Contains("greenhollow-post") ? 1 : 0) +
+            (serverDiscoveredLandmarks.Contains("ancient-grove") ? 1 : 0);
+
         [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Owner)]
         void RequestSetMountServerRpc(bool mounted, string mountId)
         {
             if (Health.Value <= 0) { IsMounted.Value = false; return; }
+            string normalized = string.IsNullOrEmpty(mountId) ? "horse" : mountId.ToLowerInvariant();
+            if (mounted && normalized == "zebra" && ServerGreenhollowCount() < 3) return;
             IsMounted.Value = mounted;
-            MountId.Value = new FixedString32Bytes(string.IsNullOrEmpty(mountId) ? "horse" : mountId);
+            MountId.Value = new FixedString32Bytes(normalized);
         }
 
         public void TriggerActionAnim(string animName)
@@ -541,6 +559,8 @@ namespace Riftbound.Network
         void ExecuteAuthoritativeRespawn()
         {
             if (!IsServer) return;
+            if (Time.time < lastServerRespawnTime + 1.5f) return;
+            lastServerRespawnTime = Time.time;
             Health.Value = MaxHealth.Value;
             Vector3 baseSpawn = new Vector3(0f, 1f, 10f);
             var lp = FindFirstObjectByType<PlayerController>();
@@ -570,6 +590,9 @@ namespace Riftbound.Network
         void ApplyServerPotionHeal()
         {
             if (!IsServer || Health.Value <= 0 || Health.Value >= MaxHealth.Value) return;
+            if (serverPotions <= 0 || Time.time < lastServerPotionTime + 1.5f) return;
+            serverPotions--;
+            lastServerPotionTime = Time.time;
             Health.Value = Mathf.Min(MaxHealth.Value, Health.Value + 70);
         }
 
@@ -599,13 +622,15 @@ namespace Riftbound.Network
             if (!IsServer || Health.Value <= 0) return false;
             if (txId == "buy_potion")
             {
-                if (Gold.Value < 10) return false;
+                if (Gold.Value < 10 || serverPotions >= 10) return false;
+                serverPotions++;
                 Gold.Value -= 10;
                 return true;
             }
             if (txId == "temper_weapon")
             {
-                if (Gold.Value < 45) return false;
+                if (Gold.Value < 45 || serverTemperedWeapon) return false;
+                serverTemperedWeapon = true;
                 Gold.Value -= 45;
                 return true;
             }
@@ -617,6 +642,55 @@ namespace Riftbound.Network
                 return true;
             }
             return false;
+        }
+
+        public void RequestDiscoverLandmark(string landmarkId)
+        {
+            if (!CoopSessionConfig.IsMultiplayer || !IsSpawned || string.IsNullOrEmpty(landmarkId)) return;
+            if (IsServer)
+            {
+                if (TryValidateLandmarkOnServer(landmarkId, out int xpGranted) && localPlayer)
+                {
+                    localPlayer.ApplyAuthorizedDiscovery(landmarkId, Gold.Value, xpGranted);
+                }
+            }
+            else
+            {
+                RequestDiscoverLandmarkServerRpc(landmarkId);
+            }
+        }
+
+        [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Owner)]
+        void RequestDiscoverLandmarkServerRpc(string landmarkId)
+        {
+            if (TryValidateLandmarkOnServer(landmarkId, out int xpGranted))
+                ApproveDiscoverLandmarkClientRpc(landmarkId, Gold.Value, xpGranted, RpcTarget.Single(OwnerClientId, RpcTargetUse.Temp));
+        }
+
+        bool TryValidateLandmarkOnServer(string landmarkId, out int xpGranted)
+        {
+            xpGranted = 0;
+            if (!IsServer || Health.Value <= 0 || string.IsNullOrEmpty(landmarkId)) return false;
+
+            Landmark match = null;
+            foreach (var lm in FindObjectsByType<Landmark>(FindObjectsSortMode.None))
+            {
+                if (lm && lm.landmarkId == landmarkId) { match = lm; break; }
+            }
+            if (!match || Vector3.Distance(transform.position, match.transform.position) > 14.0f) return false;
+            if (!serverDiscoveredLandmarks.Add(landmarkId)) return false;
+
+            bool greenhollowComplete = (landmarkId == "willow-crossing" || landmarkId == "greenhollow-post" || landmarkId == "ancient-grove") && ServerGreenhollowCount() == 3;
+            xpGranted = (landmarkId == "scarlet-crypts" || landmarkId == "redridge-frontier") ? 60 : (greenhollowComplete ? 85 : 35);
+            GrantAuthoritativeProgress(xpGranted, 15);
+            return true;
+        }
+
+        [Rpc(SendTo.SpecifiedInParams)]
+        void ApproveDiscoverLandmarkClientRpc(string landmarkId, int newGold, int xpGranted, RpcParams rpcParams = default)
+        {
+            if (!IsOwner || !localPlayer) return;
+            localPlayer.ApplyAuthorizedDiscovery(landmarkId, newGold, xpGranted);
         }
 
         [Rpc(SendTo.SpecifiedInParams)]

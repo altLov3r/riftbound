@@ -143,7 +143,8 @@ namespace Riftbound.Network
             if (!sceneName.Contains("Outpost")) return;
             bool resilienceActive = CoopSessionConfig.ResilienceSmoke && (resilienceStage == 1 || resilienceStage == 3);
             bool clientLeaveActive = CoopSessionConfig.ClientLeaveSmoke && clientLeaveStage == 1;
-            if (!CoopSessionConfig.IsMultiplayer && !resilienceActive && !clientLeaveActive) return;
+            bool uiSmokeActive = CoopSessionConfig.UiSmoke && UiSmokeStage == 2;
+            if (!CoopSessionConfig.IsMultiplayer && !resilienceActive && !clientLeaveActive && !uiSmokeActive) return;
             if (Instance != null) return;
 
             var go = new GameObject("CoopWorldManager");
@@ -160,12 +161,30 @@ namespace Riftbound.Network
             Instance = this;
         }
 
+        public static int UiSmokeStage = 0;
+
         static int resilienceStage = 0;
         static string resilienceCode1 = "";
         static int resilienceNmCount = 0;
 
         void Start()
         {
+            if (CoopSessionConfig.UiSmoke)
+            {
+                if (UiSmokeStage == 1)
+                {
+                    Time.timeScale = 1f;
+                    StartSelectedSessionMode();
+                    StartCoroutine(RunUiSmokeWorldRoutine());
+                    return;
+                }
+                if (UiSmokeStage == 2)
+                {
+                    StartCoroutine(FinishUiSmokeRoutine());
+                    return;
+                }
+            }
+
             if (CoopSessionConfig.ClientLeaveSmoke && clientLeaveStage == 1)
             {
                 StartCoroutine(FinishClientLeaveSmokeRoutine());
@@ -404,7 +423,7 @@ namespace Riftbound.Network
 
             int count = RiftboundCoopPlayer.AllPlayers.Count;
             float w = 265f;
-            float h = CoopSessionConfig.IsOnlineMode && !string.IsNullOrEmpty(OnlineSessionService.ActiveJoinCode) ? 132f : 106f;
+            float h = CoopSessionConfig.IsOnlineMode && !string.IsNullOrEmpty(OnlineSessionService.ActiveJoinCode) ? 132f : 124f;
             float x = Screen.width - w - 16f;
             float y = 16f;
 
@@ -545,6 +564,53 @@ namespace Riftbound.Network
                 if (p && p.IsSpawned && p != RiftboundCoopPlayer.LocalOwner)
                     return p;
             return null;
+        }
+
+        IEnumerator RunUiSmokeWorldRoutine()
+        {
+            float t = Time.realtimeSinceStartup;
+            while (Time.realtimeSinceStartup - t < 25f &&
+                   (OnlineSessionService.State != OnlineSessionState.InWorld || string.IsNullOrEmpty(OnlineSessionService.ActiveJoinCode) || RiftboundCoopPlayer.LocalOwner == null))
+                yield return new WaitForSeconds(0.25f);
+
+            bool worldEntered = !FrontendMenu.IsOpen &&
+                                OnlineSessionService.State == OnlineSessionState.InWorld &&
+                                !string.IsNullOrEmpty(OnlineSessionService.ActiveJoinCode) &&
+                                RiftboundCoopPlayer.LocalOwner != null;
+            if (!worldEntered)
+            {
+                string failMsg = $"FAIL UiFlow stage1: menu={FrontendMenu.IsOpen}, state={OnlineSessionService.State}, codeEmpty={string.IsNullOrEmpty(OnlineSessionService.ActiveJoinCode)}";
+                Debug.Log(failMsg);
+                System.Console.WriteLine(failMsg);
+                Application.Quit(1);
+                yield break;
+            }
+            UiSmokeStage = 2;
+            DisconnectAndReturnToMenu();
+        }
+
+        IEnumerator FinishUiSmokeRoutine()
+        {
+            yield return new WaitForSecondsRealtime(0.6f);
+            int remainingNm = FindObjectsByType<NetworkManager>(FindObjectsSortMode.None).Length;
+            int cams = 0;
+            foreach (var c in FindObjectsByType<Camera>(FindObjectsSortMode.None))
+                if (c.enabled && c.gameObject.activeInHierarchy) cams++;
+            int listeners = 0;
+            foreach (var al in FindObjectsByType<AudioListener>(FindObjectsSortMode.None))
+                if (al.enabled && al.gameObject.activeInHierarchy) listeners++;
+            bool pass = FrontendMenu.IsOpen &&
+                        OnlineSessionService.State == OnlineSessionState.Offline &&
+                        CoopSessionConfig.Mode == CoopSessionMode.Offline &&
+                        remainingNm == 0 &&
+                        cams >= 1 &&
+                        listeners == 1;
+            string msg = $"{(pass ? "PASS" : "FAIL")} UiFlow: menuOpen={FrontendMenu.IsOpen}, state={OnlineSessionService.State}, mode={CoopSessionConfig.Mode}, nm={remainingNm}, cams={cams}, listeners={listeners}";
+            Debug.Log(msg);
+            System.Console.WriteLine(msg);
+            Time.timeScale = 1f;
+            yield return new WaitForSecondsRealtime(0.2f);
+            Application.Quit(pass ? 0 : 1);
         }
 
         IEnumerator FinishClientLeaveSmokeRoutine()
@@ -773,15 +839,7 @@ namespace Riftbound.Network
             if (CoopSessionConfig.ProgressionSmoke && players >= 2 && RiftboundCoopPlayer.LocalOwner != null)
             {
                 var targetEnemy = EnemyController.FindByKey("road-raider-1");
-                LootChest targetChest = null;
-                foreach (var c in FindObjectsByType<LootChest>(FindObjectsSortMode.None))
-                {
-                    if (c && !string.IsNullOrEmpty(c.chestId) && !c.requiresCaptainDefeated && !c.requiresWardenDefeated && c.chestId != RiverReaverCamp.CacheId)
-                    {
-                        targetChest = c;
-                        break;
-                    }
-                }
+                LootChest targetChest = FindDeterministicTestChest(15, false);
 
                 var enemyStats = targetEnemy ? targetEnemy.GetComponent<Combatant>() : null;
                 var lp = FindFirstObjectByType<PlayerController>();
@@ -1170,13 +1228,269 @@ namespace Riftbound.Network
                 }
             }
 
-            bool pass = players >= minPlayers && RiftboundCoopPlayer.LocalOwner != null && activeCams == 1 && activeListeners == 1 && sep >= 1.0f && combatPass && lateJoinPass && progPass && clientLeavePass && fullAcceptPass;
+            bool authorityPass = true;
+            if (CoopSessionConfig.AuthoritySmoke && players >= 2 && RiftboundCoopPlayer.LocalOwner != null)
+            {
+                var lp = FindFirstObjectByType<PlayerController>();
+                var targetEnemy = EnemyController.FindByKey("road-raider-1");
+                LootChest targetChest = FindDeterministicTestChest(20, true);
+                Landmark lm0 = null, lm1 = null, lm2 = null;
+                foreach (var lm in FindObjectsByType<Landmark>(FindObjectsSortMode.None))
+                {
+                    if (!lm) continue;
+                    if (lm.landmarkId == "willow-crossing") lm0 = lm;
+                    else if (lm.landmarkId == "greenhollow-post") lm1 = lm;
+                    else if (lm.landmarkId == "ancient-grove") lm2 = lm;
+                }
+
+                if (lp && targetEnemy && targetChest && lm0 && lm1 && lm2)
+                {
+                    var eStats = targetEnemy.GetComponent<Combatant>();
+                    if (isHost)
+                    {
+                        var clientAvatar = GetFirstRemotePlayer();
+                        ulong remoteCid = clientAvatar != null ? clientAvatar.OwnerClientId : 1UL;
+                        yield return new WaitForSeconds(1.2f);
+
+                        if (clientAvatar != null)
+                            clientAvatar.AuthorizeHostTeleport(targetEnemy.transform.position + new Vector3(14f, 0f, 0f));
+                        yield return new WaitForSeconds(2.0f);
+
+                        if (clientAvatar != null)
+                            clientAvatar.AuthorizeHostTeleport(targetEnemy.transform.position + new Vector3(2.2f, 0f, 0f));
+                        yield return new WaitForSeconds(2.2f);
+
+                        if (clientAvatar != null)
+                            clientAvatar.AuthorizeHostTeleport(targetChest.transform.position + new Vector3(1.5f, 0f, 0f));
+                        float waitChestCli = Time.realtimeSinceStartup;
+                        while (Time.realtimeSinceStartup - waitChestCli < 10f && (clientAvatar == null || clientAvatar.Gold.Value <= 0))
+                            yield return new WaitForSeconds(0.2f);
+                        int hostGoldBefore = RiftboundCoopPlayer.LocalOwner.Gold.Value;
+                        RiftboundCoopPlayer.LocalOwner.AuthorizeHostTeleport(targetChest.transform.position + new Vector3(1.5f, 0f, 0f));
+                        yield return new WaitForSeconds(0.35f);
+                        bool hostChestOk = lp.OpenChest(targetChest) && RiftboundCoopPlayer.LocalOwner.Gold.Value > hostGoldBefore;
+
+                        if (clientAvatar != null)
+                            clientAvatar.AuthorizeHostTeleport(lm0.transform.position + new Vector3(1.5f, 0f, 0f));
+                        int gBeforeLm0 = clientAvatar != null ? clientAvatar.Gold.Value : 0;
+                        float waitLm0 = Time.realtimeSinceStartup;
+                        while (Time.realtimeSinceStartup - waitLm0 < 10f && (clientAvatar == null || clientAvatar.Gold.Value < gBeforeLm0 + 15))
+                            yield return new WaitForSeconds(0.2f);
+                        yield return new WaitForSeconds(1.2f); // allow early zebra check + dup check
+
+                        if (clientAvatar != null)
+                            clientAvatar.AuthorizeHostTeleport(lm1.transform.position + new Vector3(1.5f, 0f, 0f));
+                        int gBeforeLm1 = clientAvatar != null ? clientAvatar.Gold.Value : 0;
+                        float waitLm1 = Time.realtimeSinceStartup;
+                        while (Time.realtimeSinceStartup - waitLm1 < 10f && (clientAvatar == null || clientAvatar.Gold.Value < gBeforeLm1 + 15))
+                            yield return new WaitForSeconds(0.2f);
+
+                        if (clientAvatar != null)
+                            clientAvatar.AuthorizeHostTeleport(lm2.transform.position + new Vector3(1.5f, 0f, 0f));
+                        float waitLm2 = Time.realtimeSinceStartup;
+                        while (Time.realtimeSinceStartup - waitLm2 < 10f && (clientAvatar == null || !clientAvatar.IsMounted.Value))
+                            yield return new WaitForSeconds(0.2f);
+                        bool zebraSeenOnHost = clientAvatar != null && clientAvatar.IsMounted.Value && clientAvatar.MountId.Value.ToString() == "zebra";
+
+                        int gBeforeTemper = clientAvatar != null ? clientAvatar.Gold.Value : 0;
+                        float waitTemperH = Time.realtimeSinceStartup;
+                        while (Time.realtimeSinceStartup - waitTemperH < 4f && (clientAvatar == null || clientAvatar.Gold.Value > gBeforeTemper - 45))
+                            yield return new WaitForSeconds(0.15f);
+                        yield return new WaitForSeconds(0.7f);
+
+                        if (clientAvatar != null)
+                            RiftboundCoopPlayer.LocalOwner.AuthorizeHostTeleport(clientAvatar.transform.position + new Vector3(22f, 0f, 0f));
+                        yield return new WaitForSeconds(0.4f);
+                        RiftboundCoopPlayer.DispatchEnemyHitToPlayer(remoteCid, 500f, targetEnemy.NetworkKey);
+                        float waitDownH = Time.realtimeSinceStartup;
+                        while (Time.realtimeSinceStartup - waitDownH < 6f && clientAvatar != null && clientAvatar.Health.Value > 0)
+                            yield return new WaitForSeconds(0.15f);
+                        yield return new WaitForSeconds(1.8f); // Let dead client fail invalid RPCs
+                        RiftboundCoopPlayer.LocalOwner.RequestReviveAlly(remoteCid); // Must fail > 5m
+                        yield return new WaitForSeconds(0.6f);
+                        bool farRevBlocked = clientAvatar != null && clientAvatar.Health.Value <= 0;
+
+                        if (clientAvatar != null)
+                            RiftboundCoopPlayer.LocalOwner.AuthorizeHostTeleport(clientAvatar.transform.position + new Vector3(1.5f, 0f, 0f));
+                        yield return new WaitForSeconds(0.5f);
+                        RiftboundCoopPlayer.LocalOwner.RequestReviveAlly(remoteCid);
+                        float waitRevH = Time.realtimeSinceStartup;
+                        while (Time.realtimeSinceStartup - waitRevH < 5f && clientAvatar != null && clientAvatar.Health.Value <= 0)
+                            yield return new WaitForSeconds(0.15f);
+                        int revHp = clientAvatar != null ? clientAvatar.Health.Value : -1;
+                        RiftboundCoopPlayer.LocalOwner.RequestReviveAlly(remoteCid); // Duplicate revive must not overwrite
+                        yield return new WaitForSeconds(0.5f);
+                        bool nearRevOk = revHp > 0 && clientAvatar != null && clientAvatar.Health.Value == revHp;
+
+                        // Client is at ~50% HP after revive; wait for Client to rest back to MaxHealth and verify repeat rest rejection
+                        float waitRestH = Time.realtimeSinceStartup;
+                        while (Time.realtimeSinceStartup - waitRestH < 6f && clientAvatar != null && clientAvatar.Health.Value < clientAvatar.MaxHealth.Value)
+                            yield return new WaitForSeconds(0.2f);
+                        yield return new WaitForSeconds(0.9f);
+
+                        authorityPass = hostChestOk && zebraSeenOnHost && farRevBlocked && nearRevOk;
+                        combatInfo += $", hostAuth={(authorityPass ? "PASS" : "FAIL")}(chest={hostChestOk},zebra={zebraSeenOnHost},farRevRej={farRevBlocked},nearRev={nearRevOk})";
+                    }
+                    else
+                    {
+                        var me = RiftboundCoopPlayer.LocalOwner;
+                        string rightAb = me.ClassName.Value.ToString() == "Mage" ? "fireball" : "whirlwind";
+
+                        Vector3 prePos = lp.transform.position;
+                        me.SendSpoofedPositionForTest(prePos + new Vector3(200f, 0f, 0f));
+                        yield return new WaitForSeconds(0.75f);
+                        bool posClampOk = Vector3.Distance(lp.transform.position, prePos) < 25f;
+
+                        float wtFar = Time.realtimeSinceStartup;
+                        while (Time.realtimeSinceStartup - wtFar < 8f && Vector3.Distance(lp.transform.position, targetEnemy.transform.position) < 10f)
+                            yield return new WaitForSeconds(0.15f);
+                        float hpBeforeFar = eStats.Health;
+                        me.RequestAbilityAttack(eStats, "melee");
+                        yield return new WaitForSeconds(0.6f);
+                        bool outRangeRej = Mathf.Approximately(eStats.Health, hpBeforeFar);
+
+                        float wtNear = Time.realtimeSinceStartup;
+                        while (Time.realtimeSinceStartup - wtNear < 8f && Vector3.Distance(lp.transform.position, targetEnemy.transform.position) > 5f)
+                            yield return new WaitForSeconds(0.15f);
+                        float hpBeforeCd = eStats.Health;
+                        me.RequestAbilityAttack(eStats, rightAb);
+                        yield return new WaitForSeconds(0.05f);
+                        me.RequestAbilityAttack(eStats, rightAb);
+                        yield return new WaitForSeconds(0.9f);
+                        float dmgDealt = hpBeforeCd - eStats.Health;
+                        bool cooldownRej = dmgDealt > 0f && dmgDealt <= 42f;
+
+                        float wtChest = Time.realtimeSinceStartup;
+                        while (Time.realtimeSinceStartup - wtChest < 8f && Vector3.Distance(lp.transform.position, targetChest.transform.position) > 4f)
+                            yield return new WaitForSeconds(0.15f);
+                        lp.OpenChest(targetChest);
+                        float wtGold1 = Time.realtimeSinceStartup;
+                        while (Time.realtimeSinceStartup - wtGold1 < 5f && me.Gold.Value <= 0)
+                            yield return new WaitForSeconds(0.15f);
+                        int goldAfterChest = me.Gold.Value;
+
+                        // Discover 3 Greenhollow landmarks server-authoritatively & check Zebra policy
+                        Landmark[] lms = { lm0, lm1, lm2 };
+                        bool zebraBlockedEarly = false;
+                        bool dupLmRej = false;
+                        for (int i = 0; i < 3; i++)
+                        {
+                            float wlm = Time.realtimeSinceStartup;
+                            while (Time.realtimeSinceStartup - wlm < 8f && Vector3.Distance(lp.transform.position, lms[i].transform.position) > 5f)
+                                yield return new WaitForSeconds(0.15f);
+                            int gBefore = me.Gold.Value;
+                            lp.DiscoverLandmark(lms[i].landmarkId);
+                            float wg = Time.realtimeSinceStartup;
+                            while (Time.realtimeSinceStartup - wg < 4f && me.Gold.Value <= gBefore)
+                                yield return new WaitForSeconds(0.15f);
+                            if (i == 0)
+                            {
+                                int gDupBefore = me.Gold.Value;
+                                me.RequestDiscoverLandmark(lms[0].landmarkId);
+                                yield return new WaitForSeconds(0.45f);
+                                dupLmRej = me.Gold.Value == gDupBefore;
+
+                                me.RequestSetMount(true, "zebra");
+                                yield return new WaitForSeconds(0.45f);
+                                zebraBlockedEarly = !me.IsMounted.Value;
+                            }
+                        }
+
+                        me.RequestSetMount(true, "zebra");
+                        float wmZebra = Time.realtimeSinceStartup;
+                        while (Time.realtimeSinceStartup - wmZebra < 4f && !me.IsMounted.Value)
+                            yield return new WaitForSeconds(0.15f);
+                        bool zebraUnlockedOk = me.IsMounted.Value && me.MountId.Value.ToString() == "zebra";
+
+                        // Temper weapon once + duplicate temper rejection
+                        bool temperOk = false;
+                        if (me.Gold.Value >= 45)
+                        {
+                            me.RequestTransaction("temper_weapon");
+                            float wTemp = Time.realtimeSinceStartup;
+                            while (Time.realtimeSinceStartup - wTemp < 3f && !lp.TemperedWeapon)
+                                yield return new WaitForSeconds(0.15f);
+                            int goldAfterT1 = me.Gold.Value;
+                            me.RequestTransaction("temper_weapon");
+                            yield return new WaitForSeconds(0.45f);
+                            temperOk = lp.TemperedWeapon && me.Gold.Value == goldAfterT1;
+                        }
+
+                        // Wait down -> check dead rejections -> wait revive
+                        float wtDownC = Time.realtimeSinceStartup;
+                        while (Time.realtimeSinceStartup - wtDownC < 12f && me.Health.Value > 0)
+                            yield return new WaitForSeconds(0.15f);
+                        float enemyHpDead = eStats.Health;
+                        int goldDead = me.Gold.Value;
+                        me.RequestAbilityAttack(eStats, rightAb);
+                        me.RequestSetMount(true, "horse");
+                        me.RequestTransaction("buy_potion");
+                        yield return new WaitForSeconds(0.8f);
+                        bool deadRejOk = Mathf.Approximately(eStats.Health, enemyHpDead) && !me.IsMounted.Value && me.Gold.Value == goldDead;
+
+                        float wtRevC = Time.realtimeSinceStartup;
+                        while (Time.realtimeSinceStartup - wtRevC < 12f && me.Health.Value <= 0)
+                            yield return new WaitForSeconds(0.15f);
+                        bool revBackOk = me.Health.Value > 0;
+                        yield return new WaitForSeconds(1.2f); // Let host verify duplicate revive check before healing via rest!
+
+                        // Wait for -25 dmg -> test rest heals to MaxHealth and costs 5g
+                        float wtDmgRest = Time.realtimeSinceStartup;
+                        while (Time.realtimeSinceStartup - wtDmgRest < 8f && me.Health.Value >= me.MaxHealth.Value)
+                            yield return new WaitForSeconds(0.15f);
+                        bool restDmgOk = false;
+                        bool restFullRej = false;
+                        int restG0 = me.Gold.Value, restH0 = me.Health.Value;
+                        if (me.Gold.Value >= 5 && me.Health.Value < me.MaxHealth.Value)
+                        {
+                            int gRest = me.Gold.Value;
+                            me.RequestTransaction("rest");
+                            float wtR = Time.realtimeSinceStartup;
+                            while (Time.realtimeSinceStartup - wtR < 4f && (me.Health.Value < me.MaxHealth.Value || me.Gold.Value > gRest - 5))
+                                yield return new WaitForSeconds(0.15f);
+                            restDmgOk = me.Health.Value == me.MaxHealth.Value && me.Gold.Value == gRest - 5;
+
+                            // Now Client is guaranteed full HP -> repeat rest must be rejected
+                            int gAtFull = me.Gold.Value;
+                            me.RequestTransaction("rest");
+                            yield return new WaitForSeconds(0.45f);
+                            restFullRej = me.Gold.Value == gAtFull;
+                        }
+
+                        authorityPass = posClampOk && outRangeRej && cooldownRej && goldAfterChest > 0 && restFullRej && dupLmRej && zebraBlockedEarly && zebraUnlockedOk && temperOk && deadRejOk && revBackOk && restDmgOk;
+                        combatInfo += $", clientAuth={(authorityPass ? "PASS" : "FAIL")}(clamp={posClampOk},rngRej={outRangeRej},cdRej={cooldownRej},restRej={restFullRej},dupLmRej={dupLmRej},zEarly={zebraBlockedEarly},zOk={zebraUnlockedOk},temper={temperOk},deadRej={deadRejOk},rev={revBackOk},restOk={restDmgOk}[g={restG0}->{me.Gold.Value},h={restH0}->{me.Health.Value}/{me.MaxHealth.Value}])";
+                    }
+                }
+                else
+                {
+                    authorityPass = false;
+                    combatInfo += ", auth=FAIL(missingEntity)";
+                }
+            }
+
+            bool pass = players >= minPlayers && RiftboundCoopPlayer.LocalOwner != null && activeCams == 1 && activeListeners == 1 && sep >= 1.0f && combatPass && lateJoinPass && progPass && clientLeavePass && fullAcceptPass && authorityPass;
             string msg = $"{(pass ? "PASS" : "FAIL")} {role}: players={players}, localOwner={(RiftboundCoopPlayer.LocalOwner != null)}, cams={activeCams}, listeners={activeListeners}, sep={sep:F2}m ({posInfo}){combatInfo}";
             Debug.Log(msg);
             System.Console.WriteLine(msg);
 
             yield return new WaitForSeconds(0.5f);
             Application.Quit(pass ? 0 : 1);
+        }
+
+        /// <summary>Picks an un-gated LootChest deterministically across Host and Client.</summary>
+        static LootChest FindDeterministicTestChest(int minGold, bool pickHighest)
+        {
+            LootChest best = null;
+            foreach (var c in FindObjectsByType<LootChest>(FindObjectsSortMode.None))
+            {
+                if (!c || string.IsNullOrEmpty(c.chestId) || c.gold < minGold || c.requiresCaptainDefeated || c.requiresWardenDefeated || c.chestId == RiverReaverCamp.CacheId)
+                    continue;
+                bool better = best == null ||
+                    (pickHighest ? c.gold > best.gold : c.gold < best.gold) ||
+                    (c.gold == best.gold && string.CompareOrdinal(c.chestId, best.chestId) < 0);
+                if (better) best = c;
+            }
+            return best;
         }
     }
 }

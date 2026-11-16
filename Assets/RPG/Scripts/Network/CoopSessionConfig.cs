@@ -31,6 +31,8 @@ namespace Riftbound.Network
         public static bool ResilienceSmoke = false;
         public static bool ClientLeaveSmoke = false;
         public static bool FullAcceptanceSmoke = false;
+        public static bool UiSmoke = false;
+        public static bool AuthoritySmoke = false;
         public static int ExpectedMinPlayers = 2;
         public static bool CliParsed { get; private set; }
 
@@ -119,6 +121,15 @@ namespace Riftbound.Network
                 {
                     FullAcceptanceSmoke = true;
                     if (AutoSmokeExitSeconds <= 0f) AutoSmokeExitSeconds = 75f;
+                }
+                else if (args[i] == "-coopUiSmoke")
+                {
+                    UiSmoke = true;
+                }
+                else if (args[i] == "-coopAuthoritySmoke")
+                {
+                    AuthoritySmoke = true;
+                    if (AutoSmokeExitSeconds <= 0f) AutoSmokeExitSeconds = 70f;
                 }
                 else if (args[i] == "-coopMinPlayers" && i + 1 < args.Length && int.TryParse(args[i + 1], out int mp))
                 {

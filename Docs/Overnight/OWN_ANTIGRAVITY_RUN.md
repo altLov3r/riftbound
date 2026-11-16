@@ -61,3 +61,33 @@
 - **Blocked / Not Run (Honest Scope):**
   - 2-PC cross-network Relay internet playtest (`NOT RUN` — single machine only; same-machine loopback Relay is not cross-network acceptance).
   - Manual interactive GUI click-through playthrough in windowed `Riftbound.exe` (`NOT RUN` — all verification after final edit was automated batchmode Play Mode / standalone `-batchmode -nographics`).
+
+### Checkpoint 01:36 — Wave 2 Deep-Audit Server Authority, Exploration & UI Flow Verified
+- **UTC:** `2026-11-16T00:14:18Z` | **Sofia:** `2026-11-16T02:14:18+02:00`
+- **Elapsed:** `01:36:47` (well ahead of feature freeze `05:07:31Z` and deadline `06:37:31Z`)
+- **Current Ticket:** A07 — Branch Verification & Final Delivery (Wave 2 Hardening + Post-Final-Edit Suite Complete)
+- **Additional Wave 2 Modified Files:**
+  - `Assets/RPG/Scripts/PlayerExploration.cs`
+  - `Assets/RPG/Scripts/Network/RiftboundCoopPlayer.cs`
+  - `Assets/RPG/Scripts/FrontendMenu.cs`
+  - `Assets/RPG/Scripts/Network/CoopSessionConfig.cs`
+  - `Assets/RPG/Scripts/Network/CoopWorldManager.cs`
+- **Wave 2 Completed Fixes:**
+  - **Landmark & Zebra Policy Server Validation (`PlayerExploration.cs` + `RiftboundCoopPlayer.cs`):** Routed multiplayer `DiscoverLandmark` through `RequestDiscoverLandmarkServerRpc` (`<= 14m` server proximity & per-landmark dedup via `ApproveDiscoverLandmarkClientRpc`); enforced Greenhollow 3-landmark unlock rule on the server in `RequestSetMountServerRpc` (`"zebra"` rejected until all 3 Greenhollow landmarks are discovered).
+  - **Server Potion, Temper & Respawn Limits (`RiftboundCoopPlayer.cs`):** Tracked `serverPotions` (start `3`, `buy_potion` cap `< 10`), enforced `1.5s` potion cooldown in `ApplyServerPotionHeal`, rejected duplicate `"temper_weapon"` (`serverTemperedWeapon`), and enforced `1.5s` cooldown on `RespawnServerRpc`.
+  - **Frontend UI & Controls Accuracy (`FrontendMenu.cs` + `CoopWorldManager.cs` + `CoopSessionConfig.cs`):** Updated `DrawControlsPage()` with actual co-op keys (`[E]` Interact/Quest/Cache/Revive Ally, `[R]` Respawn when downed, `[F6]`/`[F7]` Ping/Ready Check); increased Dev LAN HUD box height (`106f` -> `124f`); added `-coopUiSmoke` (real `FrontendMenu` Host Online -> Leave to Menu check restoring `Time.timeScale = 1f` and skipping roster disk writes) and `-coopAuthoritySmoke` (position spoof clamp, out-of-range melee reject, rapid cooldown reject, duplicate rest/landmark/temper rejections, dead-player RPC rejections, far vs near revive, Greenhollow/Zebra policy).
+- **Post-Final-Edit Build & Full Regression Matrix (100% Re-Run After Final C# Edit):**
+  - **Standalone Build (`BuildOvernightAntigravityOnline`):** `Builds/OvernightAntigravityOnline/Riftbound.exe` (`542,405,872 bytes`, `warnings=858`, `errors=0`, `BUILD_EXIT=0`)
+  - **`Riftbound.Editor.QuestRouteSmokeTest.Run` (Editor Batch Play Mode, no `-nographics`, no `-quit`):** `QUEST_ROUTE_EXIT=0` — `145 PASS, 0 FAIL`, `UGS_INIT_IN_OFFLINE_LOG=0`
+  - **`-coopUiSmoke`:** `EXIT=0` (`PASS UiFlow: menuOpen=True, state=Offline, mode=Offline, nm=0, cams=2, listeners=1`)
+  - **`-coopInvalidCodeSmoke`:** `EXIT=0` (`PASS InvalidCode: state=Failed, err=Join code is invalid or expired.`)
+  - **`-coopResilienceSmoke`:** `EXIT=0` (`PASS Resilience: codes=[redacted]->[redacted], nmDuringHost=1, nmAfterLeave=0, finalState=Offline`)
+  - **`-coopAuthoritySmoke` (2p Relay):** `H=0 C=0` (`hostAuth=PASS(chest=True,zebra=True,farRevRej=True,nearRev=True)`, `clientAuth=PASS(clamp=True,rngRej=True,cdRej=True,restRej=True,dupLmRej=True,zEarly=True,zOk=True,temper=True,deadRej=True,rev=True,restOk=True[g=75->70,h=60->120/120])`)
+  - **`-coopProgressionSmoke` (2p Relay):** `H=0 C=0` (`hostProg=PASS(dead=True, chest=True)`, `clientProg=PASS(kill=True,qRej=True,c1=True,cDup=True,txRej=True,txBuy=True,resp=True)`)
+  - **`-coopFullAcceptanceSmoke` (2p Relay):** `H=0 C=0` (`hostAccept=PASS(cid=1,ping=True,rc=True/True,revive=True,kills=0,qIdx=1)`, `clientAccept=PASS(spoofRej=True,abHit=True,abHeal=True,dismount=True,qAcc=True,qComp=True,rev=True,evt=True,noDblG=True,hostDisc=True)`)
+  - **`-coopClientLeaveSmoke` (2p Relay):** `H=0 C=0` (`hostDisconnectRecovery=PASS(mounted=True,quest=True,playersAfter=1)`, `PASS ClientLeave: questAccepted=True, mounted=True, nmAfterLeave=0, finalState=Offline`)
+  - **`-coopLateJoinSmoke` (2p Relay, 3s delay):** `H=0 C=0` (`lateJoin=PASS(40/70)` on Host & Client)
+  - **`-coopCombatSmoke` (2p Relay):** `H=0 C=0` (`enemy=road-raider-1 hp=36/70, clientDamaged=True` on Host & Client)
+  - **4-Player Relay + 5th Rejection + Frame Telemetry:** `H=0 C1=0 C2=0 C3=0 C4=1` (`players=4, cams=1, listeners=1`, Host `avgMs=6.15/p95Ms=9.38, enemies=54, netObjs=4`, Clients `avgMs=5.17-5.46/p95Ms=7.48-8.14, enemies=52, netObjs=4`; C4 `[OnlineSessionService] Join failed: session is full`)
+- **Wave 2 Failures Fixed Cleanly (Under 2-Attempt Rule):**
+  - First Wave 2 `AuthoritySmoke` failed `restOk` because deterministic chest order picked a 15g chest (`15 + 30 - 45 = 0g`, leaving `< 5g` for `rest`). Fixed by adding shared helper `FindDeterministicTestChest(int minGold, bool pickHighest)`: `AuthoritySmoke` picks highest-gold un-gated chest (`>= 20g`, leaving `>= 5g` for `rest` + duplicate `rest` rejection), while `ProgressionSmoke` picks lowest-gold un-gated chest (`>= 15g`, keeping total `< 45g` so `txRej` holds). Both re-verified cleanly after the final edit.

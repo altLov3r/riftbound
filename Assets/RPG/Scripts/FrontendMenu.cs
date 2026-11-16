@@ -164,6 +164,37 @@ namespace Riftbound
             page = Page.Title;
             SetupPortraitCamera();
             RefreshPreview();
+
+            if (Network.CoopSessionConfig.UiSmoke && Network.CoopWorldManager.UiSmokeStage == 0)
+            {
+                StartCoroutine(RunUiFlowSmokeRoutine());
+            }
+        }
+
+        System.Collections.IEnumerator RunUiFlowSmokeRoutine()
+        {
+            yield return new WaitForSecondsRealtime(0.5f);
+            bool offlineClean = IsOpen && Network.OnlineSessionService.State == Network.OnlineSessionState.Offline &&
+                                Network.CoopSessionConfig.Mode == Network.CoopSessionMode.Offline &&
+                                UnityEngine.Object.FindObjectsByType<Unity.Netcode.NetworkManager>(FindObjectsSortMode.None).Length == 0;
+            OpenCharacterSelect();
+            yield return new WaitForSecondsRealtime(0.2f);
+            Network.CoopSessionConfig.Mode = Network.CoopSessionMode.JoinOnline;
+            Network.CoopSessionConfig.JoinCode = "AB";
+            EnterWorld();
+            bool shortCodeBlocked = IsOpen && !enteringWorld && !string.IsNullOrEmpty(error);
+            if (!offlineClean || !shortCodeBlocked)
+            {
+                string failMsg = $"FAIL UiFlow stage0: offlineClean={offlineClean}, shortCodeBlocked={shortCodeBlocked}, err={error}";
+                Debug.Log(failMsg);
+                System.Console.WriteLine(failMsg);
+                Application.Quit(1);
+                yield break;
+            }
+            Network.CoopWorldManager.UiSmokeStage = 1;
+            Network.CoopSessionConfig.Mode = Network.CoopSessionMode.HostOnline;
+            Network.CoopSessionConfig.JoinCode = "";
+            EnterWorld();
         }
 
         static bool ValidId(string id) => id == "" || (id != null && Guid.TryParseExact(id, "N", out _));
@@ -212,7 +243,7 @@ namespace Riftbound
                 }
                 Network.CoopSessionConfig.JoinCode = norm;
             }
-            if (!SaveRoster()) return;
+            if (!Network.CoopSessionConfig.UiSmoke && !SaveRoster()) return;
 
             enteringWorld = true;
             enteringCharacter = Selected;
@@ -1097,7 +1128,8 @@ namespace Riftbound
                 "  Mouse Wheel         Zoom camera in / out\n\n" +
                 "INTERACTION & MOUNTS:\n" +
                 "  TAB                 Target nearest enemy\n" +
-                "  E                   Interact with NPCs, quests & caches\n" +
+                "  E                   Interact / Quest / Cache / Revive Ally\n" +
+                "  R                   Respawn (when downed)\n" +
                 "  Z                   Summon / Dismount active mount\n" +
                 "  V                   Swap selected mount (Horse / Zebra / Gryphon)", body);
 
@@ -1108,11 +1140,10 @@ namespace Riftbound
                 "  3                   Class Utility / Shield / Heal / Sprint\n" +
                 "  4                   Healing Potion\n" +
                 "  N                   Specialization & Talent Trees\n\n" +
-                "PANELS & SHORTCUTS:\n" +
-                "  I                   Character Inventory & Gear\n" +
-                "  M                   World Map (Frontiers & Landmarks)\n" +
-                "  J                   Quest Journal\n" +
-                "  F5                  Manual Save Progress\n" +
+                "PANELS & CO-OP:\n" +
+                "  I / M / J           Inventory / World Map / Quest Journal\n" +
+                "  F6 / F7             Co-op Map Ping / Ready Check\n" +
+                "  F5                  Manual Save Progress (Offline)\n" +
                 "  ESC                 Game Menu / Cancel Selection", body);
 
             if (GUI.Button(new Rect(60, 520, 220, 44), "Back", button))
