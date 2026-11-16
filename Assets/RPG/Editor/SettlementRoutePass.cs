@@ -199,7 +199,11 @@ namespace Riftbound.Editor
         {
             var go = GameObject.Find(name);
             if (!go) return null;
-            var vertices = go.GetComponent<MeshFilter>().sharedMesh.vertices;
+            // Play Mode static batching can replace sharedMesh with a combined multi-route buffer.
+            var mesh = AssetDatabase.LoadAssetAtPath<Mesh>(Folder + "/" + name + ".asset");
+            if (!mesh || mesh.vertexCount < 4 || mesh.vertexCount % 2 != 0)
+                throw new InvalidOperationException("Reviewed source footway mesh missing/invalid: " + name);
+            var vertices = mesh.vertices;
             var points = new Vector3[vertices.Length / 2];
             for (int i = 0; i < points.Length; i++) points[i] = go.transform.TransformPoint((vertices[i * 2] + vertices[i * 2 + 1]) * .5f);
             return points;

@@ -47,13 +47,13 @@ namespace Riftbound.Editor
             new Route("Silverglen trail",new Vector3(-30,2,44),new Vector3(-95,12,70),new Vector3(-150,15,75)),
             new Route("Duskwood road",new Vector3(0,3,100),new Vector3(-85,10,145),new Vector3(-150,15,225),new Vector3(-220,18,260)),
             new Route("Deathknell branch",new Vector3(-150,15,225),new Vector3(-205,13,200),new Vector3(-240,12,180)),
-            new Route("Greenhollow road",new Vector3(0,3,100),new Vector3(-15,9,235),new Vector3(-17,11,349),new Vector3(-17,11,368),new Vector3(-40,13,400)),
+            new Route("Greenhollow road",new Vector3(0,3,100),new Vector3(-15,9,235),new Vector3(-17,11,349),new Vector3(-17,11,368),new Vector3(-27,11,386),new Vector3(-36,13,395)),
             new Route("Redridge pass",new Vector3(35,5.85f,91),new Vector3(105,10,150),new Vector3(185,13,170),new Vector3(240,14,150),new Vector3(280,18,210)),
             new Route("Gor'Kresh road",new Vector3(280,18,210),new Vector3(310,22,255),new Vector3(340,25,290)),
             new Route("Volcanic trail",new Vector3(280,18,210),new Vector3(230,20,260),new Vector3(180,22,300)),
             new Route("North valley crossing",new Vector3(-40,13,400),new Vector3(70,18,385),new Vector3(180,22,300)),
             new Route("Wyrmcrest switchbacks",new Vector3(340,25,290),new Vector3(365,34,370),new Vector3(330,48,425),new Vector3(245,70,463),new Vector3(250,75,485),new Vector3(250,75,510)),
-            new Route("Westbank approach",new Vector3(-200,12,-60),new Vector3(-225,9,0),new Vector3(-240,6,50),new Vector3(-260,6,50),new Vector3(-285,6,50))
+            new Route("Westbank approach",new Vector3(-200,12,-60),new Vector3(-202.5f,12,-57.5f),new Vector3(-204,12.48f,-15),new Vector3(-225,9,0),new Vector3(-240,6,50),new Vector3(-260,6,50),new Vector3(-285,6,50))
         };
 
         internal static Func<float,float,float> OriginalHeight;

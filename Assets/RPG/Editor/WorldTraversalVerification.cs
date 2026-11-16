@@ -100,7 +100,7 @@ namespace Riftbound.Editor
             }
         }
 
-        static void Traverse(Route route, bool mounted, bool reverse, CharacterController source, StringBuilder report)
+        internal static void Traverse(Route route, bool mounted, bool reverse, CharacterController source, StringBuilder report)
         {
             var points = reverse ? route.points.Reverse().ToArray() : route.points;
             var go = new GameObject("Temporary route probe"); go.layer = 2;
@@ -146,7 +146,7 @@ namespace Riftbound.Editor
         }
 
         static Vector2 Flat(Vector3 p) => new Vector2(p.x, p.z);
-        static Vector3 Surface(Vector3 p)
+        internal static Vector3 Surface(Vector3 p)
         {
             p.y = WorldRegions.GroundHeight(p);
             foreach (var hit in Physics.RaycastAll(new Vector3(p.x, p.y + 12, p.z), Vector3.down, 14, ~(1 << 2), QueryTriggerInteraction.Ignore))

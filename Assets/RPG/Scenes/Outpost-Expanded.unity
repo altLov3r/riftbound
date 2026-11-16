@@ -289033,7 +289033,8 @@ MonoBehaviour:
     - {x: -15, y: 9, z: 235}
     - {x: -17, y: 11, z: 349}
     - {x: -17, y: 11, z: 368}
-    - {x: -40, y: 13, z: 400}
+    - {x: -27, y: 11, z: 386}
+    - {x: -36, y: 13, z: 395}
   - name: Redridge pass
     points:
     - {x: 35, y: 5.85, z: 91}
@@ -289067,6 +289068,8 @@ MonoBehaviour:
   - name: Westbank approach
     points:
     - {x: -200, y: 12, z: -60}
+    - {x: -202.5, y: 12, z: -57.5}
+    - {x: -204, y: 12.48, z: -15}
     - {x: -225, y: 9, z: 0}
     - {x: -240, y: 6, z: 50}
     - {x: -260, y: 6, z: 50}
@@ -415690,7 +415693,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: c15cefbb2759eda4aa1c056a5a262e2d, type: 2}
+  - {fileID: 2100000, guid: 4c2716c77ac177448a443bf22b69609a, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
