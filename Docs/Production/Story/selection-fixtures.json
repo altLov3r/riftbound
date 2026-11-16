@@ -1,0 +1,735 @@
+[
+  {
+    "caseId": "abe-0-offer",
+    "profileId": "abe",
+    "channel": "main_body",
+    "topicId": "",
+    "state": {
+      "main.index": 0,
+      "main.accepted": false,
+      "main.ready": false,
+      "main.complete": false
+    },
+    "eligible": true,
+    "expected": "abe.main0.offer"
+  },
+  {
+    "caseId": "abe-title-0-offer",
+    "profileId": "abe",
+    "channel": "main_title",
+    "topicId": "",
+    "state": {
+      "main.index": 0,
+      "main.accepted": false,
+      "main.ready": false,
+      "main.complete": false
+    },
+    "eligible": true,
+    "expected": "abe.main0.title"
+  },
+  {
+    "caseId": "abe-0-progress",
+    "profileId": "abe",
+    "channel": "main_body",
+    "topicId": "",
+    "state": {
+      "main.index": 0,
+      "main.accepted": true,
+      "main.ready": false,
+      "main.complete": false
+    },
+    "eligible": true,
+    "expected": "abe.main0.progress"
+  },
+  {
+    "caseId": "abe-title-0-progress",
+    "profileId": "abe",
+    "channel": "main_title",
+    "topicId": "",
+    "state": {
+      "main.index": 0,
+      "main.accepted": true,
+      "main.ready": false,
+      "main.complete": false
+    },
+    "eligible": true,
+    "expected": "abe.main0.title"
+  },
+  {
+    "caseId": "abe-0-ready",
+    "profileId": "abe",
+    "channel": "main_body",
+    "topicId": "",
+    "state": {
+      "main.index": 0,
+      "main.accepted": true,
+      "main.ready": true,
+      "main.complete": false
+    },
+    "eligible": true,
+    "expected": "abe.main0.ready"
+  },
+  {
+    "caseId": "abe-title-0-ready",
+    "profileId": "abe",
+    "channel": "main_title",
+    "topicId": "",
+    "state": {
+      "main.index": 0,
+      "main.accepted": true,
+      "main.ready": true,
+      "main.complete": false
+    },
+    "eligible": true,
+    "expected": "abe.main0.title"
+  },
+  {
+    "caseId": "abe-1-offer",
+    "profileId": "abe",
+    "channel": "main_body",
+    "topicId": "",
+    "state": {
+      "main.index": 1,
+      "main.accepted": false,
+      "main.ready": false,
+      "main.complete": false
+    },
+    "eligible": true,
+    "expected": "abe.main1.offer"
+  },
+  {
+    "caseId": "abe-title-1-offer",
+    "profileId": "abe",
+    "channel": "main_title",
+    "topicId": "",
+    "state": {
+      "main.index": 1,
+      "main.accepted": false,
+      "main.ready": false,
+      "main.complete": false
+    },
+    "eligible": true,
+    "expected": "abe.main1.title"
+  },
+  {
+    "caseId": "abe-1-progress",
+    "profileId": "abe",
+    "channel": "main_body",
+    "topicId": "",
+    "state": {
+      "main.index": 1,
+      "main.accepted": true,
+      "main.ready": false,
+      "main.complete": false
+    },
+    "eligible": true,
+    "expected": "abe.main1.progress"
+  },
+  {
+    "caseId": "abe-title-1-progress",
+    "profileId": "abe",
+    "channel": "main_title",
+    "topicId": "",
+    "state": {
+      "main.index": 1,
+      "main.accepted": true,
+      "main.ready": false,
+      "main.complete": false
+    },
+    "eligible": true,
+    "expected": "abe.main1.title"
+  },
+  {
+    "caseId": "abe-1-ready",
+    "profileId": "abe",
+    "channel": "main_body",
+    "topicId": "",
+    "state": {
+      "main.index": 1,
+      "main.accepted": true,
+      "main.ready": true,
+      "main.complete": false
+    },
+    "eligible": true,
+    "expected": "abe.main1.ready"
+  },
+  {
+    "caseId": "abe-title-1-ready",
+    "profileId": "abe",
+    "channel": "main_title",
+    "topicId": "",
+    "state": {
+      "main.index": 1,
+      "main.accepted": true,
+      "main.ready": true,
+      "main.complete": false
+    },
+    "eligible": true,
+    "expected": "abe.main1.title"
+  },
+  {
+    "caseId": "abe-2-offer",
+    "profileId": "abe",
+    "channel": "main_body",
+    "topicId": "",
+    "state": {
+      "main.index": 2,
+      "main.accepted": false,
+      "main.ready": false,
+      "main.complete": false
+    },
+    "eligible": true,
+    "expected": "abe.main2.offer"
+  },
+  {
+    "caseId": "abe-title-2-offer",
+    "profileId": "abe",
+    "channel": "main_title",
+    "topicId": "",
+    "state": {
+      "main.index": 2,
+      "main.accepted": false,
+      "main.ready": false,
+      "main.complete": false
+    },
+    "eligible": true,
+    "expected": "abe.main2.title"
+  },
+  {
+    "caseId": "abe-2-progress",
+    "profileId": "abe",
+    "channel": "main_body",
+    "topicId": "",
+    "state": {
+      "main.index": 2,
+      "main.accepted": true,
+      "main.ready": false,
+      "main.complete": false
+    },
+    "eligible": true,
+    "expected": "abe.main2.progress"
+  },
+  {
+    "caseId": "abe-title-2-progress",
+    "profileId": "abe",
+    "channel": "main_title",
+    "topicId": "",
+    "state": {
+      "main.index": 2,
+      "main.accepted": true,
+      "main.ready": false,
+      "main.complete": false
+    },
+    "eligible": true,
+    "expected": "abe.main2.title"
+  },
+  {
+    "caseId": "abe-2-ready",
+    "profileId": "abe",
+    "channel": "main_body",
+    "topicId": "",
+    "state": {
+      "main.index": 2,
+      "main.accepted": true,
+      "main.ready": true,
+      "main.complete": false
+    },
+    "eligible": true,
+    "expected": "abe.main2.ready"
+  },
+  {
+    "caseId": "abe-title-2-ready",
+    "profileId": "abe",
+    "channel": "main_title",
+    "topicId": "",
+    "state": {
+      "main.index": 2,
+      "main.accepted": true,
+      "main.ready": true,
+      "main.complete": false
+    },
+    "eligible": true,
+    "expected": "abe.main2.title"
+  },
+  {
+    "caseId": "abe-complete",
+    "profileId": "abe",
+    "channel": "main_body",
+    "topicId": "",
+    "state": {
+      "main.index": 3,
+      "main.complete": true,
+      "main.accepted": false,
+      "main.ready": false
+    },
+    "eligible": true,
+    "expected": "abe.main3.complete"
+  },
+  {
+    "caseId": "abe-complete-title",
+    "profileId": "abe",
+    "channel": "main_title",
+    "topicId": "",
+    "state": {
+      "main.index": 3,
+      "main.complete": true
+    },
+    "eligible": true,
+    "expected": "abe.main3.title"
+  },
+  {
+    "caseId": "abe-complete-greeting",
+    "profileId": "abe",
+    "channel": "greeting",
+    "topicId": "",
+    "state": {
+      "main.index": 3,
+      "main.complete": true
+    },
+    "eligible": true,
+    "expected": "abe.greeting.after-main"
+  },
+  {
+    "caseId": "abe-new-greeting",
+    "profileId": "abe",
+    "channel": "greeting",
+    "topicId": "",
+    "state": {},
+    "eligible": true,
+    "expected": "abe.greeting.public"
+  },
+  {
+    "caseId": "abe-unknown-not-false",
+    "profileId": "abe",
+    "channel": "main_body",
+    "topicId": "",
+    "state": {
+      "main.index": 0,
+      "main.complete": false,
+      "main.accepted": true
+    },
+    "eligible": true,
+    "expected": "$existing"
+  },
+  {
+    "caseId": "abe-inconsistent-ready",
+    "profileId": "abe",
+    "channel": "main_body",
+    "topicId": "",
+    "state": {
+      "main.index": 0,
+      "main.complete": false,
+      "main.accepted": false,
+      "main.ready": true
+    },
+    "eligible": true,
+    "expected": "$existing"
+  },
+  {
+    "caseId": "abe-inconsistent-complete",
+    "profileId": "abe",
+    "channel": "main_body",
+    "topicId": "",
+    "state": {
+      "main.index": 0,
+      "main.complete": true
+    },
+    "eligible": true,
+    "expected": "$existing"
+  },
+  {
+    "caseId": "abe-no-mara-topic",
+    "profileId": "abe",
+    "channel": "public_topic",
+    "topicId": "mara",
+    "state": {
+      "main.index": 3,
+      "main.complete": true
+    },
+    "eligible": true,
+    "expected": "$fallback"
+  },
+  {
+    "caseId": "abe-truce-topic",
+    "profileId": "abe",
+    "channel": "public_topic",
+    "topicId": "roadward-truce",
+    "state": {},
+    "eligible": true,
+    "expected": "abe.topic.truce"
+  },
+  {
+    "caseId": "abe-ineligible",
+    "profileId": "abe",
+    "channel": "main_body",
+    "topicId": "",
+    "state": {
+      "main.index": 0,
+      "main.complete": false,
+      "main.accepted": false,
+      "main.ready": false
+    },
+    "eligible": false,
+    "expected": "$denied"
+  },
+  {
+    "caseId": "rowan-public",
+    "profileId": "rowan",
+    "channel": "greeting",
+    "topicId": "",
+    "state": {},
+    "eligible": true,
+    "expected": "rowan.greeting.public"
+  },
+  {
+    "caseId": "rowan-no-purchase-history",
+    "profileId": "rowan",
+    "channel": "public_topic",
+    "topicId": "purchase-success",
+    "state": {},
+    "eligible": true,
+    "expected": "$fallback"
+  },
+  {
+    "caseId": "mira-public",
+    "profileId": "mira",
+    "channel": "greeting",
+    "topicId": "",
+    "state": {},
+    "eligible": true,
+    "expected": "mira.greeting.public"
+  },
+  {
+    "caseId": "mira-no-purchase-history",
+    "profileId": "mira",
+    "channel": "public_topic",
+    "topicId": "purchase-success",
+    "state": {},
+    "eligible": true,
+    "expected": "$fallback"
+  },
+  {
+    "caseId": "survey-offer",
+    "profileId": "elara",
+    "channel": "quest_offer",
+    "topicId": "frontier_cartography",
+    "state": {
+      "quest.available:frontier_cartography": true
+    },
+    "eligible": true,
+    "expected": "elara.survey.offer"
+  },
+  {
+    "caseId": "survey-wrong-offer",
+    "profileId": "elara",
+    "channel": "quest_offer",
+    "topicId": "frontier_cartography",
+    "state": {
+      "quest.available:frontier_cartography": false
+    },
+    "eligible": true,
+    "expected": "$existing"
+  },
+  {
+    "caseId": "survey-unknown-offer",
+    "profileId": "elara",
+    "channel": "quest_offer",
+    "topicId": "frontier_cartography",
+    "state": {},
+    "eligible": true,
+    "expected": "$existing"
+  },
+  {
+    "caseId": "survey-progress",
+    "profileId": "elara",
+    "channel": "quest_progress",
+    "topicId": "frontier_cartography",
+    "state": {
+      "quest.active:frontier_cartography": true,
+      "quest.ready:frontier_cartography": false
+    },
+    "eligible": true,
+    "expected": "elara.survey.progress"
+  },
+  {
+    "caseId": "survey-unknown-progress",
+    "profileId": "elara",
+    "channel": "quest_progress",
+    "topicId": "frontier_cartography",
+    "state": {
+      "quest.active:frontier_cartography": true
+    },
+    "eligible": true,
+    "expected": "$existing"
+  },
+  {
+    "caseId": "survey-ready",
+    "profileId": "elara",
+    "channel": "quest_ready",
+    "topicId": "frontier_cartography",
+    "state": {
+      "quest.active:frontier_cartography": true,
+      "quest.ready:frontier_cartography": true
+    },
+    "eligible": true,
+    "expected": "elara.survey.ready"
+  },
+  {
+    "caseId": "survey-not-ready",
+    "profileId": "elara",
+    "channel": "quest_ready",
+    "topicId": "frontier_cartography",
+    "state": {
+      "quest.active:frontier_cartography": true,
+      "quest.ready:frontier_cartography": false
+    },
+    "eligible": true,
+    "expected": "$existing"
+  },
+  {
+    "caseId": "survey-aftermath",
+    "profileId": "elara",
+    "channel": "quest_after",
+    "topicId": "frontier_cartography",
+    "state": {
+      "quest.completed:frontier_cartography": true
+    },
+    "eligible": true,
+    "expected": "elara.survey.after"
+  },
+  {
+    "caseId": "survey-guest-unearned",
+    "profileId": "elara",
+    "channel": "quest_after",
+    "topicId": "frontier_cartography",
+    "state": {
+      "quest.completed:frontier_cartography": false
+    },
+    "eligible": true,
+    "expected": "$existing"
+  },
+  {
+    "caseId": "survey-unknown-aftermath",
+    "profileId": "elara",
+    "channel": "quest_after",
+    "topicId": "frontier_cartography",
+    "state": {},
+    "eligible": true,
+    "expected": "$existing"
+  },
+  {
+    "caseId": "reavers-offer",
+    "profileId": "elara",
+    "channel": "quest_offer",
+    "topicId": "river_reaver_bounty",
+    "state": {
+      "quest.available:river_reaver_bounty": true
+    },
+    "eligible": true,
+    "expected": "elara.reavers.offer"
+  },
+  {
+    "caseId": "reavers-wrong-offer",
+    "profileId": "elara",
+    "channel": "quest_offer",
+    "topicId": "river_reaver_bounty",
+    "state": {
+      "quest.available:river_reaver_bounty": false
+    },
+    "eligible": true,
+    "expected": "$existing"
+  },
+  {
+    "caseId": "reavers-unknown-offer",
+    "profileId": "elara",
+    "channel": "quest_offer",
+    "topicId": "river_reaver_bounty",
+    "state": {},
+    "eligible": true,
+    "expected": "$existing"
+  },
+  {
+    "caseId": "reavers-progress",
+    "profileId": "elara",
+    "channel": "quest_progress",
+    "topicId": "river_reaver_bounty",
+    "state": {
+      "quest.active:river_reaver_bounty": true,
+      "quest.ready:river_reaver_bounty": false
+    },
+    "eligible": true,
+    "expected": "elara.reavers.progress"
+  },
+  {
+    "caseId": "reavers-unknown-progress",
+    "profileId": "elara",
+    "channel": "quest_progress",
+    "topicId": "river_reaver_bounty",
+    "state": {
+      "quest.active:river_reaver_bounty": true
+    },
+    "eligible": true,
+    "expected": "$existing"
+  },
+  {
+    "caseId": "reavers-ready",
+    "profileId": "elara",
+    "channel": "quest_ready",
+    "topicId": "river_reaver_bounty",
+    "state": {
+      "quest.active:river_reaver_bounty": true,
+      "quest.ready:river_reaver_bounty": true
+    },
+    "eligible": true,
+    "expected": "elara.reavers.ready"
+  },
+  {
+    "caseId": "reavers-not-ready",
+    "profileId": "elara",
+    "channel": "quest_ready",
+    "topicId": "river_reaver_bounty",
+    "state": {
+      "quest.active:river_reaver_bounty": true,
+      "quest.ready:river_reaver_bounty": false
+    },
+    "eligible": true,
+    "expected": "$existing"
+  },
+  {
+    "caseId": "reavers-aftermath",
+    "profileId": "elara",
+    "channel": "quest_after",
+    "topicId": "river_reaver_bounty",
+    "state": {
+      "quest.completed:river_reaver_bounty": true
+    },
+    "eligible": true,
+    "expected": "elara.reavers.after"
+  },
+  {
+    "caseId": "reavers-guest-unearned",
+    "profileId": "elara",
+    "channel": "quest_after",
+    "topicId": "river_reaver_bounty",
+    "state": {
+      "quest.completed:river_reaver_bounty": false
+    },
+    "eligible": true,
+    "expected": "$existing"
+  },
+  {
+    "caseId": "reavers-unknown-aftermath",
+    "profileId": "elara",
+    "channel": "quest_after",
+    "topicId": "river_reaver_bounty",
+    "state": {},
+    "eligible": true,
+    "expected": "$existing"
+  },
+  {
+    "caseId": "elara-new-greeting",
+    "profileId": "elara",
+    "channel": "greeting",
+    "topicId": "",
+    "state": {},
+    "eligible": true,
+    "expected": "elara.greeting.public"
+  },
+  {
+    "caseId": "elara-complete-survey-greeting",
+    "profileId": "elara",
+    "channel": "greeting",
+    "topicId": "",
+    "state": {
+      "quest.completed:frontier_cartography": true,
+      "quest.completed:river_reaver_bounty": false
+    },
+    "eligible": true,
+    "expected": "elara.greeting.after-survey"
+  },
+  {
+    "caseId": "elara-complete-bounty-greeting",
+    "profileId": "elara",
+    "channel": "greeting",
+    "topicId": "",
+    "state": {
+      "quest.completed:frontier_cartography": true,
+      "quest.completed:river_reaver_bounty": true
+    },
+    "eligible": true,
+    "expected": "elara.greeting.after-bounty"
+  },
+  {
+    "caseId": "elara-inconsistent-active-completed",
+    "profileId": "elara",
+    "channel": "quest_ready",
+    "topicId": "river_reaver_bounty",
+    "state": {
+      "quest.active:river_reaver_bounty": true,
+      "quest.ready:river_reaver_bounty": true,
+      "quest.completed:river_reaver_bounty": true
+    },
+    "eligible": true,
+    "expected": "$existing"
+  },
+  {
+    "caseId": "elara-unknown-not-host-history",
+    "profileId": "elara",
+    "channel": "quest_after",
+    "topicId": "river_reaver_bounty",
+    "state": {},
+    "eligible": true,
+    "expected": "$existing"
+  },
+  {
+    "caseId": "selvek-alive",
+    "profileId": "selvek",
+    "channel": "encounter_bark",
+    "topicId": "aggro",
+    "state": {
+      "enemy.alive:westbank-reaver-captain": true
+    },
+    "eligible": true,
+    "expected": "selvek.encounter.toll"
+  },
+  {
+    "caseId": "selvek-dead",
+    "profileId": "selvek",
+    "channel": "encounter_bark",
+    "topicId": "aggro",
+    "state": {
+      "enemy.alive:westbank-reaver-captain": false
+    },
+    "eligible": true,
+    "expected": "$none"
+  },
+  {
+    "caseId": "selvek-missing",
+    "profileId": "selvek",
+    "channel": "encounter_bark",
+    "topicId": "aggro",
+    "state": {},
+    "eligible": true,
+    "expected": "$none"
+  },
+  {
+    "caseId": "selvek-no-friendly-greeting",
+    "profileId": "selvek",
+    "channel": "greeting",
+    "topicId": "",
+    "state": {
+      "enemy.alive:westbank-reaver-captain": true
+    },
+    "eligible": true,
+    "expected": "$denied"
+  },
+  {
+    "caseId": "unknown-profile",
+    "profileId": "unknown",
+    "channel": "greeting",
+    "topicId": "",
+    "state": {},
+    "eligible": true,
+    "expected": "$fallback"
+  }
+]

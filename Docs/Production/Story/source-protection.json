@@ -1,0 +1,61 @@
+{
+  "baseCommit": "8ad9071820c2fbed32fbb728122ffb2f02980888",
+  "scene": {
+    "path": "Assets/RPG/Scenes/Outpost-Expanded.unity",
+    "sha256": "7c9a1244d6c63c6f383311eaa041405aada73b7bd373493d2c3393cd9ba2af63",
+    "matchesBaseGitBlob": true
+  },
+  "terrains": [
+    {
+      "path": "Assets/RPG/Terrain/ReaverCamp/Reaver approach preserved final.asset",
+      "sha256": "0d9b4991d077e49b5b3c96ca91b64a1d477f76eb3ec9c811b8bffa41556a4397",
+      "matchesBaseLfsOid": true
+    },
+    {
+      "path": "Assets/RPG/Terrain/ReaverCamp/Reaver approach preserved.asset",
+      "sha256": "44c33d6575016845ede5ed735e38a0ab2fd17ff2f8299cd5a864f5780fba54a3",
+      "matchesBaseLfsOid": true
+    },
+    {
+      "path": "Assets/RPG/Terrain/ReaverCamp/Reaver approach.asset",
+      "sha256": "e98d83bc3119de5cec25336e541675fc609529cdf7f4162a312f4dc23ef4b7c5",
+      "matchesBaseLfsOid": true
+    },
+    {
+      "path": "Assets/RPG/Terrain/ReaverCamp/Westbank crossing protected.asset",
+      "sha256": "5cda8e104878069d3fc9282b68611c33b2abfbcc73ead9453c70d69802c4c66d",
+      "matchesBaseLfsOid": true
+    },
+    {
+      "path": "Assets/RPG/Terrain/WorldExpansion/Expanded atmosphere.asset",
+      "sha256": "1cdab9cd61b3751768b736284557260303c51e00d5858c35d56d65480d339963",
+      "matchesBaseLfsOid": true
+    },
+    {
+      "path": "Assets/RPG/Terrain/WorldExpansion/Westbank river.asset",
+      "sha256": "81c2baa11e3707950e1a8d56a245d0e7ac5adaad4f59ea72a279b7d4018369b0",
+      "matchesBaseLfsOid": true
+    },
+    {
+      "path": "Assets/RPG/Terrain/WorldExpansion/World tile 0-0.asset",
+      "sha256": "b9e57ef716768ebc4f0579b3fecb43ab6928d0ce4d1a8d1d810c586aad659b65",
+      "matchesBaseLfsOid": true
+    },
+    {
+      "path": "Assets/RPG/Terrain/WorldExpansion/World tile 0-1.asset",
+      "sha256": "e8e71afe76879a20ad39db49b5557042b6d1e384b5886d4b24442ca06326e1fd",
+      "matchesBaseLfsOid": true
+    },
+    {
+      "path": "Assets/RPG/Terrain/WorldExpansion/World tile 1-0.asset",
+      "sha256": "8a65ccdd945654f00958a237fc69b9582c4d7ade831b128894fcd189ade88289",
+      "matchesBaseLfsOid": true
+    },
+    {
+      "path": "Assets/RPG/Terrain/WorldExpansion/World tile 1-1.asset",
+      "sha256": "9a794173bd01c1dbff75dfde7c1ec763222a822ac3ea7e07bc7aa4e8d9060fe6",
+      "matchesBaseLfsOid": true
+    }
+  ],
+  "limitations": "Byte identity only; no new Unity tree-count, grounding, collision, traversal or rendered check."
+}

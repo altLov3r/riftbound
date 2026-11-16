@@ -12,6 +12,8 @@ Proposed runtime path after acceptance: Assets/RPG/Resources/Narrative/first-fiv
 
 JSON objects use fixed fields and arrays, suitable for ordinary Unity serializable DTOs; no map/dictionary, polymorphic expression tree, executable condition or dependency is required.
 
+The example below is a one-profile shape excerpt, not a complete passing fixture. The actual schema requires all five profiles; validate first-five.v1.proposed.json rather than this abbreviated excerpt.
+
 ```json
 {
   "schemaVersion": 1,
@@ -60,6 +62,8 @@ Profile IDs and line IDs are content identifiers only, not new NPC/quest/save ID
 Selection input is a resolved eligible actor, requested channel/topic and that interacting viewer's read-only context. Existing modal/dead/range/revive/hostile/action checks run first and stay outside content. Among entries matching all predicates, select highest priority, then lineId Ordinal ascending for deterministic safety. Authoring validation rejects equal-priority overlapping entries in the same profile/channel/topic; deterministic tie behavior is a fallback, not authoring practice. No cross-channel race where a greeting replaces a quest body.
 
 No match: for greeting/public_topic use that profile's safe fallbackText; for main/quest surfaces leave the current operational text/title intact. For encounter_bark return no line and preserve existing combat behavior. Unknown actor/profile: safe neutral greeting and existing service options; do not re-enter copied broad-name/role lore branches. Catalog errors cannot enable interaction or hide a legal service.
+
+First-slice content channels are deliberately limited: Abe=greeting/main_title/main_body/public_topic; Rowan/Mira=greeting/public_topic; Elara=greeting/quest_offer/quest_progress/quest_ready/quest_after/public_topic for frontier_cartography and river_reaver_bounty; Selvek=encounter_bark only. The source's separate Abe faction dispatch remains unchanged rather than acquiring a new main-chain prerequisite. Main title text retains the four actual PlayerProgress.QuestName values. Any broader profile/channel combination needs a reviewed scope/version, not an authoring workaround.
 
 ## Closed condition set and existing source mapping
 

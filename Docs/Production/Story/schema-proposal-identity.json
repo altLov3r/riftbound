@@ -1,0 +1,25 @@
+{
+  "proposalVersion": 1,
+  "baseCommit": "8ad9071820c2fbed32fbb728122ffb2f02980888",
+  "catalogId": "riftbound.first-five.v1",
+  "adapterDecision": "PENDING",
+  "runtimePromotionAllowed": false,
+  "artifacts": [
+    {
+      "path": "Docs/Production/Story/CATALOG_CONTRACT_V1.md",
+      "sha256": "8d88fd16f18042a793acf1d8d0f7e4b6b33f12a8f53b10080dc95410a65d971d"
+    },
+    {
+      "path": "Docs/Production/Story/first-five.schema.json",
+      "sha256": "a894d204bfd497acb2dd986fffa3d0804db2ea04bc5cae8ba7b46ea850b24e10"
+    },
+    {
+      "path": "Docs/Production/Story/first-five.v1.proposed.json",
+      "sha256": "7f27e2a2ccb65c55d362a31991fd2d4cb4f7416cb1738737972f6e98fdf70a15"
+    },
+    {
+      "path": "Docs/Production/Story/selection-fixtures.json",
+      "sha256": "5776ea3ae23d56821ebc27b716ada0cceafeabdbe9033bebc56216a2c6775246"
+    }
+  ]
+}

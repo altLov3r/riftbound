@@ -1,0 +1,788 @@
+{
+  "schemaVersion": 1,
+  "catalogId": "riftbound.first-five.v1",
+  "profiles": [
+    {
+      "profileId": "abe",
+      "actorKind": "main_quest_giver",
+      "legacyName": "Abe",
+      "enemyId": "",
+      "fallbackText": "Keep the road clear, and come back safely.",
+      "entries": [
+        {
+          "lineId": "abe.greeting.public",
+          "channel": "greeting",
+          "scope": "public",
+          "topicId": "",
+          "priority": 10,
+          "conditions": [],
+          "text": "Keep the road clear, and come back safely."
+        },
+        {
+          "lineId": "abe.greeting.after-main",
+          "channel": "greeting",
+          "scope": "viewer",
+          "topicId": "",
+          "priority": 60,
+          "conditions": [
+            {
+              "field": "main.complete",
+              "key": "",
+              "boolValue": true,
+              "intValue": 0
+            }
+          ],
+          "text": "You did the work and came back. That matters more than a tidy report."
+        },
+        {
+          "lineId": "abe.main0.title",
+          "channel": "main_title",
+          "scope": "viewer",
+          "topicId": "",
+          "priority": 50,
+          "conditions": [
+            {
+              "field": "main.index",
+              "key": "",
+              "boolValue": false,
+              "intValue": 0
+            },
+            {
+              "field": "main.complete",
+              "key": "",
+              "boolValue": false,
+              "intValue": 0
+            }
+          ],
+          "text": "The Forest Road"
+        },
+        {
+          "lineId": "abe.main1.title",
+          "channel": "main_title",
+          "scope": "viewer",
+          "topicId": "",
+          "priority": 50,
+          "conditions": [
+            {
+              "field": "main.index",
+              "key": "",
+              "boolValue": false,
+              "intValue": 1
+            },
+            {
+              "field": "main.complete",
+              "key": "",
+              "boolValue": false,
+              "intValue": 0
+            }
+          ],
+          "text": "Stolen Supplies"
+        },
+        {
+          "lineId": "abe.main2.title",
+          "channel": "main_title",
+          "scope": "viewer",
+          "topicId": "",
+          "priority": 50,
+          "conditions": [
+            {
+              "field": "main.index",
+              "key": "",
+              "boolValue": false,
+              "intValue": 2
+            },
+            {
+              "field": "main.complete",
+              "key": "",
+              "boolValue": false,
+              "intValue": 0
+            }
+          ],
+          "text": "The Ashwood Captain"
+        },
+        {
+          "lineId": "abe.main3.title",
+          "channel": "main_title",
+          "scope": "viewer",
+          "topicId": "",
+          "priority": 50,
+          "conditions": [
+            {
+              "field": "main.index",
+              "key": "",
+              "boolValue": false,
+              "intValue": 3
+            },
+            {
+              "field": "main.complete",
+              "key": "",
+              "boolValue": true,
+              "intValue": 0
+            }
+          ],
+          "text": "Hero of Emberwatch"
+        },
+        {
+          "lineId": "abe.main0.offer",
+          "channel": "main_body",
+          "scope": "viewer",
+          "topicId": "",
+          "priority": 50,
+          "conditions": [
+            {
+              "field": "main.index",
+              "key": "",
+              "boolValue": false,
+              "intValue": 0
+            },
+            {
+              "field": "main.complete",
+              "key": "",
+              "boolValue": false,
+              "intValue": 0
+            },
+            {
+              "field": "main.accepted",
+              "key": "",
+              "boolValue": false,
+              "intValue": 0
+            },
+            {
+              "field": "main.ready",
+              "key": "",
+              "boolValue": false,
+              "intValue": 0
+            }
+          ],
+          "text": "The road carries our flour and medicine. Defeat three forest raiders along the north road, then return to me. I will see that the work is paid."
+        },
+        {
+          "lineId": "abe.main0.progress",
+          "channel": "main_body",
+          "scope": "viewer",
+          "topicId": "",
+          "priority": 70,
+          "conditions": [
+            {
+              "field": "main.index",
+              "key": "",
+              "boolValue": false,
+              "intValue": 0
+            },
+            {
+              "field": "main.complete",
+              "key": "",
+              "boolValue": false,
+              "intValue": 0
+            },
+            {
+              "field": "main.accepted",
+              "key": "",
+              "boolValue": true,
+              "intValue": 0
+            },
+            {
+              "field": "main.ready",
+              "key": "",
+              "boolValue": false,
+              "intValue": 0
+            }
+          ],
+          "text": "The north road still needs your help. Deal with three forest raiders and come back safely. A signature cannot protect the next wagon on its own."
+        },
+        {
+          "lineId": "abe.main0.ready",
+          "channel": "main_body",
+          "scope": "viewer",
+          "topicId": "",
+          "priority": 90,
+          "conditions": [
+            {
+              "field": "main.index",
+              "key": "",
+              "boolValue": false,
+              "intValue": 0
+            },
+            {
+              "field": "main.complete",
+              "key": "",
+              "boolValue": false,
+              "intValue": 0
+            },
+            {
+              "field": "main.accepted",
+              "key": "",
+              "boolValue": true,
+              "intValue": 0
+            },
+            {
+              "field": "main.ready",
+              "key": "",
+              "boolValue": true,
+              "intValue": 0
+            }
+          ],
+          "text": "The raiders are dealt with. Let me hand you the agreed pay; the people waiting on that road will feel the difference."
+        },
+        {
+          "lineId": "abe.main1.offer",
+          "channel": "main_body",
+          "scope": "viewer",
+          "topicId": "",
+          "priority": 50,
+          "conditions": [
+            {
+              "field": "main.index",
+              "key": "",
+              "boolValue": false,
+              "intValue": 1
+            },
+            {
+              "field": "main.complete",
+              "key": "",
+              "boolValue": false,
+              "intValue": 0
+            },
+            {
+              "field": "main.accepted",
+              "key": "",
+              "boolValue": false,
+              "intValue": 0
+            },
+            {
+              "field": "main.ready",
+              "key": "",
+              "boolValue": false,
+              "intValue": 0
+            }
+          ],
+          "text": "The raiders have taken supplies meant for the village. Recover three supply crates from the Ashwood camp east of the road, then bring them back. We will count what actually arrived."
+        },
+        {
+          "lineId": "abe.main1.progress",
+          "channel": "main_body",
+          "scope": "viewer",
+          "topicId": "",
+          "priority": 70,
+          "conditions": [
+            {
+              "field": "main.index",
+              "key": "",
+              "boolValue": false,
+              "intValue": 1
+            },
+            {
+              "field": "main.complete",
+              "key": "",
+              "boolValue": false,
+              "intValue": 0
+            },
+            {
+              "field": "main.accepted",
+              "key": "",
+              "boolValue": true,
+              "intValue": 0
+            },
+            {
+              "field": "main.ready",
+              "key": "",
+              "boolValue": false,
+              "intValue": 0
+            }
+          ],
+          "text": "Search the Ashwood camp east of the road for three supply crates. Check the stores themselves, not just their painted marks, and return when you have them."
+        },
+        {
+          "lineId": "abe.main1.ready",
+          "channel": "main_body",
+          "scope": "viewer",
+          "topicId": "",
+          "priority": 90,
+          "conditions": [
+            {
+              "field": "main.index",
+              "key": "",
+              "boolValue": false,
+              "intValue": 1
+            },
+            {
+              "field": "main.complete",
+              "key": "",
+              "boolValue": false,
+              "intValue": 0
+            },
+            {
+              "field": "main.accepted",
+              "key": "",
+              "boolValue": true,
+              "intValue": 0
+            },
+            {
+              "field": "main.ready",
+              "key": "",
+              "boolValue": true,
+              "intValue": 0
+            }
+          ],
+          "text": "The missing crates are accounted for. These stores belong on our shelves. Your pay is ready, as promised."
+        },
+        {
+          "lineId": "abe.main2.offer",
+          "channel": "main_body",
+          "scope": "viewer",
+          "topicId": "",
+          "priority": 50,
+          "conditions": [
+            {
+              "field": "main.index",
+              "key": "",
+              "boolValue": false,
+              "intValue": 2
+            },
+            {
+              "field": "main.complete",
+              "key": "",
+              "boolValue": false,
+              "intValue": 0
+            },
+            {
+              "field": "main.accepted",
+              "key": "",
+              "boolValue": false,
+              "intValue": 0
+            },
+            {
+              "field": "main.ready",
+              "key": "",
+              "boolValue": false,
+              "intValue": 0
+            }
+          ],
+          "text": "The Ashwood Captain directs the attacks from the ruined watchtower northeast of camp. Defeat him so the road can stay open. His heavy strike has a warning: move out of the red circle before it lands."
+        },
+        {
+          "lineId": "abe.main2.progress",
+          "channel": "main_body",
+          "scope": "viewer",
+          "topicId": "",
+          "priority": 70,
+          "conditions": [
+            {
+              "field": "main.index",
+              "key": "",
+              "boolValue": false,
+              "intValue": 2
+            },
+            {
+              "field": "main.complete",
+              "key": "",
+              "boolValue": false,
+              "intValue": 0
+            },
+            {
+              "field": "main.accepted",
+              "key": "",
+              "boolValue": true,
+              "intValue": 0
+            },
+            {
+              "field": "main.ready",
+              "key": "",
+              "boolValue": false,
+              "intValue": 0
+            }
+          ],
+          "text": "The Ashwood Captain still holds the ruined watchtower northeast of camp. Watch his heavy strike, make your opening, and return once he is defeated."
+        },
+        {
+          "lineId": "abe.main2.ready",
+          "channel": "main_body",
+          "scope": "viewer",
+          "topicId": "",
+          "priority": 90,
+          "conditions": [
+            {
+              "field": "main.index",
+              "key": "",
+              "boolValue": false,
+              "intValue": 2
+            },
+            {
+              "field": "main.complete",
+              "key": "",
+              "boolValue": false,
+              "intValue": 0
+            },
+            {
+              "field": "main.accepted",
+              "key": "",
+              "boolValue": true,
+              "intValue": 0
+            },
+            {
+              "field": "main.ready",
+              "key": "",
+              "boolValue": true,
+              "intValue": 0
+            }
+          ],
+          "text": "The Ashwood Captain has fallen. You have earned the agreed reward, including Emberwatch's axe and sigil. Let us finish the account properly."
+        },
+        {
+          "lineId": "abe.main3.complete",
+          "channel": "main_body",
+          "scope": "viewer",
+          "topicId": "",
+          "priority": 60,
+          "conditions": [
+            {
+              "field": "main.index",
+              "key": "",
+              "boolValue": false,
+              "intValue": 3
+            },
+            {
+              "field": "main.complete",
+              "key": "",
+              "boolValue": true,
+              "intValue": 0
+            }
+          ],
+          "text": "The village has its supplies, and the raiders have lost their hold on the road. You kept your promise. Keep asking whether an account matches the people it is meant to protect."
+        },
+        {
+          "lineId": "abe.topic.truce",
+          "channel": "public_topic",
+          "scope": "public",
+          "topicId": "roadward-truce",
+          "priority": 40,
+          "conditions": [],
+          "text": "The Roadward Truce lets people from either side protect these roads together. It does not settle every old argument. It asks us to get our neighbours home before we start another one."
+        },
+        {
+          "lineId": "abe.topic.work",
+          "channel": "public_topic",
+          "scope": "public",
+          "topicId": "road-work",
+          "priority": 40,
+          "conditions": [],
+          "text": "A roadwarden counts the wagons that reach the next hearth, not just the seals sent with them. Ask Rowan what the village still lacks before deciding a road is safe."
+        }
+      ]
+    },
+    {
+      "profileId": "rowan",
+      "actorKind": "merchant",
+      "legacyName": "Quartermaster Rowan",
+      "enemyId": "",
+      "fallbackText": "Count what arrived, not just what was promised.",
+      "entries": [
+        {
+          "lineId": "rowan.greeting.public",
+          "channel": "greeting",
+          "scope": "public",
+          "topicId": "",
+          "priority": 10,
+          "conditions": [],
+          "text": "Signatures do not fill shelves. Count what arrived, not just what was promised."
+        },
+        {
+          "lineId": "rowan.topic.supplies",
+          "channel": "public_topic",
+          "scope": "public",
+          "topicId": "supplies",
+          "priority": 40,
+          "conditions": [],
+          "text": "I have accounts signed for stores that never reached these shelves. Abe can tell you about work on the road. Trade if you need supplies; buying something is not a condition of helping us."
+        },
+        {
+          "lineId": "rowan.topic.receipts",
+          "channel": "public_topic",
+          "scope": "public",
+          "topicId": "receipts",
+          "priority": 40,
+          "conditions": [],
+          "text": "A useful receipt can be checked against a wagon and its crew. If the numbers disagree, keep both accounts until someone can explain why."
+        }
+      ]
+    },
+    {
+      "profileId": "mira",
+      "actorKind": "merchant",
+      "legacyName": "Provisioner Mira",
+      "enemyId": "",
+      "fallbackText": "Take a moment; trade when you are ready.",
+      "entries": [
+        {
+          "lineId": "mira.greeting.public",
+          "channel": "greeting",
+          "scope": "public",
+          "topicId": "",
+          "priority": 10,
+          "conditions": [],
+          "text": "A road crew cannot live on assurances. Take a moment; trade when you are ready."
+        },
+        {
+          "lineId": "mira.topic.workers",
+          "channel": "public_topic",
+          "scope": "public",
+          "topicId": "road-crews",
+          "priority": 40,
+          "conditions": [],
+          "text": "Elara checks the route marks. I check that the people sent to find them have something to eat. Neither job is finished by signing the other's name."
+        },
+        {
+          "lineId": "mira.topic.trust",
+          "channel": "public_topic",
+          "scope": "public",
+          "topicId": "fair-trade",
+          "priority": 40,
+          "conditions": [],
+          "text": "A fair bargain leaves both people able to say no. Keep your receipt, and do not mistake an unpaid favour for an order."
+        }
+      ]
+    },
+    {
+      "profileId": "elara",
+      "actorKind": "faction_quest_giver",
+      "legacyName": "Cartographer Elara",
+      "enemyId": "",
+      "fallbackText": "A route is not true because I drew it. Ask the person who walked it.",
+      "entries": [
+        {
+          "lineId": "elara.greeting.public",
+          "channel": "greeting",
+          "scope": "public",
+          "topicId": "",
+          "priority": 10,
+          "conditions": [],
+          "text": "A route is not true because I drew it. Ask the person who walked it."
+        },
+        {
+          "lineId": "elara.greeting.after-survey",
+          "channel": "greeting",
+          "scope": "viewer",
+          "topicId": "",
+          "priority": 60,
+          "conditions": [
+            {
+              "field": "quest.completed",
+              "key": "frontier_cartography",
+              "boolValue": true,
+              "intValue": 0
+            },
+            {
+              "field": "quest.completed",
+              "key": "river_reaver_bounty",
+              "boolValue": false,
+              "intValue": 0
+            }
+          ],
+          "text": "Your observations gave us something a copied manifest could not. Keep the original marks; I still have questions about the western crossing."
+        },
+        {
+          "lineId": "elara.greeting.after-bounty",
+          "channel": "greeting",
+          "scope": "viewer",
+          "topicId": "",
+          "priority": 70,
+          "conditions": [
+            {
+              "field": "quest.completed",
+              "key": "river_reaver_bounty",
+              "boolValue": true,
+              "intValue": 0
+            }
+          ],
+          "text": "Your work at the crossing is recorded. We should keep an honest account of what happened, including the people whose testimony was ignored."
+        },
+        {
+          "lineId": "elara.survey.offer",
+          "channel": "quest_offer",
+          "scope": "viewer",
+          "topicId": "frontier_cartography",
+          "priority": 50,
+          "conditions": [
+            {
+              "field": "quest.available",
+              "key": "frontier_cartography",
+              "boolValue": true,
+              "intValue": 0
+            }
+          ],
+          "text": "Survey Westbank Overlook, Bloodrock Vista and Wyrmcrest Lookout, then return to me at Greenhollow Post. I need three independent observations to compare with the frontier's copied records. Earlier discoveries still count."
+        },
+        {
+          "lineId": "elara.survey.progress",
+          "channel": "quest_progress",
+          "scope": "viewer",
+          "topicId": "frontier_cartography",
+          "priority": 70,
+          "conditions": [
+            {
+              "field": "quest.active",
+              "key": "frontier_cartography",
+              "boolValue": true,
+              "intValue": 0
+            },
+            {
+              "field": "quest.ready",
+              "key": "frontier_cartography",
+              "boolValue": false,
+              "intValue": 0
+            }
+          ],
+          "text": "Compare the marks at Westbank Overlook, Bloodrock Vista and Wyrmcrest Lookout. Bring your observations back to Greenhollow Post once all three existing sites are surveyed."
+        },
+        {
+          "lineId": "elara.survey.ready",
+          "channel": "quest_ready",
+          "scope": "viewer",
+          "topicId": "frontier_cartography",
+          "priority": 90,
+          "conditions": [
+            {
+              "field": "quest.active",
+              "key": "frontier_cartography",
+              "boolValue": true,
+              "intValue": 0
+            },
+            {
+              "field": "quest.ready",
+              "key": "frontier_cartography",
+              "boolValue": true,
+              "intValue": 0
+            }
+          ],
+          "text": "All three sites are recorded. Your observations can now be checked against one another instead of repeating one untested account. We can finish the survey here."
+        },
+        {
+          "lineId": "elara.survey.after",
+          "channel": "quest_after",
+          "scope": "viewer",
+          "topicId": "frontier_cartography",
+          "priority": 60,
+          "conditions": [
+            {
+              "field": "quest.completed",
+              "key": "frontier_cartography",
+              "boolValue": true,
+              "intValue": 0
+            }
+          ],
+          "text": "Independent observations survive disagreement better than a copied seal. Thank you for giving me something I can verify."
+        },
+        {
+          "lineId": "elara.reavers.offer",
+          "channel": "quest_offer",
+          "scope": "viewer",
+          "topicId": "river_reaver_bounty",
+          "priority": 50,
+          "conditions": [
+            {
+              "field": "quest.available",
+              "key": "river_reaver_bounty",
+              "boolValue": true,
+              "intValue": 0
+            }
+          ],
+          "text": "Captain Selvek and the River Reavers are taking a violent toll on the western bank, north of the Westbank bridge near Willow Rest. Defeat the captain and return to me at Greenhollow Post. His lockbox can be opened after his defeat."
+        },
+        {
+          "lineId": "elara.reavers.progress",
+          "channel": "quest_progress",
+          "scope": "viewer",
+          "topicId": "river_reaver_bounty",
+          "priority": 70,
+          "conditions": [
+            {
+              "field": "quest.active",
+              "key": "river_reaver_bounty",
+              "boolValue": true,
+              "intValue": 0
+            },
+            {
+              "field": "quest.ready",
+              "key": "river_reaver_bounty",
+              "boolValue": false,
+              "intValue": 0
+            }
+          ],
+          "text": "Selvek's camp lies on the western bank north of the Westbank crossing. Defeat Captain Selvek, then return to Greenhollow Post. Keep the crossing and your retreat clear."
+        },
+        {
+          "lineId": "elara.reavers.ready",
+          "channel": "quest_ready",
+          "scope": "viewer",
+          "topicId": "river_reaver_bounty",
+          "priority": 90,
+          "conditions": [
+            {
+              "field": "quest.active",
+              "key": "river_reaver_bounty",
+              "boolValue": true,
+              "intValue": 0
+            },
+            {
+              "field": "quest.ready",
+              "key": "river_reaver_bounty",
+              "boolValue": true,
+              "intValue": 0
+            }
+          ],
+          "text": "The captain is defeated. The people he threatened deserve a safe crossing. Let us settle your bounty through the proper account; the remaining discrepancies still need honest investigation."
+        },
+        {
+          "lineId": "elara.reavers.after",
+          "channel": "quest_after",
+          "scope": "viewer",
+          "topicId": "river_reaver_bounty",
+          "priority": 60,
+          "conditions": [
+            {
+              "field": "quest.completed",
+              "key": "river_reaver_bounty",
+              "boolValue": true,
+              "intValue": 0
+            }
+          ],
+          "text": "Your bounty is recorded. Stopping a violent toll does not make every account honest. We can protect travellers and still ask whose testimony was refused."
+        },
+        {
+          "lineId": "elara.topic.method",
+          "channel": "public_topic",
+          "scope": "public",
+          "topicId": "cartography",
+          "priority": 40,
+          "conditions": [],
+          "text": "Mark what you can observe. Keep a witness's account separate from an official claim. If they disagree, write down the disagreement before choosing an explanation."
+        }
+      ]
+    },
+    {
+      "profileId": "selvek",
+      "actorKind": "hostile_enemy",
+      "legacyName": "Captain Selvek",
+      "enemyId": "westbank-reaver-captain",
+      "fallbackText": "The crossing is dangerous. Keep your distance.",
+      "entries": [
+        {
+          "lineId": "selvek.encounter.toll",
+          "channel": "encounter_bark",
+          "scope": "host_encounter",
+          "topicId": "aggro",
+          "priority": 40,
+          "conditions": [
+            {
+              "field": "enemy.alive",
+              "key": "westbank-reaver-captain",
+              "boolValue": true,
+              "intValue": 0
+            }
+          ],
+          "text": "The crossing takes a toll. Your ledger does not get to count me out."
+        }
+      ]
+    }
+  ]
+}
