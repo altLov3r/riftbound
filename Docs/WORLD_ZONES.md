@@ -1,5 +1,7 @@
 # Expanded world layout
 
+> Production planning update, 2026-11-16: **POST_ONLINE_EXPANSION_PLAN.md** owns the next region briefs and the proposed **Stormglass Reach** addition north of the current map. That fifth tile is design-only, not present in this scene. Current targeted cache/bridge/settlement repairs are tracked in **Overnight/OWN_CODEX_RUN.md** and its final handoff. Never rerun the generator below over those authored edits.
+
 The new world is authored into **Outpost-Expanded.unity**. The original Updated scene and its terrain remain available. Four connected 384-metre heightfield tiles cover **768 × 768 metres**, from x=-320 to 448 and z=-160 to 608. The original terrain covered 240 × 380 metres; the old gameplay boundary was approximately 160 × 300 metres.
 
 ## Zone plan

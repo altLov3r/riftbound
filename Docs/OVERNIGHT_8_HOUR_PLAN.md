@@ -2,6 +2,8 @@
 
 Prepared 2026-11-16, Europe/Sofia. This is an execution plan, not a claim that an overnight run has started or that eight uninterrupted hours are guaranteed.
 
+**Follow-on planning update:** **Docs/POST_ONLINE_EXPANSION_PLAN.md** extends the roadmap after this shift. It preserves this shift's deadline/freeze and completed packets. Antigravity's latest handoff reports its automated online matrix complete, with manual GUI/two-PC acceptance still NOT RUN. Its next assignment is GP00–GP03 gameplay quality, not restarting A00. Codex finishes C07/CW00 before taking a new world-production session. New task prompts are appended to OVERNIGHT_PROMPTS.md.
+
 ## 1. Mission and starting point
 
 Deliver a visibly better world and a more reliable online adventure, with independently testable branches and clear morning handoffs. Complete small player-visible improvements rather than spending the night rebuilding plans, generating unnecessary frameworks or rerunning the same smoke test.

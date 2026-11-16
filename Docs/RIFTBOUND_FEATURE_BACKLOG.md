@@ -4,6 +4,8 @@ Revision 1 · 2026-11-15 · Design targets and implementation work, not delivere
 
 This is the detailed expansion of RIFTBOUND_MASTER_PLAN.md. It maps a much larger game while keeping implementation ordered. Read the master plan for architecture, the online work order for connection details, and current status/audit files for evidence. Do not start by adding more menus or treating existing prototype scripts as finished systems.
 
+**Active production queue, 2026-11-16:** **Docs/POST_ONLINE_EXPANSION_PLAN.md** adds concrete GP/CW work packets, reference-route coordinates, a region-by-region delivery specification and EX-* implementation slices. Use it to select the next packet from this larger backlog. Antigravity's completed automated online work is preserved; manual GUI/two-PC acceptance remains pending. Codex's applied Reaver repair must not be repeated.
+
 ## 1. What the finished game should offer
 
 An original third-person fantasy RPG where a player chooses a faction, race and class, enters a coherent inhabited world, completes regional stories, earns equipment and unlocks, and explores with up to three friends through online join codes. The game should work offline, feel responsive, preserve progress according to its disclosed save policy and provide replayable cooperative encounters.
@@ -1019,6 +1021,8 @@ Each released feature must address all applicable columns; use N/A with a reason
 
 ### First twelve implementation packets
 
+Historical initial ordering; use the post-online production queue for current execution. In particular, packet 4's Reaver repair is already applied. Verify its preservation; do not recreate it. Gemini's next implementation priority is GP01 locomotion/facing, followed by GP02 controls/camera and GP03 interaction clarity; Codex closes its current world build before taking CW01–CW03 in a new session.
+
 1. Reconcile latest source/status and finish the remaining external online acceptance requests.
 2. Run a normal-input two-player quest/loot/respawn/mount session, repairing correctness rather than adding features.
 3. Verify late join, host/client leave and repeated UI session cycles; record four-player tests distinctly from ordinary playthrough.
@@ -1064,3 +1068,21 @@ Next smallest exact action:
 ```
 
 Keep the game's long-term scope ambitious and the next change concrete. Complete connected, tested experiences before adding another unfinished system.
+
+## 21. Post-online execution expansion
+
+The production supplement maps the existing epics into two independent lanes:
+
+| Delivery | Backlog areas | Active owner / next proof |
+| --- | --- | --- |
+| Responsive characters | MOVE, ANIM, CAMERA, ENEMY | Gemini GP01–GP02; actual motion/facing review and relevant online regression. |
+| Clear interaction and first adventure | TALK, QUEST, UI, ACCESS | Gemini GP03–GP05; ordinary player input through existing progression. |
+| Combat/class/loot quality | FIGHT, FX, SOUND, CLASS, ITEM, ECON | Gemini GP04/06/08/10/11; valid/invalid outcomes and authoritative state preserved. |
+| Complete reference routes | GROUND, TRAVEL, TOOL | Codex CW00–CW03; protection, visual/geometry/input evidence kept distinct. |
+| Inhabited settlement chain | TOWN, NATURE, STORY, REGION | Codex CW04–CW10; coherent approved placements plus shared content contracts. |
+| Regional campaign expansion | STORY, QUEST, LIFE, EVENTS | Coordinated location/runtime contracts; one complete arc at a time. |
+| Compact RPG systems | HERO, CLASS, BUILD, CRAFT, CRYPT | Gates M4/M5; supported roster, useful profession loop and one finished dungeon. |
+| Actual geographic expansion | REGION, GROUND, LIGHT, PERF | Codex CW13 proposal outside current world bounds; separate terrain/scene admission approval. |
+| Release and diploma | QA, SHIP, DIPLOMA | Combined acceptance only after authorized integration; fresh build/evidence/fallback. |
+
+The EX-C/Q/W/E/D/U tables in the supplement specify smaller features, dependencies and completion checks. They extend this backlog; they do not mark tickets complete, authorize mass scene edits, add a backend or reset an overnight deadline.

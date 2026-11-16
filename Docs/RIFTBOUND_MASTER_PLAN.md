@@ -6,6 +6,8 @@ Revision 1 · 2026-11-15 · Planning document, not a completion report.
 
 > Next bounded development shift: **Docs/OVERNIGHT_8_HOUR_PLAN.md**, with separate Codex/Antigravity ownership, eight elapsed-hour work packets and release gates. Copyable start/continuation prompts: **Docs/OVERNIGHT_PROMPTS.md**. These files do not start or schedule a run by themselves.
 
+> **2026-11-16 production update:** Read **Docs/POST_ONLINE_EXPANSION_PLAN.md** for the inspected overnight baseline, GP00–GP15 gameplay queue, CW00–CW15 world queue, expanded regional/system deliveries and ownership contracts. Antigravity's handoff reports broad automated online verification; manual GUI adventure and two-PC cross-network acceptance remain NOT RUN. Do not restart online foundation work or redo the applied Reaver repair because older snapshots below describe them as pending.
+
 ## 1. Purpose, authority and how to use this plan
 
 Build an original, stylized fantasy RPG with two factions, distinct playable races/classes, an authored world and private online cooperative play. Keep the scope approachable in its first release while mapping the larger game's full development path.
@@ -734,6 +736,8 @@ These are optional expansions after their prerequisites pass, not hidden release
 | PvP/battlegrounds | Trusted combat and explicit rules | Opt-in duel sandbox, then balanced small match. |
 
 ## 32. First work packets for Antigravity
+
+**Superseding next-work order, 2026-11-16:** the overnight online branch reports completion of its automated matrix. Preserve that milestone. Start **GP00–GP03 in POST_ONLINE_EXPANSION_PLAN.md**: gameplay baseline, locomotion/facing diagnosis, controls/camera and contextual interactions. Continue into first-adventure quality and readable combat after verifying each packet. Historical steps below explain the original dependency order; they are not instructions to repeat already-passed smoke tests. Cross-PC and manual acceptance remain explicit external gaps.
 
 1. Read latest IMPLEMENTATION_STATUS and online work order. Verify source, not only claims; inventory remaining O-05 acceptance gaps.
 2. Finish actual internet/session correctness and reproduce client combat/quest/reward behavior with normal input. Respect anti-loop limits.
