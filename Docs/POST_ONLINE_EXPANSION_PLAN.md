@@ -82,6 +82,8 @@ Start with GP01, then GP02 and GP03. Inspect before changing anything; an alread
 
 GP01 diagnostic receipt must include actor/model/clip names, current forward axes, root-motion setting, active state/transition and a short reproduction. Quantify foot sliding against ground/stride where captures permit. Do not claim that a state name or loop flag proves animation quality.
 
+**Concrete GP07 repro, 2026-11-16 07:39 Sofia:** Codex world standalone from 9c632c9 launched and rendered title/character selection at 1280x720. Session-mode labels are visibly clipped in their narrow buttons. Reproduce on Gemini's newer runtime branch before fixing; the observation does not establish that its latest UI has the same defect. Character preview rendered; no character was entered or save edited during this check.
+
 ## 5. Codex current finish and next world assignment
 
 The current overnight run finishes CW00 only. CW01 onward is the next production queue, subject to the scope/scene gates below.

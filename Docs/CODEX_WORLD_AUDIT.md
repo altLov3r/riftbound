@@ -320,3 +320,33 @@ Still requires user acceptance: normal-input movement/riding, affected-tree/came
 - Applied receipt, full regression, audit and build receipts are in .code-check; no multiplayer/session/combat/progression source changed. Source scene differs from backup only in two terrain-data reference lines; both original terrain files remain byte-identical after the build.
 
 **SCENE RELEASED — Codex finished the approved localized Reaver repair and verification/build window on 2026-11-16.** No further shared-scene/terrain edits are pending in this work packet. Next external acceptance: user normal-input playtest, including the Reaver trail on foot/mount and two-PC online session. Cache/bridge placement corrections require their own scoped authorization.
+
+## Overnight isolated world follow-up — 2026-11-16
+
+Applies to **Overnight/codex-world**, branch **overnight/codex-world-20261116**, not the unchanged original shared checkout. The user's Start Codex prompt authorized the targeted cache/bridge/fence/gate/arrival work. Original shift deadline remains 08:36:39 Europe/Sofia; no new feature work after its freeze. Full ledger: Docs/Overnight/OWN_CODEX_RUN.md.
+
+### Applied and checkpointed
+
+- Willow Rest cache root moved from (-285,9.22,60) to (-291,7.19,52.5), supported over the sloped footprint by a low matching stone footing. Persistent ID, rewards and lid hierarchy preserved.
+- Existing bridge deck top y=6.0 had bank intrusions up to approximately y=8.55. New **ReaverCamp/Westbank crossing protected.asset** caps only the excessive bank heights within x[-274,-237],z[45,55]; 377 samples changed, no low riverbed changes. Terrain and TerrainCollider share the new protected asset. Six existing supports grounded/extended; deck/rails retained.
+- Exactly two Emberwatch west fence segments retained but inactive for an intentional exit. Added three narrow, ground-conforming footway meshes for departure, Highspire's actual north gate and Greenhollow arrival. No major buildings/well/walls/actors moved or recreated.
+- Highspire route X/Z: (-200,-60),(-202.5,-57.5),(-204,-15),(-225,0). Greenhollow arrival X/Z: (-17,368),(-27,386),(-36,395), beside the existing marker. Runtime map/navigation adoption belongs to Gemini; no runtime files were edited here.
+
+### Current evidence
+
+- **145 PASS / 0 FAIL** in fresh isolated QuestRouteSmokeTest; existing separate-terrain assertion unchanged. Includes queued W-input movement, not a normal-input full route.
+- **20 REACHED / 0 BLOCKED** real-scene CharacterController geometry checks: five route sections, walk/mount and both directions; mounted checks include current predictive box sweep. Before/after bridge comparison: four baseline blocked, four repaired reached.
+- Saved/reimported terrain protection: 813 trees, 15 prototypes, 8 layer references, every paint texel/detail density/hole and outside-bank-footprint height preserved. Reaver grade 27.92 degrees. Six original terrain assets match published-base Git/LFS hashes.
+- Four shared edges sampled at 129 points each: maximum delta 0.0000m. Not exhaustive terrain/nav/gameplay proof.
+- Exactly 26 interpolated Reaver tree-review candidates; zero additional bridge candidates over 0.1m. Maximum stored root-to-ground offset 0.000m. Rendered bases/prototype mesh direction and per-instance colliders remain unresolved; no vegetation changed.
+- Read-only renderer pass: 872 classified renderers, no missing terrain, nine elevated component candidates (seven chest lids, two Willow Rest bands). They are supported chest parts; terrain-relative AABBs do not represent root support. No buried candidates within those audited categories. Trees/unclassified props are outside that claim; tilted bush prototype roots are review candidates, not demonstrated errors.
+
+### Limitations and next action
+
+Matched fresh GPU capture stalled once; subsequent geometry/regression work ran headlessly. Full normal-input walking/riding/camera, complete north-road traversal, individual rendered trees, live AI/NavMesh, audio listening and rendered performance comparison are **NOT RUN**. A corrected footway can coexist with older terrain paint; visual road reconciliation is CW01, not silently declared complete. Decorative C05 additions were deferred at feature freeze.
+
+Source/bootstrap/checkpoint commits and the new standalone's final result belong in **Docs/Overnight/OWN_CODEX_HANDOFF.md** when packaging finishes. Current source checkpoint **9c632c9**, planning-only checkpoint **93d1423**. No networking/session UI/combat/progression/LivingWorldEvents edits, no main merge, and no combined-branch acceptance claim.
+
+Packaging completed at **07:37:35 Sofia**: **Builds/OvernightCodexWorld/Riftbound.exe**, **Succeeded / 0 errors / 806 warnings**, 13m30.571s. Known executable/DLL/data files verified and hashed. Fresh standalone title and character-selection preview rendered through actual UI; a clipped session-mode-label issue was recorded for Gemini GP07. No character entered or save changed; preview closed. These two screen checks do not convert the full route/tree/performance NOT RUN items into passes.
+
+**SCENE RELEASED — overnight isolated Codex checkout only, approximately 07:40 Sofia.** Both own build/editor and preview process are closed; source/checks/build identity, integration coordinates and remaining acceptance are in OWN_CODEX_HANDOFF.md. Original shared scene remains unchanged.
