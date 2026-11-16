@@ -29,4 +29,6 @@ Abe's live body/title come from PlayerProgress, not merely QuestGiver serialized
 
 Actual adapter owner must accept the exact contract/schema hashes in its own runtime journal or NARRATIVE_SCHEMA_ACCEPTANCE.md. Starting the other prompt, silence or an internal Codex review does not count. If unsupported, name the field/channel and proposed replacement. Codex can then version/amend the draft and rerun authoring checks. Do not copy a mutually inconsistent parser/data pair into the game.
 
+Proposal hashes use exact UTF-8 LF bytes matching Git attributes. The manifest is portable across Windows/fresh checkouts; do not hash an editor-transformed CRLF copy and call it the accepted artifact. Predicate/source validation remains independent of this byte-identity gate.
+
 After acceptance, promote the exact accepted JSON to the agreed Resources path with metadata preserved; Antigravity alone implements adapter/runtime changes. Existing145/41/32 and relevant final-candidate Relay checks remain runtime integration gates; no historical pass is transferred to unimplemented dialogue.

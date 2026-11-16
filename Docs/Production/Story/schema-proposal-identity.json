@@ -15,11 +15,12 @@
     },
     {
       "path": "Docs/Production/Story/first-five.v1.proposed.json",
-      "sha256": "7f27e2a2ccb65c55d362a31991fd2d4cb4f7416cb1738737972f6e98fdf70a15"
+      "sha256": "9b7e38f26e1153a45c6ce0032ede3dd39acc536e0ba09594561de06e7c5b7f73"
     },
     {
       "path": "Docs/Production/Story/selection-fixtures.json",
-      "sha256": "5776ea3ae23d56821ebc27b716ada0cceafeabdbe9033bebc56216a2c6775246"
+      "sha256": "adf636845713368f289d43626fd1ef119834eb471db7d7b8d844dc50ef025c3e"
     }
-  ]
+  ],
+  "hashFormat": "SHA256 of exact UTF-8 LF bytes, matching Git attributes"
 }
