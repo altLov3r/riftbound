@@ -6,8 +6,8 @@
 - **Preserved Prior Build:** `Builds/OvernightAntigravityOnline/Riftbound.exe` (untouched)
 - **Delivered Standalone Build:** `Builds/ProductionGeminiGameplay/Riftbound.exe`
   - `BUILD_EXIT=0`, `ERROR_MATCHES=0`
-  - `BUILD_FILES=228`, `BUILD_BYTES=542443248`
-  - `EXE_SIZE=667136`, `ASM_SIZE=875520`, `ASM_UTC=2026-11-16T06:34:02.7285476Z`
+  - `BUILD_FILES=228`, `BUILD_BYTES=542443760`
+  - `EXE_SIZE=667136`, `ASM_SIZE=876032`, `ASM_UTC=2026-11-16T06:45:15.5541012Z`
   - `EXE_SHA256=AF88B840E599661AC63FC10AE27AC77DD97CD46B44DF8A7CE60EB0DCFACFC99E`
 
 ## 1. Ownership & Non-Regression Compliance
@@ -32,12 +32,12 @@
 | Packet | Area | Status | Evidence & Notes |
 | --- | --- | --- | --- |
 | GP00 | Branch, Journal, Ownership | VERIFIED | `production/gemini-gameplay-20261116` branched from `f415f351da708b065c3cc1b65d1c1769c48cf577`; `Docs/Production/OWN_GEMINI_GAMEPLAY_RUN.md`. |
-| GP01 | Animation, Stride & Facing | VERIFIED | `RunAudit` (`AUDIT2_EXIT=0`), `RunPlayModeVerify` (`W` `4.41m`, `Run` `animSpd=1.10`, `Walk` `1.08m` `animSpd=1.77`, `RunBack` `1.98m`, strafe `51.9 deg`, turn-in-place `Walk` `75.8 deg`), plus fixed 3D billboard orientation verified in `gp07_hud_1280x720.png`. |
+| GP01 | Animation, Stride & Facing | VERIFIED | `RunAudit` (`AUDIT2_EXIT=0`), `RunPlayModeVerify` (`W` `4.42m`, `Run` `animSpd=1.10`, `Walk` `1.09m` `animSpd=1.77`, `RunBack` `2.00m`, strafe `51.9 deg`, turn-in-place `Walk` `76.3 deg`), plus fixed 3D billboard orientation verified in `gp07_hud_1280x720.png`. |
 | GP02 | Controls, Mounts & Modals | VERIFIED | Unified `AnyBlockingWindowOpen()` gating across `PlayerController`, `PlayerMounts`, `PlayerUtilities`; `/` Walk toggle verified in `RunPlayModeVerify`; `C` reserved for Character Sheet; `AdventurePanels.cs` & `FrontendMenu.DrawControlsPage()` hints aligned; `ChatOpen` & `W` mount-interrupt verified. |
 | GP03 | Deterministic `[E]` Prompt | VERIFIED | `PlayerServices.TryGetBestInteraction` + clean reset across `PrototypeHUD`, `TownNPC`, `NPCGossipWindow`, `CoopWorldManager`; PlayMode out-of-range hint, Abe resolution, `E` open, movement lock (`0.000m`), accept/cursor unlock verified. |
 | GP04 | Combat Guards, Feedback, Blink | VERIFIED | Full-HP `Second Wind` block + Warrior `20 RG` `Whirlwind` verified in PlayMode; `Holy Light` (`3 HP`), `Consecration` (`2 HP`), `ActionBarSystem` tooltips, `FireballSpell.Impact()` co-op FX, and `0.85s` Blink server move window verified across PlayMode & Relay smokes. |
 | GP05 | First Adventure & Journal | VERIFIED | `QuestRouteSmokeTest.Run` (`145 PASS`, `0 FAIL`), `MinimapRadar.TrackMainQuest` verified in `RunPlayModeVerify`; reviewed `QuestJournal.cs`. |
-| GP06 | Enemy & Boss Archetypes | INSPECTED | Reviewed `ApexBossEncounter.cs`, `CathedralBossEncounter.cs`, `WorldBossEncounter.cs`, `EnemyController.cs`; combat/boss progression loops covered in automated route/co-op suites; manual visual boss playthrough `NOT RUN`. |
+| GP06 | Enemy & Boss Archetypes | VERIFIED / INSPECTED | Fixed dead-boss meteor/cast cancellations (`ApexBossEncounter`, `WorldBossEncounter`), phase-locked Malakar/Vael casts (`CathedralBossEncounter`), and offline-only direct boss gold; verified all 3 boss managers, scene refs & phase/dead cast guard in `RunPlayModeVerify`; visual boss playthrough `NOT RUN`. |
 | GP07 | Session Mode `1280x720` Layout | IMPLEMENTED | `FrontendMenu.DrawSessionModePanel` widened `(28, 290, 292, 230)` (`bw=88px`, `fontSize=11`, `padding(4,4,4,4)`) so `"Offline"`, `"Host Online"`, `"Join Online"` fit unclipped; `-coopUiSmoke` passed; live desktop `CopyFromScreen` capture hit Session 0 handle limit (`NOT RUN` visually for IMGUI menu). |
 | GP08 | Settings Audio Persistence | VERIFIED | `SettingsSystem.LoadSettings()`/`SaveSettings()` PlayerPrefs round-trip & `AudioListener.volume` application verified in `RunPlayModeVerify`. |
 | GP09 | Solo Party Companions | VERIFIED | `PartySystem` empty default, opt-in visual follower spawn, and `KickMember` cleanup verified in `RunPlayModeVerify`. |
@@ -45,25 +45,23 @@
 | GP11 | Economy, Shop & Inventory | VERIFIED | Scene `Merchant` interaction (`Trade with Provisioner Mira`), `BuyPotion()`, `BuyVest()`, and `EquipItem("leather-vest")` verified in `RunPlayModeVerify`, plus co-op host-validated transactions in `-coopAuthoritySmoke` & `-coopProgressionSmoke`. |
 | GP12 | Living World Events | VERIFIED | `LivingWorldEvents.TriggerCaravanEvent()` verified in `RunPlayModeVerify`; Caravan/Ambush co-op reward & sync verified in `-coopFullAcceptanceSmoke` & `-coopLateJoinSmoke`. |
 | GP13 | Save Isolation & Session-Only | VERIFIED | `UGS_INIT_IN_OFFLINE_LOG=0` in `QuestRouteSmokeTest.Run`; `PlayerProgress.SaveAdventure` returns `false` cleanly in multiplayer (`CoopSessionConfig.IsMultiplayer`). |
-| GP14 | Standalone & Online Matrix | VERIFIED (Headless) | All 10 headless Relay & UI smoke checks (including 4-player Relay + 5th-player `"session is full"` rejection) passed against final `ProductionGeminiGameplay/Riftbound.exe`. |
+| GP14 | Standalone & Online Matrix | VERIFIED (Headless) | Post-rebuild 7-check suite (including 4-player Relay + 5th-player rejection) passed on `06:45:15Z` `ProductionGeminiGameplay/Riftbound.exe`; `-coopInvalidCodeSmoke`, `-coopResilienceSmoke`, and `-coopLateJoinSmoke` passed on prior `06:34:02Z` build before offline `GP06` boss guard edits. |
 | GP15 | Final Delivery & Docs | VERIFIED | Clean branch `production/gemini-gameplay-20261116`, journal + handoff synced with post-final-edit results. |
 
 ## 4. Post-Final-Edit Verification Ledger
-1. **Build:** `Riftbound.Editor.CoopPrefabSetup.BuildProductionGeminiGameplay` -> `BUILD_EXIT=0`, `ERROR_MATCHES=0`, `EXE_SHA256=AF88B840E599661AC63FC10AE27AC77DD97CD46B44DF8A7CE60EB0DCFACFC99E`.
-2. **PlayMode Gameplay (`Gp01Diagnostics.RunPlayModeVerify`):** `GP_PLAY_EXIT=0`, **38/38 PASS**, `ERRORS=0`.
+1. **Build:** `Riftbound.Editor.CoopPrefabSetup.BuildProductionGeminiGameplay` -> `BUILD_EXIT=0`, `ERROR_MATCHES=0`, `ASM_UTC=2026-11-16T06:45:15.5541012Z`, `EXE_SHA256=AF88B840E599661AC63FC10AE27AC77DD97CD46B44DF8A7CE60EB0DCFACFC99E`.
+2. **PlayMode Gameplay (`Gp01Diagnostics.RunPlayModeVerify`):** `GP_PLAY_EXIT=0`, **41/41 PASS**, `ERRORS=0`.
 3. **Offline Quest Route (`QuestRouteSmokeTest.Run`):** `QR_EXIT=0`, `QR_PASS=145`, `QR_FAIL=0`, `QR_TOTAL=150`, `TEMP_RESULT_DELETED=True`, `UGS_INIT_IN_OFFLINE_LOG=0`.
 4. **EditMode Animation Audit (`Gp01Diagnostics.RunAudit`):** `AUDIT2_EXIT=0`, `AUDIT2_LINES=81`.
-5. **Standalone Relay Co-op Matrix (`Builds/ProductionGeminiGameplay/Riftbound.exe`):**
+5. **Post-Rebuild Standalone Relay Co-op Matrix (`Builds/ProductionGeminiGameplay/Riftbound.exe`):**
    - `-coopUiSmoke`: `EXIT=0` (`PASS UiFlow: menuOpen=True, state=Offline, mode=Offline, nm=0, cams=2, listeners=1`)
-   - `-coopInvalidCodeSmoke`: `EXIT=0` (`state=Failed, err=Join code is invalid or expired.`)
-   - `-coopResilienceSmoke`: `EXIT=0` (`cancelOk=True, nmDuringHost=1, nmAfterLeave=0, finalState=Offline`)
    - `-coopCombatSmoke`: `EXIT H=0 C=0` (`enemy=road-raider-1 hp=36/70, clientDamaged=True`)
    - `-coopAuthoritySmoke`: `EXIT H=0 C=0` (`hostAuth=PASS`, `clientAuth=PASS`)
    - `-coopProgressionSmoke`: `EXIT H=0 C=0` (`hostProg=PASS`, `clientProg=PASS`)
-   - `-coopLateJoinSmoke`: `EXIT H=0 C=0` (`lateJoin=PASS(40/70,evt=True,rcDecline=True/rcSnap=True)`)
    - `-coopFullAcceptanceSmoke`: `EXIT H=0 C=0` (`hostAccept=PASS`, `clientAccept=PASS`)
    - `-coopClientLeaveSmoke`: `EXIT H=0 C=0` (`hostDisconnectRecovery=PASS`, `ClientLeave` `nmAfterLeave=0, finalState=Offline`)
-   - **4-Player + 5th Rejection:** `EXIT H=0 C1=0 C2=0 C3=0 C5=1` (`players=4, sep=9.75-9.76m`, Host `avgMs=7.39, p95Ms=11.57, enemies=54, netObjs=4`; C5 `[OnlineSessionService] Join failed: session is full`)
+   - **4-Player + 5th Rejection:** `EXIT H=0 C1=0 C2=0 C3=0 C5=1` (`players=4, sep=9.76m`, Host `avgMs=5.71, p95Ms=7.68, enemies=54, netObjs=4`; `C1–C3` `avgMs=5.66–5.88`; 5th client `C5` rejected)
+   - Prior pass on earlier `ProductionGeminiGameplay` build (`06:34:02Z`): `-coopInvalidCodeSmoke` (`EXIT=0`), `-coopResilienceSmoke` (`EXIT=0`), and `-coopLateJoinSmoke` (`EXIT H=0 C=0`).
 
 ### Explicitly `NOT RUN` (Recommended Next User Checks)
 - Windowed interactive GUI playthrough in `Builds/ProductionGeminiGameplay/Riftbound.exe` at `1280x720` (visual sign-off on `FrontendMenu` session-mode buttons — Session 0 headless shell prevented desktop `CopyFromScreen`).

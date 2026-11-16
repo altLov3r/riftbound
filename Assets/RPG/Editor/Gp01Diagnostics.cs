@@ -468,6 +468,15 @@ namespace Riftbound.Editor
                     pc.transform.position = savedPos;
                     if (cc11) cc11.enabled = true;
 
+                    // GP06: Boss encounter references & phase/alive cast guards
+                    Assert(ApexBossEncounter.Instance != null && CathedralBossEncounter.Instance != null && WorldBossEncounter.Instance != null, "GP06 All 3 boss encounter managers initialized");
+                    var cb = CathedralBossEncounter.Instance;
+                    Assert(cb.malakar != null && cb.abbotVael != null && ApexBossEncounter.Instance.bossCombatant != null && WorldBossEncounter.Instance.bossCombatant != null, "GP06 Vermithrax, Malakar, Vael & Gorgonax scene refs bound");
+                    typeof(CathedralBossEncounter).GetProperty("EncounterPhase").SetValue(cb, 2);
+                    typeof(CathedralBossEncounter).GetMethod("CastMalakarHolyWrath", BindingFlags.NonPublic | BindingFlags.Instance).Invoke(cb, null);
+                    Assert(!CastBarSystem.IsTargetCasting(cb.malakar.GetComponent<Combatant>()), "GP06 Dead/wrong-phase boss cast safely blocked");
+                    typeof(CathedralBossEncounter).GetProperty("EncounterPhase").SetValue(cb, 1);
+
                     // GP12: LivingWorldEvents Caravan trigger
                     Assert(LivingWorldEvents.Instance != null, "GP12 LivingWorldEvents active");
                     LivingWorldEvents.Instance.TriggerCaravanEvent();

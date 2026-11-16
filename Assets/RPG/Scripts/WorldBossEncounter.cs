@@ -130,6 +130,7 @@ namespace Riftbound
 
             // Warning delay
             yield return new WaitForSeconds(2.4f);
+            if (!bossCombatant || !bossCombatant.Alive) { meteorActive = false; yield break; }
 
             // Impact
             float distToImpact = Vector3.Distance(player.transform.position, targetPos);
@@ -160,8 +161,11 @@ namespace Riftbound
         {
             ChatSystem.LogSystem("<color=#ffd700><b>[WORLD EVENT]</b></color> Gorgonax the Worldbreaker has been vanquished!");
             CombatTextManager.Spawn(player.transform.position + Vector3.up * 2.5f, "WORLD BOSS DEFEATED! +150 XP", new Color(1f, 0.85f, 0.2f), true);
-            player.AddExperience(150);
-            player.AddGoldDirect(65);
+            if (player && !Network.CoopSessionConfig.IsMultiplayer)
+            {
+                player.AddExperience(150);
+                player.AddGoldDirect(65);
+            }
             AudioEffects.PlayLootCoin();
 
             // Spawn World Boss Hoard Chest (prefer 3D TreasureChest prefab over raw primitive)

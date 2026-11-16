@@ -198,6 +198,7 @@ namespace Riftbound
         IEnumerator DropMeteor(Vector3 targetPos, float delay)
         {
             yield return new WaitForSeconds(delay);
+            if (!bossCombatant || !bossCombatant.Alive) yield break;
             SpellFX.CreateConsecration(targetPos, 2.5f);
             AudioEffects.PlayBladeHit();
 
@@ -215,7 +216,7 @@ namespace Riftbound
             ZoneBanner.Show("Wyrmcrest Conquered!", "Apex Sovereign Purged. The Skies of Aethelgard are Free.");
             AudioEffects.PlayBossVictory();
 
-            if (player)
+            if (player && !Network.CoopSessionConfig.IsMultiplayer)
             {
                 player.AddExperience(400);
                 player.AddGoldDirect(120);

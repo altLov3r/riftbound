@@ -173,7 +173,7 @@ namespace Riftbound
             if (abbotVael) LootDropSystem.SpawnLoot(abbotVael.transform.position, "Dread Abbot Vael", 45, 8, "scarlet-aegis");
             if (malakar) LootDropSystem.SpawnLoot(malakar.transform.position, "High Inquisitor Malakar", 35, 6, "cathedral-relic");
 
-            if (player)
+            if (player && !Network.CoopSessionConfig.IsMultiplayer)
             {
                 player.AddExperience(250);
                 player.AddGoldDirect(80);
@@ -188,12 +188,13 @@ namespace Riftbound
 
         void CastMalakarHolyWrath()
         {
-            if (!malakar || !player || !player.Stats.Alive) return;
+            if (!malakar || !player || !player.Stats.Alive || EncounterPhase != 1) return;
             var mStats = malakar.GetComponent<Combatant>();
+            if (!mStats || !mStats.Alive) return;
             ChatSystem.LogCombat("High Inquisitor Malakar begins casting [Holy Wrath]...");
             CastBarSystem.StartTargetCast(mStats, "Holy Wrath", "☼", 2.2f, () =>
             {
-                if (malakar && player && player.Stats.Alive)
+                if (malakar && mStats && mStats.Alive && EncounterPhase == 1 && player && player.Stats.Alive)
                 {
                     player.Stats.Damage(24f);
                     CombatTextManager.Spawn(player.transform.position, "-24 HOLY", new Color(1f, 0.85f, 0.3f), false);
@@ -205,12 +206,13 @@ namespace Riftbound
 
         void CastVaelShadowVolley()
         {
-            if (!abbotVael || !player || !player.Stats.Alive) return;
+            if (!abbotVael || !player || !player.Stats.Alive || EncounterPhase != 2) return;
             var vStats = abbotVael.GetComponent<Combatant>();
+            if (!vStats || !vStats.Alive) return;
             ChatSystem.LogCombat("Dread Abbot Vael begins casting [Shadow Bolt Volley]...");
             CastBarSystem.StartTargetCast(vStats, "Shadow Bolt Volley", "💀", 2.4f, () =>
             {
-                if (abbotVael && player && player.Stats.Alive)
+                if (abbotVael && vStats && vStats.Alive && EncounterPhase == 2 && player && player.Stats.Alive)
                 {
                     player.Stats.Damage(28f);
                     CombatTextManager.Spawn(player.transform.position, "-28 SHADOW", new Color(0.7f, 0.2f, 0.95f), false);
