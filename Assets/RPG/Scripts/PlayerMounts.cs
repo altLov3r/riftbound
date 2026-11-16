@@ -27,20 +27,21 @@ namespace Riftbound
         Vector3 riderPosition, normalCenter, mountPosition;
         float normalHeight, normalRadius, mountStarted, mountHitTime;
         public bool MountUnlocked(MountDefinition mount) => mount && (!mount.requiresExploration || GreenhollowLandmarksFound == 3);
-        bool MountWindowOpen => DialogueOpen || ShopOpen || MapOpen || JournalOpen || InventoryOpen;
+        bool MountWindowOpen => AnyBlockingWindowOpen();
         bool UpdateMounts(Keyboard keys)
         {
             if (Mounted)
             {
-                // In WoW: dismount with Z or when using combat abilities (1, 2, 3, 4, Q, H) - NOT by clicking camera!
-                bool action = keys.digit1Key.wasPressedThisFrame || keys.digit2Key.wasPressedThisFrame || keys.digit3Key.wasPressedThisFrame || keys.digit4Key.wasPressedThisFrame || keys.eKey.wasPressedThisFrame || keys.qKey.wasPressedThisFrame || keys.hKey.wasPressedThisFrame;
-                if (!Stats.Alive || keys.zKey.wasPressedThisFrame || action) { Dismount(); return false; }
+                // Dismount with Z or when using combat/utility abilities (1, 2, 3, 4, Q, H); E remains reserved for contextual interact
+                bool action = keys.digit1Key.wasPressedThisFrame || keys.digit2Key.wasPressedThisFrame || keys.digit3Key.wasPressedThisFrame || keys.digit4Key.wasPressedThisFrame || keys.qKey.wasPressedThisFrame || keys.hKey.wasPressedThisFrame;
+                bool allowAutoDismount = !SettingsSystem.Instance || SettingsSystem.Instance.autoDismount;
+                if (!Stats.Alive || keys.zKey.wasPressedThisFrame || (allowAutoDismount && !MountWindowOpen && action)) { Dismount(); return false; }
                 if (MountWindowOpen) mountInstance.Animate(0, false, false);
                 return false;
             }
             if (keys.zKey.wasPressedThisFrame && Mounting) { Mounting = false; CastBarSystem.CancelCast(); Message = "Mount summon cancelled."; return false; }
             if (keys.vKey.wasPressedThisFrame && !Mounting && !MountWindowOpen && !ReturningHome && !Blocking) CycleMount();
-            if (keys.zKey.wasPressedThisFrame && !Mounting) BeginMount();
+            if (keys.zKey.wasPressedThisFrame && !Mounting && !MountWindowOpen) BeginMount();
             if (!Mounting) return false;
             bool move = keys.wKey.isPressed || keys.aKey.isPressed || keys.sKey.isPressed || keys.dKey.isPressed || keys.upArrowKey.isPressed || keys.downArrowKey.isPressed || keys.leftArrowKey.isPressed || keys.rightArrowKey.isPressed;
             bool actionKey = keys.spaceKey.wasPressedThisFrame || keys.eKey.wasPressedThisFrame || keys.qKey.wasPressedThisFrame || keys.hKey.wasPressedThisFrame || keys.iKey.wasPressedThisFrame || keys.jKey.wasPressedThisFrame || keys.mKey.wasPressedThisFrame || keys.digit1Key.wasPressedThisFrame || keys.digit2Key.wasPressedThisFrame || keys.digit3Key.wasPressedThisFrame || keys.digit4Key.wasPressedThisFrame;

@@ -5,12 +5,23 @@ namespace Riftbound
 {
     public partial class PrototypeHUD
     {
+        static PrototypeHUD activeGossipHud;
         int gossipMenuState = 0; // 0: Main, 1: Lore, 2: Threats, 3: Directions
         string gossipFeedback = "";
         Vector2 gossipScroll = Vector2.zero;
 
+        public static void ResetGossipState()
+        {
+            if (!activeGossipHud) activeGossipHud = FindFirstObjectByType<PrototypeHUD>();
+            if (!activeGossipHud) return;
+            activeGossipHud.gossipMenuState = 0;
+            activeGossipHud.gossipFeedback = "";
+            activeGossipHud.gossipScroll = Vector2.zero;
+        }
+
         void DrawTownNPCGossip(float width, float height)
         {
+            activeGossipHud = this;
             var npc = player.ActiveTownNPC;
             if (!npc) return;
 

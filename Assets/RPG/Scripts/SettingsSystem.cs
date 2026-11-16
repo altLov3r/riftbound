@@ -49,7 +49,35 @@ namespace Riftbound
                 return;
             }
             Instance = this;
+            LoadSettings();
             player = GetComponent<PlayerController>() ?? FindFirstObjectByType<PlayerController>();
+        }
+
+        public void LoadSettings()
+        {
+            masterVolume = Mathf.Clamp01(PlayerPrefs.GetFloat("Riftbound.Volume", 0.8f));
+            musicVolume = Mathf.Clamp01(PlayerPrefs.GetFloat("Riftbound.MusicVolume", 0.75f));
+            sfxVolume = Mathf.Clamp01(PlayerPrefs.GetFloat("Riftbound.SfxVolume", 0.85f));
+            ambienceVolume = Mathf.Clamp01(PlayerPrefs.GetFloat("Riftbound.AmbienceVolume", 0.70f));
+            showCombatText = PlayerPrefs.GetInt("Riftbound.ShowCombatText", 1) != 0;
+            showEnemyNameplates = PlayerPrefs.GetInt("Riftbound.ShowNameplates", 1) != 0;
+            autoDismount = PlayerPrefs.GetInt("Riftbound.AutoDismount", 1) != 0;
+            lockActionBars = PlayerPrefs.GetInt("Riftbound.LockActionBars", 0) != 0;
+            AudioListener.volume = masterVolume;
+        }
+
+        public void SaveSettings()
+        {
+            PlayerPrefs.SetFloat("Riftbound.Volume", masterVolume);
+            PlayerPrefs.SetFloat("Riftbound.MusicVolume", musicVolume);
+            PlayerPrefs.SetFloat("Riftbound.SfxVolume", sfxVolume);
+            PlayerPrefs.SetFloat("Riftbound.AmbienceVolume", ambienceVolume);
+            PlayerPrefs.SetInt("Riftbound.ShowCombatText", showCombatText ? 1 : 0);
+            PlayerPrefs.SetInt("Riftbound.ShowNameplates", showEnemyNameplates ? 1 : 0);
+            PlayerPrefs.SetInt("Riftbound.AutoDismount", autoDismount ? 1 : 0);
+            PlayerPrefs.SetInt("Riftbound.LockActionBars", lockActionBars ? 1 : 0);
+            PlayerPrefs.Save();
+            AudioListener.volume = masterVolume;
         }
 
         void Update()
@@ -321,8 +349,9 @@ namespace Riftbound
             GUI.Label(new Rect(cx, cy + 138, 280, 20), $"Ambience & Environment: {Mathf.RoundToInt(ambienceVolume * 100)}%");
             ambienceVolume = GUI.HorizontalSlider(new Rect(cx, cy + 160, w - 60, 20), ambienceVolume, 0f, 1f);
 
-            // Apply to AudioListener
+            // Apply to AudioListener and persist if changed
             AudioListener.volume = masterVolume;
+            if (GUI.changed) SaveSettings();
 
             DrawBackButton(x, y, w, h);
         }
@@ -336,6 +365,8 @@ namespace Riftbound
             showEnemyNameplates = GUI.Toggle(new Rect(cx, cy + 30, w - 60, 24), showEnemyNameplates, " Always Show Enemy Health Bars");
             autoDismount = GUI.Toggle(new Rect(cx, cy + 60, w - 60, 24), autoDismount, " Auto-Dismount on Spell Cast");
             lockActionBars = GUI.Toggle(new Rect(cx, cy + 90, w - 60, 24), lockActionBars, " Lock Action Bars in Combat");
+
+            if (GUI.changed) SaveSettings();
 
             DrawBackButton(x, y, w, h);
         }

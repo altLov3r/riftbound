@@ -62,10 +62,22 @@ namespace Riftbound.Network
         float actionAnimUntil;
         Vector3 lastLocalPos;
         bool hasLastLocalPos;
+        Vector3 lastRemoteWorldPos;
+        bool hasLastRemotePos;
+        float remoteSmoothedSpeed;
+        float remoteZeroSpeedTimer;
+        Quaternion remoteBaseVisualRot = Quaternion.identity;
+        float remoteVisualYawOffset;
         bool spawnPositioned;
         readonly Dictionary<string, float> serverAbilityCooldowns = new Dictionary<string, float>();
         readonly HashSet<string> serverDefeatedEnemyKeys = new HashSet<string>();
         readonly HashSet<string> serverCompletedEvents = new HashSet<string>();
+        readonly HashSet<string> serverDiscoveredLandmarks = new HashSet<string>();
+        readonly HashSet<string> serverCompletedFactionQuests = new HashSet<string>();
+        int serverPotions = 3;
+        bool serverTemperedWeapon;
+        float lastServerPotionTime = -10f;
+        float lastServerRespawnTime = -10f;
         static GUIStyle nameplateStyle;
 
         public override void OnNetworkSpawn()
@@ -188,7 +200,8 @@ namespace Riftbound.Network
             {
                 remoteVisualRoot.name = $"CoopVisual_{r}_{c}";
                 remoteVisualRoot.transform.localPosition = Vector3.zero;
-                remoteVisualRoot.transform.localRotation = Quaternion.identity;
+                remoteBaseVisualRot = remoteVisualRoot.transform.localRotation;
+                remoteVisualYawOffset = 0f;
                 foreach (var cam in remoteVisualRoot.GetComponentsInChildren<Camera>(true)) Destroy(cam);
                 foreach (var al in remoteVisualRoot.GetComponentsInChildren<AudioListener>(true)) Destroy(al);
                 remoteAnimator = remoteVisualRoot.GetComponentInChildren<Animator>();
@@ -256,10 +269,61 @@ namespace Riftbound.Network
 
         void UpdateRemoteAnimation()
         {
-            if (!remoteAnimator || Time.time < actionAnimUntil) return;
-            string desired = Health.Value <= 0
-                ? "Hit"
-                : (IsMounted.Value ? "Ride" : (MoveSpeed.Value > 4.2f ? "Run" : (MoveSpeed.Value > 0.25f ? "Walk" : "Idle")));
+            if (!remoteAnimator) return;
+            Vector3 curWorldPos = transform.position;
+            Vector3 worldVel = hasLastRemotePos && Time.deltaTime > 0.0001f
+                ? (curWorldPos - lastRemoteWorldPos) / Time.deltaTime
+                : Vector3.zero;
+            lastRemoteWorldPos = curWorldPos;
+            hasLastRemotePos = true;
+            worldVel.y = 0f;
+
+            float netSpd = MoveSpeed.Value;
+            if (netSpd > 0.2f) remoteZeroSpeedTimer = 0f;
+            else remoteZeroSpeedTimer += Time.deltaTime;
+            float effectiveSpeed = netSpd > 0.2f ? netSpd : (remoteZeroSpeedTimer < 0.12f ? remoteSmoothedSpeed : 0f);
+            remoteSmoothedSpeed = Mathf.Lerp(remoteSmoothedSpeed, effectiveSpeed, 1f - Mathf.Exp(-14f * Time.deltaTime));
+
+            // Smoothly orient visual child toward strafe direction while moving unmounted
+            float targetYaw = 0f;
+            Vector3 localVel = transform.InverseTransformDirection(worldVel);
+            bool movingBack = localVel.z < -0.25f && remoteSmoothedSpeed > 0.25f;
+            if (Health.Value > 0 && !IsMounted.Value && Time.time >= actionAnimUntil && worldVel.sqrMagnitude > 0.09f)
+            {
+                float signedAngle = Vector3.SignedAngle(transform.forward, worldVel.normalized, Vector3.up);
+                if (Mathf.Abs(signedAngle) <= 105f) targetYaw = Mathf.Clamp(signedAngle, -52f, 52f);
+                else targetYaw = Mathf.Clamp(Vector3.SignedAngle(-transform.forward, worldVel.normalized, Vector3.up), -30f, 30f);
+            }
+            remoteVisualYawOffset = Mathf.Lerp(remoteVisualYawOffset, targetYaw, 1f - Mathf.Exp(-14f * Time.deltaTime));
+            if (remoteVisualRoot)
+                remoteVisualRoot.transform.localRotation = remoteBaseVisualRot * Quaternion.Euler(0f, remoteVisualYawOffset, 0f);
+
+            if (Time.time < actionAnimUntil)
+            {
+                remoteAnimator.speed = 1f;
+                return;
+            }
+
+            string desired;
+            if (Health.Value <= 0)
+                desired = remoteAnimator.HasState(0, Animator.StringToHash("Death")) ? "Death" : "Hit";
+            else if (IsMounted.Value)
+                desired = "Ride";
+            else if (remoteSmoothedSpeed > 3.6f)
+                desired = movingBack && remoteAnimator.HasState(0, Animator.StringToHash("RunBack")) ? "RunBack" : "Run";
+            else if (remoteSmoothedSpeed > 0.25f)
+                desired = movingBack && remoteAnimator.HasState(0, Animator.StringToHash("WalkBack")) ? "WalkBack" : "Walk";
+            else
+                desired = "Idle";
+
+            CharacterVisualFactory.GetCalibratedStrides(builtRace, builtClass, out float walkStride, out float runStride);
+            if (desired == "Run" || desired == "RunBack")
+                remoteAnimator.speed = Mathf.Clamp(remoteSmoothedSpeed / Mathf.Max(0.1f, desired == "RunBack" ? runStride * 0.85f : runStride), 0.75f, 2.25f);
+            else if (desired == "Walk" || desired == "WalkBack")
+                remoteAnimator.speed = Mathf.Clamp(remoteSmoothedSpeed / Mathf.Max(0.1f, desired == "WalkBack" ? walkStride * 0.92f : walkStride), 0.65f, 2.25f);
+            else
+                remoteAnimator.speed = 1f;
+
             if (desired == currentRemoteAnim) return;
             if (remoteAnimator.HasState(0, Animator.StringToHash(desired)))
             {
@@ -344,18 +408,31 @@ namespace Riftbound.Network
 
         // ── O-01 Authoritative Mounts & Animations ──────────────────────────────────────
 
+        public void SendSpoofedPositionForTest(Vector3 targetPos)
+        {
+            if (!CoopSessionConfig.IsMultiplayer || !IsSpawned || !IsOwner) return;
+            SubmitMoveStateServerRpc(targetPos, transform.eulerAngles.y, 10f);
+        }
+
         public void RequestSetMount(bool mounted, string mountId)
         {
             if (!CoopSessionConfig.IsMultiplayer || !IsSpawned) return;
             RequestSetMountServerRpc(mounted, string.IsNullOrEmpty(mountId) ? "horse" : mountId);
         }
 
+        int ServerGreenhollowCount() =>
+            (serverDiscoveredLandmarks.Contains("willow-crossing") ? 1 : 0) +
+            (serverDiscoveredLandmarks.Contains("greenhollow-post") ? 1 : 0) +
+            (serverDiscoveredLandmarks.Contains("ancient-grove") ? 1 : 0);
+
         [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Owner)]
         void RequestSetMountServerRpc(bool mounted, string mountId)
         {
             if (Health.Value <= 0) { IsMounted.Value = false; return; }
+            string normalized = string.IsNullOrEmpty(mountId) ? "horse" : mountId.ToLowerInvariant();
+            if (mounted && normalized == "zebra" && ServerGreenhollowCount() < 3) return;
             IsMounted.Value = mounted;
-            MountId.Value = new FixedString32Bytes(string.IsNullOrEmpty(mountId) ? "horse" : mountId);
+            MountId.Value = new FixedString32Bytes(normalized);
         }
 
         public void TriggerActionAnim(string animName)
@@ -421,11 +498,19 @@ namespace Riftbound.Network
             if (!stats || !stats.Alive) return;
 
             string key = string.IsNullOrEmpty(abilityId) ? "melee" : abilityId.ToLowerInvariant();
-            float cd = key == "melee" ? 0.35f : 0.8f;
-            if (serverAbilityCooldowns.TryGetValue(key, out float readyAt) && Time.time < readyAt) return;
-            serverAbilityCooldowns[key] = Time.time + cd;
+            string cls = ClassName.Value.ToString();
+            if ((key == "fireball" || key == "frostnova") && cls != "Mage") return;
+            if (key == "eviscerate" && cls != "Rogue") return;
+            if (key == "consecration" && cls != "Paladin") return;
+            if (key == "whirlwind" && cls != "Warrior") return;
 
-            float maxRange = key == "fireball" ? 30f : (key == "frostnova" || key == "whirlwind" || key == "consecration" ? 8.5f : 5.0f);
+            bool isAoe = key == "frostnova" || key == "consecration" || key == "whirlwind";
+            string cdKey = isAoe ? $"{key}:{enemy.NetworkKey}" : key;
+            float cd = key == "melee" ? 0.35f : 0.8f;
+            if (serverAbilityCooldowns.TryGetValue(cdKey, out float readyAt) && Time.time < readyAt) return;
+            serverAbilityCooldowns[cdKey] = Time.time + cd;
+
+            float maxRange = key == "fireball" ? 30f : (isAoe ? 8.5f : 5.0f);
             if (Vector3.Distance(transform.position, enemy.transform.position) > maxRange) return;
 
             // LOS check (ignore triggers/characters)
@@ -448,8 +533,9 @@ namespace Riftbound.Network
             {
                 "fireball" => 34f,
                 "frostnova" => 24f,
-                "consecration" => 22f,
+                "consecration" => 24f,
                 "whirlwind" => 28f,
+                "eviscerate" => 46f,
                 _ => 18f
             };
             float computedDamage = baseDmg + (Level.Value - 1) * 4f;
@@ -458,6 +544,33 @@ namespace Riftbound.Network
             stats.Damage(computedDamage);
             BroadcastActionAnimClientRpc(key == "fireball" || key == "frostnova" || key == "consecration" ? "Cast" : "Attack");
             BroadcastEnemyState(enemy);
+        }
+
+        public void RequestAbilityHeal(int amount, string abilityId)
+        {
+            if (!CoopSessionConfig.IsMultiplayer || !IsSpawned || amount <= 0) return;
+            if (IsServer) ApplyServerAbilityHeal(amount, abilityId);
+            else RequestAbilityHealServerRpc(amount, abilityId);
+        }
+
+        [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Owner)]
+        void RequestAbilityHealServerRpc(int amount, string abilityId) => ApplyServerAbilityHeal(amount, abilityId);
+
+        void ApplyServerAbilityHeal(int amount, string abilityId)
+        {
+            if (!IsServer || Health.Value <= 0) return;
+            string key = string.IsNullOrEmpty(abilityId) ? "heal" : abilityId.ToLowerInvariant();
+            string cls = ClassName.Value.ToString();
+            if (key == "arcane_ward" && cls != "Mage") return;
+            if (key == "holy_light" && cls != "Paladin") return;
+            if (key == "second_wind" && cls != "Warrior") return;
+
+            if (serverAbilityCooldowns.TryGetValue("heal:" + key, out float readyAt) && Time.time < readyAt) return;
+            serverAbilityCooldowns["heal:" + key] = Time.time + 8.0f;
+            if (key == "arcane_ward") lastServerMoveTime -= 0.85f; // Allow 7.5m Blink displacement once per validated arcane_ward cast
+
+            int clamped = Mathf.Clamp(amount, 1, 65);
+            Health.Value = Mathf.Min(MaxHealth.Value, Health.Value + clamped);
         }
 
         public void BroadcastEnemyState(EnemyController enemy)
@@ -506,20 +619,28 @@ namespace Riftbound.Network
         void ExecuteAuthoritativeRespawn()
         {
             if (!IsServer) return;
-            Health.Value = MaxHealth.Value;
+            bool fellOutOfWorld = transform.position.y < -10f;
+            if (Health.Value > 0 && !fellOutOfWorld) return;
+            if (Time.time < lastServerRespawnTime + 1.5f) return;
+            lastServerRespawnTime = Time.time;
+            if (Health.Value <= 0)
+                Health.Value = MaxHealth.Value;
             Vector3 baseSpawn = new Vector3(0f, 1f, 10f);
             var lp = FindFirstObjectByType<PlayerController>();
             if (lp) baseSpawn = lp.GetRacialSpawnPosition();
             Vector3 slotSpawn = ComputeSpawnPosition(baseSpawn, SpawnSlot.Value);
             AuthorizeHostTeleport(slotSpawn);
-            ApproveRespawnClientRpc(slotSpawn, RpcTarget.Single(OwnerClientId, RpcTargetUse.Temp));
+            if (IsOwner && localPlayer)
+                localPlayer.ApplyAuthorizedRespawn(slotSpawn, Health.Value);
+            else
+                ApproveRespawnClientRpc(slotSpawn, Health.Value, RpcTarget.Single(OwnerClientId, RpcTargetUse.Temp));
         }
 
         [Rpc(SendTo.SpecifiedInParams)]
-        void ApproveRespawnClientRpc(Vector3 safeSpawn, RpcParams rpcParams = default)
+        void ApproveRespawnClientRpc(Vector3 safeSpawn, int serverHp, RpcParams rpcParams = default)
         {
             if (!IsOwner || !localPlayer) return;
-            localPlayer.ApplyAuthorizedRespawn(safeSpawn);
+            localPlayer.ApplyAuthorizedRespawn(safeSpawn, serverHp);
         }
 
         public void RequestUsePotion()
@@ -535,7 +656,21 @@ namespace Riftbound.Network
         void ApplyServerPotionHeal()
         {
             if (!IsServer || Health.Value <= 0 || Health.Value >= MaxHealth.Value) return;
+            if (serverPotions <= 0 || Time.time < lastServerPotionTime + 1.5f) return;
+            serverPotions--;
+            lastServerPotionTime = Time.time;
             Health.Value = Mathf.Min(MaxHealth.Value, Health.Value + 70);
+            if (IsOwner && localPlayer)
+                localPlayer.ApplyAuthorizedPotionUse(serverPotions, Health.Value);
+            else
+                ApproveUsePotionClientRpc(serverPotions, Health.Value, RpcTarget.Single(OwnerClientId, RpcTargetUse.Temp));
+        }
+
+        [Rpc(SendTo.SpecifiedInParams)]
+        void ApproveUsePotionClientRpc(int remainingPotions, int newHealth, RpcParams rpcParams = default)
+        {
+            if (!IsOwner || !localPlayer) return;
+            localPlayer.ApplyAuthorizedPotionUse(remainingPotions, newHealth);
         }
 
         public void RequestTransaction(string txId)
@@ -564,13 +699,15 @@ namespace Riftbound.Network
             if (!IsServer || Health.Value <= 0) return false;
             if (txId == "buy_potion")
             {
-                if (Gold.Value < 10) return false;
+                if (Gold.Value < 10 || serverPotions >= 10) return false;
+                serverPotions++;
                 Gold.Value -= 10;
                 return true;
             }
             if (txId == "temper_weapon")
             {
-                if (Gold.Value < 45) return false;
+                if (Gold.Value < 45 || serverTemperedWeapon) return false;
+                serverTemperedWeapon = true;
                 Gold.Value -= 45;
                 return true;
             }
@@ -582,6 +719,55 @@ namespace Riftbound.Network
                 return true;
             }
             return false;
+        }
+
+        public void RequestDiscoverLandmark(string landmarkId)
+        {
+            if (!CoopSessionConfig.IsMultiplayer || !IsSpawned || string.IsNullOrEmpty(landmarkId)) return;
+            if (IsServer)
+            {
+                if (TryValidateLandmarkOnServer(landmarkId, out int xpGranted) && localPlayer)
+                {
+                    localPlayer.ApplyAuthorizedDiscovery(landmarkId, Gold.Value, xpGranted);
+                }
+            }
+            else
+            {
+                RequestDiscoverLandmarkServerRpc(landmarkId);
+            }
+        }
+
+        [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Owner)]
+        void RequestDiscoverLandmarkServerRpc(string landmarkId)
+        {
+            if (TryValidateLandmarkOnServer(landmarkId, out int xpGranted))
+                ApproveDiscoverLandmarkClientRpc(landmarkId, Gold.Value, xpGranted, RpcTarget.Single(OwnerClientId, RpcTargetUse.Temp));
+        }
+
+        bool TryValidateLandmarkOnServer(string landmarkId, out int xpGranted)
+        {
+            xpGranted = 0;
+            if (!IsServer || Health.Value <= 0 || string.IsNullOrEmpty(landmarkId)) return false;
+
+            Landmark match = null;
+            foreach (var lm in FindObjectsByType<Landmark>(FindObjectsSortMode.None))
+            {
+                if (lm && lm.landmarkId == landmarkId) { match = lm; break; }
+            }
+            if (!match || Vector3.Distance(transform.position, match.transform.position) > 14.0f) return false;
+            if (!serverDiscoveredLandmarks.Add(landmarkId)) return false;
+
+            bool greenhollowComplete = (landmarkId == "willow-crossing" || landmarkId == "greenhollow-post" || landmarkId == "ancient-grove") && ServerGreenhollowCount() == 3;
+            xpGranted = (landmarkId == "scarlet-crypts" || landmarkId == "redridge-frontier") ? 60 : (greenhollowComplete ? 85 : 35);
+            GrantAuthoritativeProgress(xpGranted, 15);
+            return true;
+        }
+
+        [Rpc(SendTo.SpecifiedInParams)]
+        void ApproveDiscoverLandmarkClientRpc(string landmarkId, int newGold, int xpGranted, RpcParams rpcParams = default)
+        {
+            if (!IsOwner || !localPlayer) return;
+            localPlayer.ApplyAuthorizedDiscovery(landmarkId, newGold, xpGranted);
         }
 
         [Rpc(SendTo.SpecifiedInParams)]
@@ -767,6 +953,86 @@ namespace Riftbound.Network
             localPlayer.ApplyAuthorizedCompleteQuest(questIndex);
         }
 
+        public bool RequestCompleteFactionQuestServerValidated(string questId)
+        {
+            if (!CoopSessionConfig.IsMultiplayer || !IsSpawned || string.IsNullOrEmpty(questId)) return false;
+            if (IsServer)
+            {
+                if (TryValidateFactionQuestOnServer(questId, out int goldGain, out int xpGain))
+                {
+                    if (FactionQuestSystem.Instance && localPlayer)
+                        FactionQuestSystem.Instance.ApplyAuthorizedComplete(localPlayer, questId, Gold.Value, goldGain, xpGain);
+                    return true;
+                }
+                return false;
+            }
+            RequestCompleteFactionQuestServerRpc(questId);
+            return false;
+        }
+
+        [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Owner)]
+        void RequestCompleteFactionQuestServerRpc(string questId)
+        {
+            if (TryValidateFactionQuestOnServer(questId, out int goldGain, out int xpGain))
+            {
+                ApproveCompleteFactionQuestClientRpc(questId, Gold.Value, goldGain, xpGain, RpcTarget.Single(OwnerClientId, RpcTargetUse.Temp));
+            }
+        }
+
+        bool TryValidateFactionQuestOnServer(string questId, out int goldGain, out int xpGain)
+        {
+            goldGain = 0;
+            xpGain = 0;
+            if (!IsServer || Health.Value <= 0 || string.IsNullOrEmpty(questId)) return false;
+
+            var q = FactionQuestSystem.GetQuest(questId);
+            if (q == null || serverCompletedFactionQuests.Contains(questId)) return false;
+            if (!string.IsNullOrEmpty(q.prerequisiteQuestId) && !serverCompletedFactionQuests.Contains(q.prerequisiteQuestId))
+                return false;
+
+            string targetNpc = q.targetType == "talk_npc" ? q.targetId : q.giverNpc;
+            bool nearNpc = false;
+            foreach (var npc in FindObjectsByType<TownNPC>(FindObjectsSortMode.None))
+            {
+                if (npc && string.Equals(npc.npcName, targetNpc, System.StringComparison.OrdinalIgnoreCase) &&
+                    Vector3.Distance(transform.position, npc.transform.position) <= 7.0f)
+                {
+                    nearNpc = true;
+                    break;
+                }
+            }
+            if (!nearNpc) return false;
+
+            if (q.id == "frontier_cartography")
+            {
+                if (!serverDiscoveredLandmarks.Contains("westbank-overlook") ||
+                    !serverDiscoveredLandmarks.Contains("bloodrock-vista") ||
+                    !serverDiscoveredLandmarks.Contains("wyrmcrest-lookout"))
+                    return false;
+            }
+            else if (q.targetType == "defeat_enemy")
+            {
+                bool exactBoss = q.targetId == RiverReaverCamp.CaptainId || q.targetId == "redridge-outcast-boss" || q.targetId == "vermithrax-boss";
+                if (exactBoss ? !serverDefeatedEnemyKeys.Contains(q.targetId) : serverDefeatedEnemyKeys.Count < q.requiredCount)
+                    return false;
+            }
+
+            if (!serverCompletedFactionQuests.Add(questId)) return false;
+
+            goldGain = Race.Value.ToString() == "Human" ? Mathf.RoundToInt(q.rewardGold * 1.25f) : q.rewardGold;
+            xpGain = q.rewardXP;
+            GrantAuthoritativeProgress(xpGain, goldGain);
+            Health.Value = MaxHealth.Value;
+            return true;
+        }
+
+        [Rpc(SendTo.SpecifiedInParams)]
+        void ApproveCompleteFactionQuestClientRpc(string questId, int newServerGold, int goldGain, int xpGain, RpcParams rpcParams = default)
+        {
+            if (!IsOwner || !localPlayer || !FactionQuestSystem.Instance) return;
+            FactionQuestSystem.Instance.ApplyAuthorizedComplete(localPlayer, questId, newServerGold, goldGain, xpGain);
+        }
+
         // ── O-01 Shared World Events & Late-Join Snapshot ───────────────────────────────
 
         public void SendWorldSnapshotToClient(ulong clientId)
@@ -784,6 +1050,47 @@ namespace Riftbound.Network
                     SendEnemySnapshotClientRpc(enemy.NetworkKey, c.Health, c.maxHealth, c.Alive, enemy.transform.position, enemy.transform.eulerAngles.y, rpcParams);
                 }
             }
+            if (CoopWorldManager.Instance != null && CoopWorldManager.Instance.TryGetActiveReadyCheck(out string rcInitiator))
+            {
+                SendReadyCheckSnapshotClientRpc(rcInitiator, rpcParams);
+            }
+            if (LivingWorldEvents.Instance != null)
+            {
+                LivingWorldEvents.Instance.SendEventSnapshotToClient(this, rpcParams);
+            }
+        }
+
+        [Rpc(SendTo.SpecifiedInParams)]
+        void SendReadyCheckSnapshotClientRpc(string initiatorName, RpcParams rpcParams = default)
+        {
+            if (CoopWorldManager.Instance) CoopWorldManager.Instance.OpenReadyCheck(initiatorName);
+        }
+
+        public void SendEventSnapshotRpc(string eventId, bool active, Vector3 pos, RpcParams rpcParams)
+        {
+            SendEventSnapshotClientRpc(eventId, active, pos, rpcParams);
+        }
+
+        [Rpc(SendTo.SpecifiedInParams)]
+        void SendEventSnapshotClientRpc(string eventId, bool active, Vector3 pos, RpcParams rpcParams = default)
+        {
+            if (IsServer) return;
+            var lwe = LivingWorldEvents.Instance ? LivingWorldEvents.Instance : FindFirstObjectByType<LivingWorldEvents>();
+            if (lwe) lwe.ApplyClientEventState(eventId, active, pos);
+        }
+
+        public static void BroadcastWorldEventState(string eventId, bool active, Vector3 pos)
+        {
+            if (LocalOwner && LocalOwner.IsServer && LocalOwner.IsSpawned)
+                LocalOwner.BroadcastWorldEventStateClientRpc(eventId, active, pos);
+        }
+
+        [Rpc(SendTo.Everyone)]
+        void BroadcastWorldEventStateClientRpc(string eventId, bool active, Vector3 pos)
+        {
+            if (IsServer) return;
+            var lwe = LivingWorldEvents.Instance ? LivingWorldEvents.Instance : FindFirstObjectByType<LivingWorldEvents>();
+            if (lwe) lwe.ApplyClientEventState(eventId, active, pos);
         }
 
         [Rpc(SendTo.SpecifiedInParams)]
@@ -815,22 +1122,29 @@ namespace Riftbound.Network
         {
             if (!IsOwner || !localPlayer) return;
             localPlayer.AddExperience(xp);
-            localPlayer.AddGold(gold);
+            localPlayer.SetAuthoritativeGold(Gold.Value);
             string tag = firstClear ? "Event Complete" : "Bounty Repeat";
             localPlayer.Message = $"{tag}: +{xp} XP, +{gold} Gold!";
         }
 
         // ── Deliverables #5: Map Pings, Ready Check & Ally Revive ───────────────────────
 
+        float lastServerPingTime = -10f;
+        float lastLocalPingTime = -10f;
+
         public void RequestMapPing(Vector3 worldPos)
         {
-            if (!CoopSessionConfig.IsMultiplayer || !IsSpawned) return;
+            if (!CoopSessionConfig.IsMultiplayer || !IsSpawned || Health.Value <= 0) return;
+            if (Time.time < lastLocalPingTime + 2.0f) return;
+            lastLocalPingTime = Time.time;
             RequestMapPingServerRpc(worldPos);
         }
 
         [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Owner)]
         void RequestMapPingServerRpc(Vector3 worldPos)
         {
+            if (Health.Value <= 0 || Time.time < lastServerPingTime + 2.0f) return;
+            lastServerPingTime = Time.time;
             BroadcastMapPingClientRpc(PlayerName.Value.ToString(), worldPos);
         }
 
@@ -894,7 +1208,8 @@ namespace Riftbound.Network
         void ReceiveAllyReviveClientRpc(string reviverName, int newHp, RpcParams rpcParams = default)
         {
             if (!IsOwner || !localPlayer || !localPlayer.Stats) return;
-            localPlayer.Stats.SetReplicatedHealth(newHp, localPlayer.Stats.maxHealth);
+            int effectiveHp = Health.Value > 0 ? Mathf.Max(Health.Value, newHp) : newHp;
+            localPlayer.Stats.SetReplicatedHealth(effectiveHp, localPlayer.Stats.maxHealth);
             localPlayer.Message = $"Revived by {reviverName}!";
             SpellFX.CreateArcaneBurst(localPlayer.transform.position);
         }

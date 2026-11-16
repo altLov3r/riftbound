@@ -16,15 +16,16 @@ namespace Riftbound
         bool UpdateUtilities(Keyboard keys)
         {
             if (!Stats.Alive) { StopGuard(); ReturningHome = false; return false; }
-            if (Blocking && (!keys.qKey.isPressed || Time.time >= GuardEnds || !motor.isGrounded || DialogueOpen || ShopOpen || MapOpen || JournalOpen || InventoryOpen)) StopGuard();
+            bool uiBlocked = AnyBlockingWindowOpen();
+            if (Blocking && (!keys.qKey.isPressed || Time.time >= GuardEnds || !motor.isGrounded || uiBlocked)) StopGuard();
             bool isSteering = orbit && orbit.IsSteering;
             bool isMoving = keys.wKey.isPressed || keys.sKey.isPressed || keys.aKey.isPressed || keys.dKey.isPressed;
-            if (!Blocking && keys.qKey.isPressed && !isSteering && !isMoving && Time.time >= GuardReady && Time.time >= busyUntil && motor.isGrounded && !DialogueOpen && !ShopOpen && !MapOpen && !JournalOpen && !InventoryOpen && !ReturningHome)
+            if (!Blocking && keys.qKey.isPressed && !isSteering && !isMoving && !uiBlocked && Time.time >= GuardReady && Time.time >= busyUntil && motor.isGrounded && !ReturningHome)
             {
                 Blocking = true; GuardEnds = Time.time + 3; Stats.incomingDamageMultiplier = .5f;
                 moveVelocity = Vector3.zero; if (animator) animator.speed = 1; Play("Block", true);
             }
-            if (keys.hKey.wasPressedThisFrame && !ReturningHome && !Blocking && !DialogueOpen && !ShopOpen && !MapOpen && !JournalOpen && !InventoryOpen && Time.time >= busyUntil)
+            if (keys.hKey.wasPressedThisFrame && !ReturningHome && !Blocking && !uiBlocked && Time.time >= busyUntil)
             {
                 if (Time.time < HearthReady) Message = "Hearthstone is still recharging.";
                 else if (!motor.isGrounded || InCombat()) Message = "Hearthstone requires safe ground, outside combat.";

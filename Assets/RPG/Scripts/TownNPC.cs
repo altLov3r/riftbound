@@ -79,6 +79,16 @@ namespace Riftbound
             questTransform.gameObject.SetActive(false);
         }
 
+        public void TriggerGreetingBark()
+        {
+            if (string.IsNullOrEmpty(greeting)) return;
+            barkUntil = Time.time + 4.5f;
+            if (barkMesh) barkMesh.text = $"\"{greeting}\"";
+            GameSound.Play(SoundCue.Guard, transform.position);
+            if (ChatSystem.Instance)
+                ChatSystem.Instance.AddMessage(ChatSystem.Channel.Say, npcName, greeting, new Color(0.95f, 0.95f, 0.95f));
+        }
+
         void LateUpdate()
         {
             var cam = Camera.main;
@@ -95,23 +105,12 @@ namespace Riftbound
                 labelTransform.gameObject.SetActive(showName);
 
             if (showName)
-                labelTransform.rotation = cam.transform.rotation * Quaternion.Euler(0f, 180f, 0f);
+                labelTransform.rotation = cam.transform.rotation;
 
             if (!player) player = FindFirstObjectByType<PlayerController>();
             if (player && player.Stats && player.Stats.Alive)
             {
                 float playerDist = Vector3.Distance(player.transform.position, transform.position);
-                if (playerDist < 3.1f && !player.DialogueOpen && !player.ShopOpen)
-                {
-                    if (Keyboard.current != null && Keyboard.current.eKey.wasPressedThisFrame && !string.IsNullOrEmpty(greeting))
-                    {
-                        barkUntil = Time.time + 4.5f;
-                        barkMesh.text = $"\"{greeting}\"";
-                        GameSound.Play(SoundCue.Guard, transform.position);
-                        if (ChatSystem.Instance)
-                            ChatSystem.Instance.AddMessage(ChatSystem.Channel.Say, npcName, greeting, new Color(0.95f, 0.95f, 0.95f));
-                    }
-                }
 
                 bool isTalkingToMe = player && player.DialogueOpen && player.ActiveTownNPC == this;
                 if ((Time.time < barkUntil || isTalkingToMe) && playerDist < 8f)
@@ -131,7 +130,7 @@ namespace Riftbound
             if (barkTransform.gameObject.activeSelf != showBark)
                 barkTransform.gameObject.SetActive(showBark);
             if (showBark)
-                barkTransform.rotation = cam.transform.rotation * Quaternion.Euler(0f, 180f, 0f);
+                barkTransform.rotation = cam.transform.rotation;
 
             UpdateQuestIndicator(cam, camDist);
         }
@@ -193,7 +192,7 @@ namespace Riftbound
             {
                 float bob = Mathf.Sin(Time.time * 3.2f) * 0.08f;
                 questTransform.localPosition = Vector3.up * (nameplateHeight + 0.95f + bob);
-                questTransform.rotation = cam.transform.rotation * Quaternion.Euler(0f, 180f, 0f);
+                questTransform.rotation = cam.transform.rotation;
                 if (questMesh.text != icon) questMesh.text = icon;
                 questMesh.color = col;
             }

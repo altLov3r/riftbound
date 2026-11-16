@@ -179,8 +179,10 @@ namespace Riftbound
                     float d = Vector3.Distance(transform.position, replicatedPos);
                     if (d > 0.08f)
                     {
+                        Vector3 prevPos = transform.position;
                         transform.position = Vector3.Lerp(transform.position, replicatedPos, Time.deltaTime * 12f);
-                        Play("Run", false);
+                        float approxSpeed = Time.deltaTime > 0.0001f ? Vector3.Distance(prevPos, transform.position) / Time.deltaTime : d * 12f;
+                        Play(approxSpeed > 2.4f ? "Run" : "Walk", false);
                     }
                     else
                     {
@@ -283,7 +285,7 @@ namespace Riftbound
             {
                 pendingDamage = false;
                 CastBarSystem.CancelTargetCast(stats);
-                if (targetAlive && ranged && range < attackRange + 2 && (targetIsRemote || ClearSight()))
+                if (targetAlive && ranged && range < attackRange + 2 && (targetIsRemote || ClearSightForTarget(targetTransform)))
                 {
                     if (targetIsRemote)
                         Network.RiftboundCoopPlayer.DispatchEnemyHitToPlayer(targetClientId, attackDamage, NetworkKey);
@@ -292,7 +294,7 @@ namespace Riftbound
                         EnemyProjectile.Launch(transform.position + Vector3.up * 1.25f, player, attackDamage);
                     }
                 }
-                else if (targetAlive && !ranged && range < 2.8f && (targetIsRemote || ClearSight()))
+                else if (targetAlive && !ranged && range < 2.8f && (targetIsRemote || ClearSightForTarget(targetTransform)))
                 {
                     if (targetIsRemote)
                     {
@@ -345,10 +347,18 @@ namespace Riftbound
                 motor.Move(direction.normalized * speed * Time.deltaTime);
                 var travelled = transform.position - previousPosition; travelled.y = 0;
                 Play(travelled.sqrMagnitude > .000001f ? (chasing ? "Run" : "Walk") : "Idle");
-                float stride = chasing ? (runStrideSpeed > 0 ? runStrideSpeed : (player ? player.runStrideSpeed : 5f)) : (walkStrideSpeed > 0 ? walkStrideSpeed : (player ? player.walkStrideSpeed : 2.5f));
-                if (animator) animator.speed = Mathf.Clamp(travelled.magnitude / Mathf.Max(.001f, Time.deltaTime * stride), .6f, 2.0f);
+                float stride = chasing
+                    ? (runStrideSpeed > 0 ? runStrideSpeed : (player ? player.runStrideSpeed : 4.2f))
+                    : (walkStrideSpeed > 0 ? walkStrideSpeed : (player ? player.walkStrideSpeed : 0.9f));
+                if (animator) animator.speed = Mathf.Clamp(travelled.magnitude / Mathf.Max(.001f, Time.deltaTime * stride), .65f, 2.25f);
             }
-            else { Play("Idle"); if (animator) animator.speed = 1; }
+            else
+            {
+                Play("Idle");
+                if (animator) animator.speed = 1;
+                if (!chasing && Vector3.Distance(transform.position, home) <= 1.2f)
+                    transform.rotation = Quaternion.Slerp(transform.rotation, homeRotation, Time.deltaTime * 5f);
+            }
 
             if (Network.CoopSessionConfig.IsMultiplayer && Unity.Netcode.NetworkManager.Singleton && Unity.Netcode.NetworkManager.Singleton.IsServer && (chasing || evading))
             {
@@ -365,21 +375,25 @@ namespace Riftbound
         void FacePoint(Vector3 point)
         {
             var look = point - transform.position; look.y = 0;
-            if (look.sqrMagnitude > .01f) transform.rotation = Quaternion.LookRotation(look);
+            if (look.sqrMagnitude > .01f)
+                transform.rotation = Quaternion.RotateTowards(transform.rotation, Quaternion.LookRotation(look), 540f * Time.deltaTime);
         }
         void Play(string value, bool force = false)
         {
             if (!animator || (!force && state == value)) return;
             animator.CrossFadeInFixedTime(value, .18f, 0, 0); state = value;
         }
-        bool ClearSight()
+        bool ClearSight() => ClearSightForTarget(player ? player.transform : null);
+        bool ClearSightForTarget(Transform target)
         {
+            Transform t = target ? target : (player ? player.transform : null);
+            if (!t) return false;
             Vector3 origin = transform.position + Vector3.up * 1.1f;
-            Vector3 delta = player.transform.position + Vector3.up - origin;
+            Vector3 delta = t.position + Vector3.up - origin;
             Vector3 heading = Vector3.ProjectOnPlane(delta, Vector3.up);
             if (heading.sqrMagnitude >= .01f && Vector3.Dot(transform.forward, heading.normalized) <= .25f) return false;
             return !Physics.Raycast(origin, delta.normalized, out var hit, delta.magnitude, ~(1 << 2), QueryTriggerInteraction.Ignore) ||
-                hit.collider.GetComponentInParent<PlayerController>() == player;
+                hit.collider.GetComponentInParent<PlayerController>() != null || hit.collider.transform.IsChildOf(t);
         }
         void FacePlayer()
         {

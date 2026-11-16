@@ -352,12 +352,55 @@ namespace Riftbound
                 motor.center = profile.controllerCenter;
             }
 
-            // 5. Update stride speeds
-            player.walkStrideSpeed = profile.walkStride;
-            player.runStrideSpeed = profile.runStride;
+            // 5. Update calibrated stride speeds matching measured clip foot travel
+            GetCalibratedStrides(race, characterClass, out float walkStride, out float runStride);
+            player.walkStrideSpeed = walkStride;
+            player.runStrideSpeed = runStride;
+            player.backWalkStrideSpeed = walkStride * 0.92f;
+            player.backRunStrideSpeed = runStride * 0.85f;
 
+            player.OnVisualApplied(anim);
             player.Play("Idle", true);
             Debug.Log($"<color=#70df80>[CharacterVisualFactory]</color> Applied {race} {characterClass} to player avatar successfully.");
+        }
+
+        public static void GetCalibratedStrides(string race, string characterClass, out float walkStride, out float runStride)
+        {
+            race = NormalizeRace(race);
+            characterClass = NormalizeClass(characterClass);
+
+            if (race == "Undead")
+            {
+                walkStride = 0.72f;
+                runStride = 1.00f;
+                return;
+            }
+
+            bool isRogue = characterClass == "Rogue";
+            switch (race)
+            {
+                case "Orc":
+                    walkStride = 0.77f;
+                    runStride = isRogue ? 4.39f : 4.10f;
+                    break;
+                case "Dwarf":
+                    walkStride = isRogue ? 1.20f : 1.02f;
+                    runStride = isRogue ? 6.19f : 5.50f;
+                    break;
+                case "Elf":
+                    walkStride = 0.80f;
+                    runStride = isRogue ? 4.05f : 4.25f;
+                    break;
+                case "Goblin":
+                    walkStride = 0.65f;
+                    runStride = isRogue ? 3.76f : 3.30f;
+                    break;
+                case "Human":
+                default:
+                    walkStride = 0.93f;
+                    runStride = isRogue ? 4.73f : 5.00f;
+                    break;
+            }
         }
     }
 }

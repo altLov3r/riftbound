@@ -911,10 +911,30 @@ namespace Riftbound
             var q = GetActiveQuest();
             if (q == null || !IsActiveQuestReady()) return;
 
+            if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner != null)
+            {
+                Network.RiftboundCoopPlayer.LocalOwner.RequestCompleteFactionQuestServerValidated(q.id);
+                return;
+            }
+
+            int goldGain = q.rewardGold;
+            if (player && player.CharacterRace == "Human") goldGain = Mathf.RoundToInt(goldGain * 1.25f);
+            FinalizeQuestCompletion(player, q, goldGain, q.rewardXP, authoritativeGoldAlreadySet: false);
+            SaveData();
+        }
+
+        public void ApplyAuthorizedComplete(PlayerController player, string questId, int newServerGold, int goldGain, int xpGain)
+        {
+            var q = GetQuest(questId);
+            if (q == null || completedQuests.Contains(questId)) return;
+            if (player) player.SetAuthoritativeGold(newServerGold);
+            FinalizeQuestCompletion(player, q, goldGain, xpGain, authoritativeGoldAlreadySet: true);
+        }
+
+        void FinalizeQuestCompletion(PlayerController player, QuestDef q, int goldGain, int xpGain, bool authoritativeGoldAlreadySet)
+        {
             completedQuests.Add(q.id);
             string completedTitle = q.title;
-            int goldGain = q.rewardGold;
-            int xpGain = q.rewardXP;
             string rewardItem = q.rewardItem;
 
             ActiveQuestId = "";
@@ -922,15 +942,17 @@ namespace Riftbound
 
             if (player)
             {
-                if (player.CharacterRace == "Human") goldGain = Mathf.RoundToInt(goldGain * 1.25f);
-                player.AddGoldDirect(goldGain);
+                if (!authoritativeGoldAlreadySet) player.AddGoldDirect(goldGain);
                 player.AddExperience(xpGain);
                 if (!string.IsNullOrEmpty(rewardItem))
                 {
                     player.GrantItem(rewardItem, true);
                     ChatSystem.LogQuest($"<color=#70df80>Received Equipment Reward: [{ItemCatalog.Get(rewardItem)?.name ?? rewardItem}]!</color>");
                 }
-                player.Stats.Heal(player.Stats.maxHealth);
+                if (authoritativeGoldAlreadySet && player.Stats)
+                    player.Stats.SetReplicatedHealth(player.Stats.maxHealth, player.Stats.maxHealth);
+                else if (player.Stats)
+                    player.Stats.Heal(player.Stats.maxHealth);
                 player.Message = $"Quest Complete: {completedTitle}! (+{goldGain} Gold, +{xpGain} XP)";
                 CombatTextManager.Spawn(player.transform.position + Vector3.up * 2.5f, $"★ QUEST COMPLETE: {completedTitle} ★", new Color(0.4f, 1f, 0.5f), true);
             }
@@ -943,8 +965,6 @@ namespace Riftbound
             {
                 MinimapRadar.ClearWaypoint();
             }
-
-            SaveData();
         }
 
         public void OnEnemyDefeated(EnemyController enemy)
@@ -1023,6 +1043,7 @@ namespace Riftbound
 
         public void SaveData()
         {
+            if (Network.CoopSessionConfig.IsMultiplayer) return;
             try
             {
                 var data = new FactionQuestSaveData
@@ -1044,6 +1065,7 @@ namespace Riftbound
             ActiveQuestId = "";
             CurrentProgress = 0;
             completedQuests.Clear();
+            if (Network.CoopSessionConfig.IsMultiplayer) return;
             try
             {
                 string path = SaveFilePath;

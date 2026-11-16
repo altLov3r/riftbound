@@ -129,7 +129,7 @@ namespace Riftbound
             // Slot 2: Cleave / Burst / Nova
             float cd2 = Mathf.Max(0f, player.CleaveReady - Time.time);
             string s2Icon = player.CharacterClass == "Mage" ? "❄" : player.CharacterClass == "Rogue" ? "🩸" : player.CharacterClass == "Paladin" ? "☼" : "🌪";
-            string s2Cost = player.CharacterClass == "Mage" ? "25 MP" : player.CharacterClass == "Rogue" ? "35 NR" : player.CharacterClass == "Paladin" ? "1 HP" : "25 RG";
+            string s2Cost = player.CharacterClass == "Mage" ? "25 MP" : player.CharacterClass == "Rogue" ? "35 NR" : player.CharacterClass == "Paladin" ? "2 HP" : "20 RG";
             if (DrawSlot(new Rect(barX + (slotSize + spacing) * 1, barY, slotSize, slotSize), "2", s2Icon, s2Cost, cd2, () => player.CastAbility2Public()))
             {
                 hoverTitle = ab2.name;
@@ -153,7 +153,7 @@ namespace Riftbound
             {
                 hoverTitle = "Health Potion";
                 hoverSub = "Consumable  •  Instant";
-                hoverDesc = $"Restores 65 Health points instantly.\nYou currently hold {player.Potions} potion(s). Purchase more from town vendors.";
+                hoverDesc = $"Restores 70 Health points instantly.\nYou currently hold {player.Potions} potion(s). Purchase more from town vendors.";
             }
 
             // Slot 5: Spell Interrupt [F]

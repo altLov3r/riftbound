@@ -313,38 +313,10 @@ namespace Riftbound
 
                 DrawUtilityMenu(width, height);
             }
-            if (!player.DialogueOpen && !player.ShopOpen)
+            if (!player.DialogueOpen && !player.ShopOpen && !player.AnyBlockingWindowOpen())
             {
-                string promptKey = "E";
-                string promptText = null;
-
-                if (LootDropSystem.Instance && LootDropSystem.Instance.GetNearbyCorpse(player.transform.position, 3.2f) is var corpse && corpse != null)
-                    promptText = $"Loot {corpse.name}";
-                else if (Mailbox.GetNearby(player.transform.position, 3.5f) is var mbNear && mbNear != null)
-                    promptText = $"Open {mbNear.mailboxName}";
-                else if (TownNPC.FindNearby(player.transform.position) is TownNPC townNpcAuc && townNpcAuc.roleTag == "Auctioneer")
-                    promptText = "Browse Auction House";
-                else if (FlightMaster.GetNearby(player.transform.position) is var fm && fm != null)
-                    promptText = $"Flight Master: {fm.nodeName}";
-                else if (GatheringNode.GetNearby(player.transform.position, 3.2f) is var gn && gn != null)
-                    promptText = gn.ActionPrompt;
-                else if (player.NearbyMerchant())
-                    promptText = $"Trade with {player.NearbyMerchant().npcName}";
-                else if (player.CanTalk())
-                    promptText = "Speak with Elder Abe";
-                else if (player.NearbyLandmark())
-                    promptText = $"Discover {player.NearbyLandmark().displayName}";
-                else if (player.NearbyRune())
-                    promptText = "Activate Runestone";
-                else if (player.NearbySupply())
-                    promptText = "Recover Supplies";
-                else if (player.NearbyChest())
-                    promptText = "Open Loot Cache";
-                else if (TownNPC.FindNearby(player.transform.position) is TownNPC townNpc)
-                    promptText = $"Speak with {townNpc.npcName}";
-
-                if (!string.IsNullOrEmpty(promptText))
-                    DrawInteractionBadge(promptKey, promptText, width, height);
+                if (player.TryGetBestInteraction(out var interaction, out _))
+                    DrawInteractionBadge("E", interaction.text, width, height);
             }
             if (player.DialogueOpen)
             {

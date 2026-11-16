@@ -113,10 +113,20 @@ namespace Riftbound
         public void UsePotion()
         {
             if (!Stats.Alive || FrontendMenu.IsOpen || DialogueOpen || ShopOpen || MapOpen || JournalOpen || (orbit && orbit.Paused) || Potions <= 0 || Stats.Health >= Stats.maxHealth) return;
-            Potions--; Stats.Heal(70); Message = "Health potion: restored 70 HP.";
             if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner != null)
+            {
                 Network.RiftboundCoopPlayer.LocalOwner.RequestUsePotion();
+                return;
+            }
+            Potions--; Stats.Heal(70); Message = "Health potion: restored 70 HP.";
             SaveAdventure(false);
+        }
+
+        public void ApplyAuthorizedPotionUse(int remainingPotions, int newHealth)
+        {
+            Potions = Mathf.Max(0, remainingPotions);
+            Stats.SetReplicatedHealth(newHealth, Stats.maxHealth);
+            Message = "Health potion: restored 70 HP.";
         }
         public void RefreshAdventureWorld()
         {
