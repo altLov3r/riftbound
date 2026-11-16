@@ -87,3 +87,11 @@ Maximum two unchanged failed attempts; stop after ten minutes without new eviden
 - Six exact packaged files hashed; level0/sharedassets changed and new scenery names present in level0. Runtime DLL unchanged from Production01. Receipts copied into Evidence/Supplies02. All seven terrain hashes reverified after build; no asset normalization required.
 - Standalone first launched hidden (PID5764), initialized scene/D3D11 but had no targetable window. Stopped only that own process, then changed hypothesis to visible Computer Use launch. Actual title/background/model rendered; closed normally viaAlt+F4, verified no window/process. No character/save changed. Manual route/GPU-performance/combined-online checks remain NOT RUN.
 - **SCENE RELEASED**, own checkout only. Final handoff OWN_CODEX_WORLD_02_HANDOFF.md; current source and final documentation pushed separately. No background work remains.
+
+## Continuation03 — Greenhollow preparation / reporting boundary
+
+- User activated further work after Production02. Inspected plans/current scene evidence and Gemini's3935340 handoff; no new Gemini change observed.
+- Reused the bounded supply tool with a separate Greenhollow plan/root/profile and extra4m marker/mount-display aprons. Focused capture/arrival-input entry points added in owned editor tooling only.
+- Survey PID32772 compiled and completed10:24:10 Sofia:209 anchors,125 accepted/84 rejected; existing carrot feed crate/sack/bucket selected near(-42,411). Temporary instances removed; source scene/assets not saved. No native preview/application/regression/new build run for this proposal.
+- At the user's later request for a whole-session report, stopped new feature work at this safe read-only boundary. Two editor files intentionally remain uncommitted WIP, absent from Production02; no scene ownership change or active own process. Do not describe them as delivered scenery.
+- Combined report: SESSION_REPORT_20261116.md, based on current remote refs and both agents' handoffs. It distinguishes delivered features, separately reported tests, unmerged branches, known limitations and pending integration. No claim of continuous work during conversation gaps.
