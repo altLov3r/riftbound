@@ -79,6 +79,16 @@ namespace Riftbound
             questTransform.gameObject.SetActive(false);
         }
 
+        public void TriggerGreetingBark()
+        {
+            if (string.IsNullOrEmpty(greeting)) return;
+            barkUntil = Time.time + 4.5f;
+            if (barkMesh) barkMesh.text = $"\"{greeting}\"";
+            GameSound.Play(SoundCue.Guard, transform.position);
+            if (ChatSystem.Instance)
+                ChatSystem.Instance.AddMessage(ChatSystem.Channel.Say, npcName, greeting, new Color(0.95f, 0.95f, 0.95f));
+        }
+
         void LateUpdate()
         {
             var cam = Camera.main;
@@ -101,17 +111,6 @@ namespace Riftbound
             if (player && player.Stats && player.Stats.Alive)
             {
                 float playerDist = Vector3.Distance(player.transform.position, transform.position);
-                if (playerDist < 3.1f && !player.DialogueOpen && !player.ShopOpen)
-                {
-                    if (Keyboard.current != null && Keyboard.current.eKey.wasPressedThisFrame && !string.IsNullOrEmpty(greeting))
-                    {
-                        barkUntil = Time.time + 4.5f;
-                        barkMesh.text = $"\"{greeting}\"";
-                        GameSound.Play(SoundCue.Guard, transform.position);
-                        if (ChatSystem.Instance)
-                            ChatSystem.Instance.AddMessage(ChatSystem.Channel.Say, npcName, greeting, new Color(0.95f, 0.95f, 0.95f));
-                    }
-                }
 
                 bool isTalkingToMe = player && player.DialogueOpen && player.ActiveTownNPC == this;
                 if ((Time.time < barkUntil || isTalkingToMe) && playerDist < 8f)

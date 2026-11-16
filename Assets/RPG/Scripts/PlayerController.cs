@@ -45,6 +45,43 @@ namespace Riftbound
         Vector3 dodgeDir;
         public float DodgeCooldownRemaining => Mathf.Max(0f, dodgeReadyTime - Time.time);
         Vector3 moveVelocity;
+        Quaternion visualBaseRotation = Quaternion.identity;
+        bool hasVisualBaseRotation;
+        float visualYawOffset;
+
+        public void OnVisualApplied(Animator anim)
+        {
+            if (anim)
+            {
+                visualBaseRotation = anim.transform.localRotation;
+                hasVisualBaseRotation = true;
+            }
+            else
+            {
+                visualBaseRotation = Quaternion.identity;
+                hasVisualBaseRotation = false;
+            }
+            visualYawOffset = 0f;
+        }
+
+        public bool AnyBlockingWindowOpen() =>
+            DialogueOpen || ShopOpen || MapOpen || JournalOpen || EncounterJournalOpen || InventoryOpen || TalentsOpen || ChatOpen ||
+            ProfessionSystem.IsOpen || AuctionHouseSystem.AuctionOpen || AuctionHouseSystem.MailboxOpen || SpellbookOpen || AchievementOpen || ReputationOpen ||
+            FlightMaster.IsAnyTaxiMapOpen ||
+            (GuildSystem.Instance && GuildSystem.Instance.IsOpen) ||
+            (CharacterSheetSystem.Instance && CharacterSheetSystem.Instance.IsOpen) ||
+            (SettingsSystem.Instance && SettingsSystem.Instance.IsMenuOpen) ||
+            (DungeonFinderSystem.Instance && DungeonFinderSystem.Instance.IsWindowOpen) ||
+            (ArchaeologySystem.Instance && ArchaeologySystem.Instance.IsWindowOpen) ||
+            (TransmogSystem.Instance && TransmogSystem.Instance.IsWindowOpen) ||
+            (FishingSystem.Instance && FishingSystem.Instance.IsWindowOpen) ||
+            (CalendarEventSystem.Instance && CalendarEventSystem.Instance.IsWindowOpen) ||
+            (BarberShopSystem.Instance && BarberShopSystem.Instance.IsWindowOpen) ||
+            (WorldPvPSystem.Instance && WorldPvPSystem.Instance.IsOverviewOpen) ||
+            (EquipmentSetSystem.Instance && EquipmentSetSystem.Instance.IsWindowOpen) ||
+            (GlyphSystem.Instance && GlyphSystem.Instance.IsWindowOpen) ||
+            (GemSocketSystem.Instance && GemSocketSystem.Instance.IsWindowOpen) ||
+            (PetBattleSystem.Instance && (PetBattleSystem.Instance.IsJournalOpen || PetBattleSystem.Instance.IsBattleActive));
         public float ClassResource { get; private set; } = 100f;
         public float MaxClassResource => CharacterClass == "Paladin" ? 5f : 100f;
         public string ClassResourceName => CharacterClass == "Warrior" ? "Rage" : CharacterClass == "Mage" ? "Mana" : CharacterClass == "Rogue" ? "Energy" : "Holy Power";
@@ -320,13 +357,14 @@ namespace Riftbound
 
             if (moveDirection.sqrMagnitude > 1f) moveDirection.Normalize();
 
-            bool isBackpedaling = backInput && !forwardInput && (!rightMouseSteering || (!leftInput && !rightInput));
+            bool isBackpedaling = backInput && !forwardInput;
+            bool diagonalBackpedal = isBackpedaling && rightMouseSteering && (leftInput || rightInput);
             float speed = Mounted && SelectedMount ? (running ? SelectedMount.runSpeed : SelectedMount.walkSpeed) : running ? runSpeed : walkSpeed;
             if (CharacterRace == "Human") speed *= 1.10f;
             if (Time.time < sprintUntil) speed *= 1.65f;
             speed *= WorldShrineSystem.GetSpeedMultiplier();
             UpdateMotionTrail(Time.time < sprintUntil || Time.time < dodgeEnds || Mounted);
-            if (isBackpedaling && !Mounted) speed *= backwardMultiplier;
+            if (isBackpedaling && !Mounted) speed *= (diagonalBackpedal ? 0.78f : backwardMultiplier);
 
             if (isFlyingMount)
             {
@@ -369,6 +407,30 @@ namespace Riftbound
 
             var planarVelocity = motor.velocity; planarVelocity.y = 0;
             float actualSpeed = planarVelocity.magnitude;
+            bool turningInPlace = !rightMouseSteering && (leftInput ^ rightInput) && actualSpeed <= 0.2f;
+
+            if (animator && !hasVisualBaseRotation)
+            {
+                visualBaseRotation = animator.transform.localRotation;
+                hasVisualBaseRotation = true;
+            }
+
+            // Visual strafe/diagonal alignment: turn the child mesh smoothly into strafe/backpedal motion while keeping actor transform.forward authoritative for camera/combat
+            float desiredVisualYaw = 0f;
+            if (animator && !Mounted && !attacking && motor.isGrounded && actualSpeed > 0.2f)
+            {
+                float signedTravelAngle = Vector3.SignedAngle(transform.forward, planarVelocity.normalized, Vector3.up);
+                if (Mathf.Abs(signedTravelAngle) <= 105f) desiredVisualYaw = Mathf.Clamp(signedTravelAngle, -52f, 52f);
+                else desiredVisualYaw = Mathf.Clamp(Vector3.SignedAngle(-transform.forward, planarVelocity.normalized, Vector3.up), -32f, 32f);
+            }
+            if (animator)
+            {
+                float lerpRate = attacking ? 28f : 14f;
+                visualYawOffset = Mathf.Lerp(visualYawOffset, desiredVisualYaw, 1f - Mathf.Exp(-lerpRate * Time.deltaTime));
+                if (hasVisualBaseRotation)
+                    animator.transform.localRotation = visualBaseRotation * Quaternion.Euler(0f, visualYawOffset, 0f);
+            }
+
             if (Mounted)
             {
                 Play("Ride"); if (animator) animator.speed = 1;
@@ -380,12 +442,20 @@ namespace Riftbound
                 bool movingBack = isBackpedaling || Vector3.Dot(planarVelocity, transform.forward) < -.15f;
                 bool animationRun = running;
                 string movementState = animationRun ? (movingBack ? "RunBack" : "Run") : (movingBack ? "WalkBack" : "Walk");
-                Play(airborne ? "Jump" : actualSpeed > .2f ? movementState : "Idle");
+                if (airborne)
+                    Play("Jump");
+                else if (actualSpeed > .2f)
+                    Play(movementState);
+                else if (turningInPlace)
+                    Play("Walk");
+                else
+                    Play("Idle");
+
                 if (animator)
                 {
                     float stride = animationRun ? (movingBack ? backRunStrideSpeed : runStrideSpeed) : (movingBack ? backWalkStrideSpeed : walkStrideSpeed);
-                    float playback = !airborne && actualSpeed > .2f ? Mathf.Clamp(actualSpeed / Mathf.Max(.1f, stride), .75f, 1.4f) : 1f;
-                    animator.speed = airborne || actualSpeed <= .2f ? 1f : playback;
+                    float playback = !airborne && actualSpeed > .2f ? Mathf.Clamp(actualSpeed / Mathf.Max(.1f, stride), .65f, 2.25f) : (turningInPlace && !airborne ? 0.75f : 1f);
+                    animator.speed = playback;
                 }
             }
             bool attack = keys.digit1Key.wasPressedThisFrame;
@@ -476,12 +546,13 @@ namespace Riftbound
         }
         float dialogueOpenedAt;
         public bool CanTalk() => Stats && Stats.Alive && questGiver && questGiver.gameObject.activeInHierarchy && Vector3.Distance(transform.position, questGiver.position) < 4;
-        public void CloseDialogue() { DialogueOpen = false; ActiveQuestGiver = null; ActiveTownNPC = null; }
+        public void CloseDialogue() { DialogueOpen = false; ActiveQuestGiver = null; ActiveTownNPC = null; PrototypeHUD.ResetGossipState(); }
         public void OpenTownNPCDialogue(TownNPC npc)
         {
             if (!npc) return;
             if (Stats && !Stats.Alive) return;
             FactionQuestSystem.Instance?.OnTalkedToNPC(npc.npcName);
+            PrototypeHUD.ResetGossipState();
             ActiveTownNPC = npc;
             ActiveQuestGiver = null;
             DialogueOpen = true;
@@ -548,12 +619,12 @@ namespace Riftbound
 
         void CastAbility1()
         {
-            if (Blocking || InventoryOpen || Time.time < attackReady) return;
+            if (Blocking || InventoryOpen || AnyBlockingWindowOpen() || Time.time < attackReady) return;
             if (CharacterClass == "Mage")
             {
                 if (ClassResource < 15) { Message = "Not enough Mana!"; return; }
-                if (!Target) SelectTarget();
-                if (!Target || Vector3.Distance(transform.position, Target.transform.position) > 28f)
+                if (!Target || !Target.Alive) SelectTarget();
+                if (!Target || !Target.Alive || Vector3.Distance(transform.position, Target.transform.position) > 28f)
                 {
                     Message = "Target is out of range (28m). TAB selects the nearest target.";
                     return;
@@ -561,9 +632,14 @@ namespace Riftbound
                 ClassResource -= 15;
                 var dir = Target.transform.position - transform.position; dir.y = 0;
                 if (dir.sqrMagnitude > .01f) transform.rotation = Quaternion.LookRotation(dir);
+                visualYawOffset = 0f;
+                if (animator && hasVisualBaseRotation) animator.transform.localRotation = visualBaseRotation;
                 attackReady = Time.time + 1.25f;
                 busyUntil = Time.time + 0.6f;
                 Play("Attack", true);
+                if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner != null)
+                    Network.RiftboundCoopPlayer.LocalOwner.TriggerActionAnim("Attack");
+                AudioEffects.PlaySpellCast();
                 float dmg = 36 + (Level - 1) * 4 + WeaponBonus;
                 if (CharacterRace == "Brute") dmg *= 1.15f;
                 FireballSpell.Cast(this, Target, dmg);
@@ -589,14 +665,24 @@ namespace Riftbound
 
         void CastAbility2()
         {
-            if (Blocking || InventoryOpen || Time.time < CleaveReady || Time.time < attackReady) return;
+            if (Blocking || InventoryOpen || AnyBlockingWindowOpen() || Time.time < attackReady) return;
+            if (Time.time < CleaveReady)
+            {
+                Message = $"Ability recharging ({Mathf.CeilToInt(CleaveReady - Time.time)}s).";
+                return;
+            }
             if (CharacterClass == "Mage")
             {
                 if (ClassResource < 25) { Message = "Not enough Mana!"; return; }
                 ClassResource -= 25;
                 CleaveReady = Time.time + 6f;
                 busyUntil = Time.time + 0.5f;
+                visualYawOffset = 0f;
+                if (animator && hasVisualBaseRotation) animator.transform.localRotation = visualBaseRotation;
                 Play("Cleave", true);
+                if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner != null)
+                    Network.RiftboundCoopPlayer.LocalOwner.TriggerActionAnim("Cleave");
+                AudioEffects.PlaySpellCast();
                 SpellFX.CreateFrostNova(transform.position, 6.5f);
                 float dmg = 32 + (Level - 1) * 3 + WeaponBonus;
                 if (CharacterRace == "Brute") dmg *= 1.15f;
@@ -612,7 +698,7 @@ namespace Riftbound
             else if (CharacterClass == "Rogue")
             {
                 if (ClassResource < 35) { Message = "Not enough Energy!"; return; }
-                if (!Target || Vector3.Distance(transform.position, Target.transform.position) > 3.5f)
+                if (!Target || !Target.Alive || Vector3.Distance(transform.position, Target.transform.position) > 3.5f)
                 {
                     Message = "Eviscerate requires a target in melee range.";
                     return;
@@ -621,7 +707,11 @@ namespace Riftbound
                 CleaveReady = Time.time + 4f;
                 attackReady = Time.time + 0.6f;
                 busyUntil = Time.time + 0.5f;
+                visualYawOffset = 0f;
+                if (animator && hasVisualBaseRotation) animator.transform.localRotation = visualBaseRotation;
                 Play("Cleave", true);
+                if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner != null)
+                    Network.RiftboundCoopPlayer.LocalOwner.TriggerActionAnim("Cleave");
                 Hit(Target, 52, "eviscerate");
                 Message = "Eviscerate! Critical finisher!";
             }
@@ -631,7 +721,12 @@ namespace Riftbound
                 ClassResource -= 2;
                 CleaveReady = Time.time + 6f;
                 busyUntil = Time.time + 0.5f;
+                visualYawOffset = 0f;
+                if (animator && hasVisualBaseRotation) animator.transform.localRotation = visualBaseRotation;
                 Play("Cleave", true);
+                if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner != null)
+                    Network.RiftboundCoopPlayer.LocalOwner.TriggerActionAnim("Cleave");
+                AudioEffects.PlaySpellCast();
                 SpellFX.CreateConsecration(transform.position, 5.5f);
                 float dmg = 40 + (Level - 1) * 3 + WeaponBonus;
                 if (CharacterRace == "Brute") dmg *= 1.15f;
@@ -646,14 +741,20 @@ namespace Riftbound
             }
             else // Warrior
             {
-                if (ClassResource >= 20) ClassResource -= 20;
+                if (ClassResource < 20) { Message = "Requires 20 Rage for Whirlwind!"; return; }
+                ClassResource -= 20;
                 StartCoroutine(Attack(true, cleaveDuration, 38f, "Whirlwind!"));
             }
         }
 
         void CastAbility3()
         {
-            if (Time.time < HealReady) return;
+            if (Blocking || InventoryOpen || AnyBlockingWindowOpen() || (Stats && !Stats.Alive)) return;
+            if (Time.time < HealReady)
+            {
+                Message = $"Ability recharging ({Mathf.CeilToInt(HealReady - Time.time)}s).";
+                return;
+            }
             if (CharacterClass == "Mage")
             {
                 if (ClassResource < 20) { Message = "Not enough Mana!"; return; }
@@ -663,6 +764,7 @@ namespace Riftbound
                 Stats.Heal(40);
                 if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner != null)
                     Network.RiftboundCoopPlayer.LocalOwner.RequestAbilityHeal(40, "arcane_ward");
+                AudioEffects.PlaySpellCast();
                 SpellFX.CreateArcaneBurst(transform.position);
                 Message = "Blink & Arcane Ward: Teleported & shielded 40 HP!";
             }
@@ -673,25 +775,30 @@ namespace Riftbound
                 HealReady = Time.time + 10f;
                 sprintUntil = Time.time + 5f;
                 attackReady = Time.time;
+                AudioEffects.PlaySpellCast();
                 Message = "Sprint: +65% speed for 5 seconds!";
             }
             else if (CharacterClass == "Paladin")
             {
+                if (Stats && Stats.Health >= Stats.maxHealth) { Message = "Health is already full."; return; }
                 if (ClassResource < 3) { Message = "Requires 3 Holy Power!"; return; }
                 ClassResource -= 3;
                 HealReady = Time.time + 12f;
                 Stats.Heal(60);
                 if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner != null)
                     Network.RiftboundCoopPlayer.LocalOwner.RequestAbilityHeal(60, "holy_light");
+                AudioEffects.PlaySpellCast();
                 SpellFX.CreateConsecration(transform.position, 2f);
                 Message = "Holy Light: restored 60 health.";
             }
             else // Warrior
             {
+                if (Stats && Stats.Health >= Stats.maxHealth) { Message = "Health is already full."; return; }
                 HealReady = Time.time + 12f;
                 Stats.Heal(45);
                 if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner != null)
                     Network.RiftboundCoopPlayer.LocalOwner.RequestAbilityHeal(45, "second_wind");
+                AudioEffects.PlaySpellCast();
                 Message = "Second Wind: restored 45 health.";
             }
         }
@@ -699,22 +806,27 @@ namespace Riftbound
         IEnumerator Attack(bool cleave, float duration = -1f, float damage = 24f, string message = "")
         {
             if (duration < 0) duration = cleave ? cleaveDuration : attackDuration;
-            if (!Target) SelectTarget();
+            if (!Target || !Target.Alive) SelectTarget();
             var victim = Target;
-            if (!cleave && (!Target || Vector3.Distance(transform.position, Target.transform.position) > 3.2f))
+            if (!cleave && (!Target || !Target.Alive || Vector3.Distance(transform.position, Target.transform.position) > 3.2f))
             { Message = "Move closer to an enemy. TAB selects the nearest target."; yield break; }
-            if (Target)
+            if (Target && Target.Alive)
             {
                 var direction = Target.transform.position - transform.position; direction.y = 0;
                 if (direction.sqrMagnitude > .01f) transform.rotation = Quaternion.LookRotation(direction);
             }
+            visualYawOffset = 0f;
+            if (animator && hasVisualBaseRotation) animator.transform.localRotation = visualBaseRotation;
             attackReady = Time.time + duration + .08f;
             if (cleave) CleaveReady = Time.time + Mathf.Max(1.5f, 5f - TalentSystem.GetWhirlwindCooldownReduction(this));
             busyUntil = Time.time + duration * .78f;
             if (animator) animator.speed = 1;
-            Play(cleave ? "Cleave" : "Attack", true);
+            string swingAnim = cleave ? "Cleave" : "Attack";
+            Play(swingAnim, true);
+            if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner != null)
+                Network.RiftboundCoopPlayer.LocalOwner.TriggerActionAnim(swingAnim);
             yield return new WaitForSeconds(duration * .45f);
-            if (!Stats.Alive) yield break;
+            if (!Stats.Alive || Blocking) yield break;
             if (cleave)
             {
                 SpellFX.CreateCleaveArc(transform.position, 3.8f, CharacterClass);
@@ -723,11 +835,15 @@ namespace Riftbound
                     if (Vector3.Distance(transform.position, enemy.transform.position) < 3.8f) Hit(enemy.GetComponent<Combatant>(), damage, "whirlwind");
                 Message = string.IsNullOrEmpty(message) ? "Whirlwind!" : message;
             }
-            else if (victim && Vector3.Distance(transform.position, victim.transform.position) < 3.5f && Vector3.Dot(transform.forward, (victim.transform.position - transform.position).normalized) > .1f)
+            else if (victim && victim.Alive && Vector3.Distance(transform.position, victim.transform.position) < 3.5f && Vector3.Dot(transform.forward, (victim.transform.position - transform.position).normalized) > .1f)
             {
                 SpellFX.CreateSlashArc(transform.position, transform.forward, CharacterClass);
                 Hit(victim, damage, "melee");
                 if (!string.IsNullOrEmpty(message)) Message = message;
+            }
+            else
+            {
+                Message = !victim || !victim.Alive ? "Target defeated." : "Target moved out of melee range.";
             }
         }
 
@@ -917,6 +1033,9 @@ namespace Riftbound
             StopGuard(); ReturningHome = false;
             StopAllCoroutines(); motor.enabled = false; transform.position = safeSpawn; motor.enabled = true;
             vertical = 0; moveVelocity = Vector3.zero;
+            visualYawOffset = 0f;
+            if (animator && hasVisualBaseRotation) animator.transform.localRotation = visualBaseRotation;
+            Cursor.lockState = CursorLockMode.None; Cursor.visible = true;
             if (serverHp >= 0) Stats.SetReplicatedHealth(serverHp, Stats.maxHealth);
             else Stats.Restore();
             Target = null; busyUntil = 0;

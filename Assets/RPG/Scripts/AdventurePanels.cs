@@ -18,7 +18,7 @@ namespace Riftbound
                     GUI.Label(new Rect(width / 2 - 120, height - 104, 240, 24), "Guarding", small);
                 if (player.Mounted)
                 {
-                    string travelHint = player.IsFlying ? "Z Dismount   Space Ascend   X Descend" : "Z Dismount   C Walk / run";
+                    string travelHint = player.IsFlying ? "Z Dismount   Space Ascend   X Descend" : "Z Dismount   / Walk / run";
                     GUI.Label(new Rect(24, height - 54, 370, 24), travelHint, small);
                 }
             }

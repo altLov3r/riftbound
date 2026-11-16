@@ -62,6 +62,12 @@ namespace Riftbound.Network
         float actionAnimUntil;
         Vector3 lastLocalPos;
         bool hasLastLocalPos;
+        Vector3 lastRemoteWorldPos;
+        bool hasLastRemotePos;
+        float remoteSmoothedSpeed;
+        float remoteZeroSpeedTimer;
+        Quaternion remoteBaseVisualRot = Quaternion.identity;
+        float remoteVisualYawOffset;
         bool spawnPositioned;
         readonly Dictionary<string, float> serverAbilityCooldowns = new Dictionary<string, float>();
         readonly HashSet<string> serverDefeatedEnemyKeys = new HashSet<string>();
@@ -194,7 +200,8 @@ namespace Riftbound.Network
             {
                 remoteVisualRoot.name = $"CoopVisual_{r}_{c}";
                 remoteVisualRoot.transform.localPosition = Vector3.zero;
-                remoteVisualRoot.transform.localRotation = Quaternion.identity;
+                remoteBaseVisualRot = remoteVisualRoot.transform.localRotation;
+                remoteVisualYawOffset = 0f;
                 foreach (var cam in remoteVisualRoot.GetComponentsInChildren<Camera>(true)) Destroy(cam);
                 foreach (var al in remoteVisualRoot.GetComponentsInChildren<AudioListener>(true)) Destroy(al);
                 remoteAnimator = remoteVisualRoot.GetComponentInChildren<Animator>();
@@ -262,10 +269,61 @@ namespace Riftbound.Network
 
         void UpdateRemoteAnimation()
         {
-            if (!remoteAnimator || Time.time < actionAnimUntil) return;
-            string desired = Health.Value <= 0
-                ? "Hit"
-                : (IsMounted.Value ? "Ride" : (MoveSpeed.Value > 4.2f ? "Run" : (MoveSpeed.Value > 0.25f ? "Walk" : "Idle")));
+            if (!remoteAnimator) return;
+            Vector3 curWorldPos = transform.position;
+            Vector3 worldVel = hasLastRemotePos && Time.deltaTime > 0.0001f
+                ? (curWorldPos - lastRemoteWorldPos) / Time.deltaTime
+                : Vector3.zero;
+            lastRemoteWorldPos = curWorldPos;
+            hasLastRemotePos = true;
+            worldVel.y = 0f;
+
+            float netSpd = MoveSpeed.Value;
+            if (netSpd > 0.2f) remoteZeroSpeedTimer = 0f;
+            else remoteZeroSpeedTimer += Time.deltaTime;
+            float effectiveSpeed = netSpd > 0.2f ? netSpd : (remoteZeroSpeedTimer < 0.12f ? remoteSmoothedSpeed : 0f);
+            remoteSmoothedSpeed = Mathf.Lerp(remoteSmoothedSpeed, effectiveSpeed, 1f - Mathf.Exp(-14f * Time.deltaTime));
+
+            // Smoothly orient visual child toward strafe direction while moving unmounted
+            float targetYaw = 0f;
+            Vector3 localVel = transform.InverseTransformDirection(worldVel);
+            bool movingBack = localVel.z < -0.25f && remoteSmoothedSpeed > 0.25f;
+            if (Health.Value > 0 && !IsMounted.Value && Time.time >= actionAnimUntil && worldVel.sqrMagnitude > 0.09f)
+            {
+                float signedAngle = Vector3.SignedAngle(transform.forward, worldVel.normalized, Vector3.up);
+                if (Mathf.Abs(signedAngle) <= 105f) targetYaw = Mathf.Clamp(signedAngle, -52f, 52f);
+                else targetYaw = Mathf.Clamp(Vector3.SignedAngle(-transform.forward, worldVel.normalized, Vector3.up), -30f, 30f);
+            }
+            remoteVisualYawOffset = Mathf.Lerp(remoteVisualYawOffset, targetYaw, 1f - Mathf.Exp(-14f * Time.deltaTime));
+            if (remoteVisualRoot)
+                remoteVisualRoot.transform.localRotation = remoteBaseVisualRot * Quaternion.Euler(0f, remoteVisualYawOffset, 0f);
+
+            if (Time.time < actionAnimUntil)
+            {
+                remoteAnimator.speed = 1f;
+                return;
+            }
+
+            string desired;
+            if (Health.Value <= 0)
+                desired = remoteAnimator.HasState(0, Animator.StringToHash("Death")) ? "Death" : "Hit";
+            else if (IsMounted.Value)
+                desired = "Ride";
+            else if (remoteSmoothedSpeed > 3.6f)
+                desired = movingBack && remoteAnimator.HasState(0, Animator.StringToHash("RunBack")) ? "RunBack" : "Run";
+            else if (remoteSmoothedSpeed > 0.25f)
+                desired = movingBack && remoteAnimator.HasState(0, Animator.StringToHash("WalkBack")) ? "WalkBack" : "Walk";
+            else
+                desired = "Idle";
+
+            CharacterVisualFactory.GetCalibratedStrides(builtRace, builtClass, out float walkStride, out float runStride);
+            if (desired == "Run" || desired == "RunBack")
+                remoteAnimator.speed = Mathf.Clamp(remoteSmoothedSpeed / Mathf.Max(0.1f, desired == "RunBack" ? runStride * 0.85f : runStride), 0.75f, 2.25f);
+            else if (desired == "Walk" || desired == "WalkBack")
+                remoteAnimator.speed = Mathf.Clamp(remoteSmoothedSpeed / Mathf.Max(0.1f, desired == "WalkBack" ? walkStride * 0.92f : walkStride), 0.65f, 2.25f);
+            else
+                remoteAnimator.speed = 1f;
+
             if (desired == currentRemoteAnim) return;
             if (remoteAnimator.HasState(0, Animator.StringToHash(desired)))
             {
@@ -509,6 +567,7 @@ namespace Riftbound.Network
 
             if (serverAbilityCooldowns.TryGetValue("heal:" + key, out float readyAt) && Time.time < readyAt) return;
             serverAbilityCooldowns["heal:" + key] = Time.time + 8.0f;
+            if (key == "arcane_ward") lastServerMoveTime -= 0.85f; // Allow 7.5m Blink displacement once per validated arcane_ward cast
 
             int clamped = Mathf.Clamp(amount, 1, 65);
             Health.Value = Mathf.Min(MaxHealth.Value, Health.Value + clamped);

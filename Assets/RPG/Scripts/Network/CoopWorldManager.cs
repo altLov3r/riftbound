@@ -77,18 +77,7 @@ namespace Riftbound.Network
             {
                 RiftboundCoopPlayer.LocalOwner.RequestReadyCheck();
             }
-            if (keys.eKey.wasPressedThisFrame)
-            {
-                var lp = RiftboundCoopPlayer.LocalOwner;
-                foreach (var p in RiftboundCoopPlayer.AllPlayers)
-                {
-                    if (p && p != lp && p.Health.Value <= 0 && Vector3.Distance(lp.transform.position, p.transform.position) <= 4.5f)
-                    {
-                        lp.RequestReviveAlly(p.OwnerClientId);
-                        break;
-                    }
-                }
-            }
+            // Note: [E] Ally Revive is handled cleanly through PlayerServices.TryGetBestInteraction / Interact() so [E] never double-fires alongside quests/NPCs/chests.
         }
 
         readonly Dictionary<ulong, HashSet<string>> claimedChestsByClient = new Dictionary<ulong, HashSet<string>>();

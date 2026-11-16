@@ -179,8 +179,10 @@ namespace Riftbound
                     float d = Vector3.Distance(transform.position, replicatedPos);
                     if (d > 0.08f)
                     {
+                        Vector3 prevPos = transform.position;
                         transform.position = Vector3.Lerp(transform.position, replicatedPos, Time.deltaTime * 12f);
-                        Play("Run", false);
+                        float approxSpeed = Time.deltaTime > 0.0001f ? Vector3.Distance(prevPos, transform.position) / Time.deltaTime : d * 12f;
+                        Play(approxSpeed > 2.4f ? "Run" : "Walk", false);
                     }
                     else
                     {
@@ -345,10 +347,18 @@ namespace Riftbound
                 motor.Move(direction.normalized * speed * Time.deltaTime);
                 var travelled = transform.position - previousPosition; travelled.y = 0;
                 Play(travelled.sqrMagnitude > .000001f ? (chasing ? "Run" : "Walk") : "Idle");
-                float stride = chasing ? (runStrideSpeed > 0 ? runStrideSpeed : (player ? player.runStrideSpeed : 5f)) : (walkStrideSpeed > 0 ? walkStrideSpeed : (player ? player.walkStrideSpeed : 2.5f));
-                if (animator) animator.speed = Mathf.Clamp(travelled.magnitude / Mathf.Max(.001f, Time.deltaTime * stride), .6f, 2.0f);
+                float stride = chasing
+                    ? (runStrideSpeed > 0 ? runStrideSpeed : (player ? player.runStrideSpeed : 4.2f))
+                    : (walkStrideSpeed > 0 ? walkStrideSpeed : (player ? player.walkStrideSpeed : 0.9f));
+                if (animator) animator.speed = Mathf.Clamp(travelled.magnitude / Mathf.Max(.001f, Time.deltaTime * stride), .65f, 2.25f);
             }
-            else { Play("Idle"); if (animator) animator.speed = 1; }
+            else
+            {
+                Play("Idle");
+                if (animator) animator.speed = 1;
+                if (!chasing && Vector3.Distance(transform.position, home) <= 1.2f)
+                    transform.rotation = Quaternion.Slerp(transform.rotation, homeRotation, Time.deltaTime * 5f);
+            }
 
             if (Network.CoopSessionConfig.IsMultiplayer && Unity.Netcode.NetworkManager.Singleton && Unity.Netcode.NetworkManager.Singleton.IsServer && (chasing || evading))
             {
@@ -365,7 +375,8 @@ namespace Riftbound
         void FacePoint(Vector3 point)
         {
             var look = point - transform.position; look.y = 0;
-            if (look.sqrMagnitude > .01f) transform.rotation = Quaternion.LookRotation(look);
+            if (look.sqrMagnitude > .01f)
+                transform.rotation = Quaternion.RotateTowards(transform.rotation, Quaternion.LookRotation(look), 540f * Time.deltaTime);
         }
         void Play(string value, bool force = false)
         {

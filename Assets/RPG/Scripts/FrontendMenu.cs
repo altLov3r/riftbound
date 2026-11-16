@@ -722,10 +722,10 @@ namespace Riftbound
             DrawActionButtonsBottomRight(new Rect(880, 575, 360, 125));
 
             // Bottom Left Navigation Buttons: Settings / Controls / Quit
-            GUI.Label(new Rect(40, 155, 245, 30), "Your adventure", subHeading);
-            GUI.Label(new Rect(40, 196, 230, 75), "Choose a character to continue, or begin a new story on the frontier.", body);
-            DrawSessionModePanel(new Rect(40, 290, 255, 230));
-            DrawNavigationButtonsBottomLeft(new Rect(40, 540, 240, 140));
+            GUI.Label(new Rect(28, 155, 290, 30), "Your adventure", subHeading);
+            GUI.Label(new Rect(28, 196, 285, 75), "Choose a character to continue, or begin a new story on the frontier.", body);
+            DrawSessionModePanel(new Rect(28, 290, 292, 230));
+            DrawNavigationButtonsBottomLeft(new Rect(28, 540, 240, 140));
         }
 
         void DrawSessionModePanel(Rect rect)
@@ -771,7 +771,14 @@ namespace Riftbound
         void DrawModeButton(Rect rect, string label, Network.CoopSessionMode mode)
         {
             bool active = Network.CoopSessionConfig.Mode == mode;
-            var style = active ? enterButton : button;
+            var style = new GUIStyle(active ? enterButton : button)
+            {
+                fontSize = 11,
+                fontStyle = active ? FontStyle.Bold : FontStyle.Normal,
+                alignment = TextAnchor.MiddleCenter,
+                padding = new RectOffset(4, 4, 4, 4),
+                wordWrap = false
+            };
             if (GUI.Button(rect, label, style))
             {
                 Network.CoopSessionConfig.Mode = mode;
@@ -1119,32 +1126,29 @@ namespace Riftbound
 
             GUI.Label(new Rect(60, 155, 540, 340),
                 "MOVEMENT & CAMERA:\n" +
-                "  W / A / S / D       Run / Strafe (WoW Responsive Physics)\n" +
-                "  C                   Toggle slow RP walk\n" +
+                "  W / A / S / D       Run / Turn (RMB + A/D/Q Strafe)\n" +
+                "  /  (Numpad /)      Toggle slow RP walk (Default: Run)\n" +
                 "  SPACE               Jump (or Ascend while on Flying Mount)\n" +
-                "  X                   Descend (while on Flying Mount)\n" +
-                "  LEFT SHIFT (Hold)   Flight Sprint Boost (24 m/s)\n" +
-                "  RMB + Mouse         Turn character & orbit camera\n" +
+                "  X / LEFT SHIFT      Descend / Flight Sprint Boost (24 m/s)\n" +
+                "  LEFT ALT            Dodge Roll\n" +
+                "  RMB / LMB + Mouse   Steer character / Free-orbit camera\n" +
                 "  Mouse Wheel         Zoom camera in / out\n\n" +
                 "INTERACTION & MOUNTS:\n" +
                 "  TAB                 Target nearest enemy\n" +
                 "  E                   Interact / Quest / Cache / Revive Ally\n" +
                 "  R                   Respawn (when downed)\n" +
-                "  Z                   Summon / Dismount active mount\n" +
-                "  V                   Swap selected mount (Horse / Zebra / Gryphon)", body);
+                "  Z / V               Summon-Dismount / Swap Mount", body);
 
             GUI.Label(new Rect(640, 155, 560, 340),
                 "COMBAT & TALENTS:\n" +
-                "  1 / LMB             Primary Class Strike / Spell\n" +
-                "  2                   Secondary AOE Cleave / Frost Nova / Finisher\n" +
-                "  3                   Class Utility / Shield / Heal / Sprint\n" +
-                "  4                   Healing Potion\n" +
-                "  N                   Specialization & Talent Trees\n\n" +
+                "  1 / 2 / 3           Class Strike / AOE / Shield-Heal\n" +
+                "  4 / F / Q (Hold)    Health Potion / Interrupt / Shield Block\n" +
+                "  N / C               Talents / Character Sheet\n\n" +
                 "PANELS & CO-OP:\n" +
-                "  I / M / J           Inventory / World Map / Quest Journal\n" +
+                "  I (or B) / M / J    Inventory / World Map / Quest Journal\n" +
                 "  F6 / F7             Co-op Map Ping / Ready Check\n" +
                 "  F5                  Manual Save Progress (Offline)\n" +
-                "  ESC                 Game Menu / Cancel Selection", body);
+                "  ESC                 Close Window / Cancel Selection / Menu", body);
 
             if (GUI.Button(new Rect(60, 520, 220, 44), "Back", button))
             {
