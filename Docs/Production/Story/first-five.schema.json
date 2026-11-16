@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:riftbound:narrative:first-five:1",
+  "title": "Riftbound first-five catalog proposal v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "catalogId", "profiles"],
+  "properties": {
+    "schemaVersion": {"type": "integer", "const": 1},
+    "catalogId": {"type": "string", "const": "riftbound.first-five.v1"},
+    "profiles": {"type": "array", "minItems": 5, "maxItems": 5, "items": {"$ref": "#/$defs/profile"}}
+  },
+  "$defs": {
+    "condition": {
+      "type": "object", "additionalProperties": false,
+      "required": ["field", "key", "boolValue", "intValue"],
+      "properties": {
+        "field": {"type": "string", "enum": ["main.index", "main.accepted", "main.ready", "main.complete", "quest.available", "quest.active", "quest.ready", "quest.completed", "enemy.alive", "enemy.defeated"]},
+        "key": {"type": "string", "maxLength": 80},
+        "boolValue": {"type": "boolean"},
+        "intValue": {"type": "integer", "minimum": 0, "maximum": 3}
+      }
+    },
+    "entry": {
+      "type": "object", "additionalProperties": false,
+      "required": ["lineId", "channel", "scope", "topicId", "priority", "conditions", "text"],
+      "properties": {
+        "lineId": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]+$", "maxLength": 100},
+        "channel": {"type": "string", "enum": ["greeting", "main_title", "main_body", "quest_offer", "quest_progress", "quest_ready", "quest_after", "public_topic", "encounter_bark"]},
+        "scope": {"type": "string", "enum": ["public", "viewer", "host_encounter"]},
+        "topicId": {"type": "string", "pattern": "^[a-z0-9_.-]*$", "maxLength": 80},
+        "priority": {"type": "integer", "minimum": 0, "maximum": 99},
+        "conditions": {"type": "array", "maxItems": 12, "items": {"$ref": "#/$defs/condition"}},
+        "text": {"type": "string", "minLength": 1, "maxLength": 900}
+      }
+    },
+    "profile": {
+      "type": "object", "additionalProperties": false,
+      "required": ["profileId", "actorKind", "legacyName", "enemyId", "fallbackText", "entries"],
+      "properties": {
+        "profileId": {"type": "string", "enum": ["abe", "rowan", "mira", "elara", "selvek"]},
+        "actorKind": {"type": "string", "enum": ["main_quest_giver", "merchant", "faction_quest_giver", "hostile_enemy"]},
+        "legacyName": {"type": "string", "minLength": 1, "maxLength": 80},
+        "enemyId": {"type": "string", "maxLength": 80},
+        "fallbackText": {"type": "string", "minLength": 1, "maxLength": 180},
+        "entries": {"type": "array", "minItems": 1, "maxItems": 100, "items": {"$ref": "#/$defs/entry"}}
+      }
+    }
+  }
+}
