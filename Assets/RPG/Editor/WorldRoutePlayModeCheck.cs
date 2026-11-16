@@ -43,8 +43,11 @@ namespace Riftbound.Editor
 
         public static void RunGateDiagnostic() { Start(true,false); }
         public static void CaptureFrames() { Start(false,true); }
+        public static void CaptureSupplyPreview() { Start(false,true,supplies:"compare"); }
+        public static void CaptureSupplyFinal() { Start(false,true,supplies:"final"); }
+        public static void RunDepartureVerification() { Start(false,false,departure:true); }
 
-        static void Start(bool gateOnly, bool captureOnly)
+        static void Start(bool gateOnly, bool captureOnly,string supplies="",bool departure=false)
         {
             WorldProductionAudit.Open();
             folder = WorldProductionAudit.Evidence + (captureOnly ? "frames-" : "play-") + DateTime.UtcNow.ToString("yyyyMMdd-HHmmss");
@@ -52,6 +55,7 @@ namespace Riftbound.Editor
             SessionState.SetString(Key + ".Folder",folder);
             SessionState.SetBool(Key,true); SessionState.SetBool(Key + ".Failed",false);
             SessionState.SetBool(Key+".GateOnly",gateOnly); SessionState.SetBool(Key+".CaptureOnly",captureOnly);
+            SessionState.SetString(Key+".Supplies",supplies);SessionState.SetBool(Key+".Departure",departure);
             SessionState.SetBool(Key + ".DirectPlay",EditorPrefs.GetBool("Riftbound.DirectPlayInEditor",false));
             EditorPrefs.SetBool("Riftbound.DirectPlayInEditor",false);
             UIArtSetup.PrepareGameView();
@@ -149,6 +153,11 @@ namespace Riftbound.Editor
                     if(SessionState.GetBool(Key+".GateOnly",false))
                         cases=new List<Case> {new Case("Isolated Highspire north gate",gate,false)};
                     if(SessionState.GetBool(Key+".CaptureOnly",false)) cases.Clear();
+                    if(SessionState.GetBool(Key+".Departure",false))
+                    {
+                        var exit=SettlementRoutePass.ReadPath("Emberwatch west departure");cases.Clear();
+                        foreach(bool mounted in new[] {false,true}) foreach(bool reverse in new[] {false,true}) cases.Add(new Case("Emberwatch departure",exit,mounted,reverse));
+                    }
                     stage=2;
                 }
                 if (stage == 2)
@@ -231,6 +240,13 @@ namespace Riftbound.Editor
 
         static void Capture(double now)
         {
+            string supplies=SessionState.GetString(Key+".Supplies","");
+            if(supplies.Length>0)
+            {
+                if(SettlementSupplyPass.RenderPreviewTick(player,folder,supplies=="final"))
+                {Report.AppendLine("Native supply preview completed; inspect PNGs and separate timing receipt before applying.");Finish(false);}
+                return;
+            }
             if(SystemInfo.graphicsDeviceType==UnityEngine.Rendering.GraphicsDeviceType.Null)
             { Report.AppendLine("NOT RUN: native GPU frame captures (headless device)."); Finish(false); return; }
             var names=new[] {"Highspire","Westbank","Reaver-lower","Reaver-upper","Greenhollow","Highspire-gate"};
@@ -262,6 +278,7 @@ namespace Riftbound.Editor
         static void Finish(bool failed)
         {
             EditorApplication.update-=Tick;
+            if(SessionState.GetString(Key+".Supplies","").Length>0) SettlementSupplyPass.EndPreview();
             if(keyboard!=null) { Keys(); InputSystem.RemoveDevice(keyboard); }
             Report.AppendLine($"Editor error-pause clears={pauseClears}; headless graphics errors/editor exceptions require separate classification.");
             File.WriteAllText(folder+"/result.txt",Report.ToString());

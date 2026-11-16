@@ -368,3 +368,15 @@ Native before/after/gate frames are committed in **Docs/Production/Evidence/**. 
 **NOT RUN:** continuous manual adventure, complete OrbitCamera/animation/audio/NavMesh review, all26 individually identified tree bases/colliders, rendered frame-time comparison, complete mounted Reaver combat, two-PC online/combined-branch acceptance. Exact ownership requests: Docs/Production/GEMINI_RUNTIME_FINDINGS.md. Full source/build identities, test boundaries and player route: **Docs/Production/OWN_CODEX_WORLD_HANDOFF.md**.
 
 **SCENE RELEASED — production checkout only, approximately09:00 Sofia.** No main merge, networking/combat/progression/session UI/camera/LivingWorldEvents edit or world regeneration. Next acceptance is user playtest; later implementation follows the production contract and existing narrow approvals.
+
+## Production02 — restrained supply/rest scenery, 2026-11-16
+
+User-activated continuation in the same isolated production branch, preserving Production01 and the finished overnight delivery. Applied only the existing C05 loading/rest scope: Emberwatch two wooden crates/one barrel; Willow Rest one bench/one barrel. Five active renderers/five box colliders, no new scripts/IDs/rewards. Exact source-model links/transforms and reviewed native images: Docs/Production/SETTLEMENT_SUPPLIES_CHANGESET.md and Evidence/Supplies02/. The rejected miniature-prefab preview was never saved.
+
+- Scene adds712 lines/removes0 against Production01. Original buildings, actors, source model/import/material assets and all terrain/trees/paint/details retained. Seven terrain and three model byte hashes match baselines.
+- Save/reload checks passed for all five placements, source links, transforms, support, road margins, service aprons, physical overlap and conservative tree-footprint exclusion. Maximum terrain footprint spread0.043m; no grading.
+- Existing quest regression after saved scene:145 PASS/0 FAIL, unchanged separate-terrain assertion. Focused actual-player/mount queued-input departure:four passes, both directions. Fixture heading/teleports and isolated saves; not continuous/manual adventure.
+- Full read-only geometry:36 REACHED/0 BLOCKED; map deviations0.00m. Headless graphics warnings and one UnityEditor.Search startup exception retained as tooling limitations; no rendered acceptance inferred.
+- Six before/after native previews and three final saved-scene frames inspected. Matching scale/support and clear exit. Paused UI-hidden editor p95 before/after differs by approximately-0.1 to+0.5ms; batches unavailable. Not standalone performance or normal animation/camera acceptance.
+
+Unique Production02 packaging is pending at this source checkpoint. Final source/build identity and release are recorded in Docs/Production/OWN_CODEX_WORLD_02_HANDOFF.md after execution. Continuous manual/full camera/tree/audio/NavMesh, mounted Reaver combat, standalone GPU profiling and two-PC/combined runtime acceptance remain NOT RUN. Earlier strict mounted Reaver encounter failure is preserved. Gemini's newer gameplay branch has not been merged or modified.

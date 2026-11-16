@@ -107,11 +107,21 @@ namespace Riftbound.Editor
 
         public static void BuildVerifiedWorld()
         {
+            BuildToFolder("Builds/CodexWorldProduction01","build");
+        }
+
+        public static void BuildSettlementWorld()
+        {
+            BuildToFolder("Builds/CodexWorldProduction02","build-02");
+        }
+
+        static void BuildToFolder(string folder,string receipt)
+        {
             try
             {
                 Open();
-                const string output="Builds/CodexWorldProduction01/Riftbound.exe";
-                if(Directory.Exists("Builds/CodexWorldProduction01")) throw new InvalidOperationException("Production output already exists; do not overwrite.");
+                string output=folder+"/Riftbound.exe";
+                if(Directory.Exists(folder)) throw new InvalidOperationException("Production output already exists; do not overwrite.");
                 var terrain=WorldRegions.TerrainAt(RiverReaverCamp.Position);
                 var original=AssetDatabase.LoadAssetAtPath<TerrainData>("Assets/RPG/Terrain/ReaverCamp/Reaver approach preserved final.asset");
                 var report=new StringBuilder($"PRODUCTION BUILD PROTECTION UTC={DateTime.UtcNow:O}\n");
@@ -123,18 +133,18 @@ namespace Riftbound.Editor
                 if(grade>35) throw new InvalidOperationException("Reaver grade regressed.");
                 report.AppendLine($"PASS Terrain/Collider, 15 prototypes, grade={grade:F2}");
                 Phase1WorldAudit.AuditCurrentScene();
-                File.WriteAllText(Evidence+"build-protection.txt",report.ToString());
+                File.WriteAllText(Evidence+receipt+"-protection.txt",report.ToString());
                 var build=BuildPipeline.BuildPlayer(new BuildPlayerOptions
                 {
                     scenes=new[] {WorldRegions.ScenePath},locationPathName=output,
                     target=BuildTarget.StandaloneWindows64,options=BuildOptions.None
                 });
-                File.WriteAllText(Evidence+"build-result.txt",$"UTC={DateTime.UtcNow:O}\nPath={output}\nResult={build.summary.result}\nErrors={build.summary.totalErrors}\nWarnings={build.summary.totalWarnings}\nDuration={build.summary.totalTime}\nBytes={build.summary.totalSize}\n");
+                File.WriteAllText(Evidence+receipt+"-result.txt",$"UTC={DateTime.UtcNow:O}\nPath={output}\nResult={build.summary.result}\nErrors={build.summary.totalErrors}\nWarnings={build.summary.totalWarnings}\nDuration={build.summary.totalTime}\nBytes={build.summary.totalSize}\n");
                 EditorApplication.Exit(build.summary.result==UnityEditor.Build.Reporting.BuildResult.Succeeded ? 0 : 1);
             }
             catch(Exception e)
             {
-                Directory.CreateDirectory(Evidence); File.WriteAllText(Evidence+"build-error.txt",e.ToString());
+                Directory.CreateDirectory(Evidence); File.WriteAllText(Evidence+receipt+"-error.txt",e.ToString());
                 Debug.LogException(e); EditorApplication.Exit(1);
             }
         }

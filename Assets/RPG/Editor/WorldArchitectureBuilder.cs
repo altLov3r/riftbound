@@ -1814,7 +1814,7 @@ namespace Riftbound.Editor
             return inst;
         }
 
-        static Material ResolveImportedMaterial(Material source, string relativePath)
+        internal static Material ResolveImportedMaterial(Material source, string relativePath)
         {
             string family = relativePath.Split('/')[0];
             string key = family + "_" + source.name.Replace('/', '_');
