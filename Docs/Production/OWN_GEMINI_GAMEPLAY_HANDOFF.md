@@ -45,7 +45,7 @@
 | GP11 | Economy, Shop & Inventory | VERIFIED | Scene `Merchant` interaction (`Trade with Provisioner Mira`), `BuyPotion()`, `BuyVest()`, and `EquipItem("leather-vest")` verified in `RunPlayModeVerify`, plus co-op host-validated transactions in `-coopAuthoritySmoke` & `-coopProgressionSmoke`. |
 | GP12 | Living World Events | VERIFIED | `LivingWorldEvents.TriggerCaravanEvent()` verified in `RunPlayModeVerify`; Caravan/Ambush co-op reward & sync verified in `-coopFullAcceptanceSmoke` & `-coopLateJoinSmoke`. |
 | GP13 | Save Isolation & Session-Only | VERIFIED | `UGS_INIT_IN_OFFLINE_LOG=0` in `QuestRouteSmokeTest.Run`; `PlayerProgress.SaveAdventure` returns `false` cleanly in multiplayer (`CoopSessionConfig.IsMultiplayer`). |
-| GP14 | Standalone & Online Matrix | VERIFIED (Headless) | Post-rebuild 7-check suite (including 4-player Relay + 5th-player rejection) passed on `06:45:15Z` `ProductionGeminiGameplay/Riftbound.exe`; `-coopInvalidCodeSmoke`, `-coopResilienceSmoke`, and `-coopLateJoinSmoke` passed on prior `06:34:02Z` build before offline `GP06` boss guard edits. |
+| GP14 | Standalone & Online Matrix | VERIFIED (Headless) | All 10 headless Relay & UI smoke checks (including 4-player Relay + 5th-player rejection) passed cleanly against the final `06:45:15Z` `ProductionGeminiGameplay/Riftbound.exe` build. |
 | GP15 | Final Delivery & Docs | VERIFIED | Clean branch `production/gemini-gameplay-20261116`, journal + handoff synced with post-final-edit results. |
 
 ## 4. Post-Final-Edit Verification Ledger
@@ -53,15 +53,17 @@
 2. **PlayMode Gameplay (`Gp01Diagnostics.RunPlayModeVerify`):** `GP_PLAY_EXIT=0`, **41/41 PASS**, `ERRORS=0`.
 3. **Offline Quest Route (`QuestRouteSmokeTest.Run`):** `QR_EXIT=0`, `QR_PASS=145`, `QR_FAIL=0`, `QR_TOTAL=150`, `TEMP_RESULT_DELETED=True`, `UGS_INIT_IN_OFFLINE_LOG=0`.
 4. **EditMode Animation Audit (`Gp01Diagnostics.RunAudit`):** `AUDIT2_EXIT=0`, `AUDIT2_LINES=81`.
-5. **Post-Rebuild Standalone Relay Co-op Matrix (`Builds/ProductionGeminiGameplay/Riftbound.exe`):**
+5. **Post-Rebuild Standalone Relay Co-op Matrix (`Builds/ProductionGeminiGameplay/Riftbound.exe`, `06:45:15Z`):**
    - `-coopUiSmoke`: `EXIT=0` (`PASS UiFlow: menuOpen=True, state=Offline, mode=Offline, nm=0, cams=2, listeners=1`)
+   - `-coopInvalidCodeSmoke`: `EXIT=0` (`state=Failed, err=Join code is invalid or expired.`)
+   - `-coopResilienceSmoke`: `EXIT=0` (`cancelOk=True`, fresh code rotated cleanly, `nmDuringHost=1, nmAfterLeave=0, finalState=Offline`)
    - `-coopCombatSmoke`: `EXIT H=0 C=0` (`enemy=road-raider-1 hp=36/70, clientDamaged=True`)
    - `-coopAuthoritySmoke`: `EXIT H=0 C=0` (`hostAuth=PASS`, `clientAuth=PASS`)
    - `-coopProgressionSmoke`: `EXIT H=0 C=0` (`hostProg=PASS`, `clientProg=PASS`)
+   - `-coopLateJoinSmoke`: `EXIT H=0 C=0` (`lateJoin=PASS(40/70,evt=True,rcDecline=True/rcSnap=True)`)
    - `-coopFullAcceptanceSmoke`: `EXIT H=0 C=0` (`hostAccept=PASS`, `clientAccept=PASS`)
    - `-coopClientLeaveSmoke`: `EXIT H=0 C=0` (`hostDisconnectRecovery=PASS`, `ClientLeave` `nmAfterLeave=0, finalState=Offline`)
    - **4-Player + 5th Rejection:** `EXIT H=0 C1=0 C2=0 C3=0 C5=1` (`players=4, sep=9.76m`, Host `avgMs=5.71, p95Ms=7.68, enemies=54, netObjs=4`; `C1–C3` `avgMs=5.66–5.88`; 5th client `C5` rejected)
-   - Prior pass on earlier `ProductionGeminiGameplay` build (`06:34:02Z`): `-coopInvalidCodeSmoke` (`EXIT=0`), `-coopResilienceSmoke` (`EXIT=0`), and `-coopLateJoinSmoke` (`EXIT H=0 C=0`).
 
 ### Explicitly `NOT RUN` (Recommended Next User Checks)
 - Windowed interactive GUI playthrough in `Builds/ProductionGeminiGameplay/Riftbound.exe` at `1280x720` (visual sign-off on `FrontendMenu` session-mode buttons — Session 0 headless shell prevented desktop `CopyFromScreen`).
