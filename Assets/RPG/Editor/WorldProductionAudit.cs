@@ -120,6 +120,11 @@ namespace Riftbound.Editor
             BuildToFolder("Builds/RiftboundCombined01","build-combined");
         }
 
+        public static void BuildCombinedWorld02()
+        {
+            BuildToFolder("Builds/RiftboundCombined02","build-combined-02");
+        }
+
         static void BuildToFolder(string folder,string receipt)
         {
             try

@@ -4,7 +4,7 @@ Use the delivery status/source in INTEGRATION_HANDOFF.md before testing. Do not 
 
 ## Launch
 
-- Standalone: C:/Users/skama/Documents/wow=rpg-diplomna/Integration/combined-20261116/Builds/RiftboundCombined01/Riftbound.exe.
+- Standalone: C:/Users/skama/Documents/wow=rpg-diplomna/Integration/combined-20261116/Builds/RiftboundCombined02/Riftbound.exe. Combined01 is superseded because its initial client spawn could sample the wrong terrain tile.
 - Unity project: C:/Users/skama/Documents/wow=rpg-diplomna/Integration/combined-20261116. Add/open this folder through Unity Hub using6000.6.2f1. The original shared project still contains its older source.
 - This test build is on integration/combined-20261116. Main and both agents' original working copies remain separate. The unfinished Greenhollow feed-storage survey is not included.
 
@@ -22,7 +22,7 @@ Use the delivery status/source in INTEGRATION_HANDOFF.md before testing. Do not 
 
 ## Online — same complete build on both PCs
 
-Copy the entire RiftboundCombined01 folder, including Riftbound_Data and DLLs. Keep internet access available. Distinct networks, such as home broadband and a phone hotspot, establish a stronger internet acceptance test than two local instances.
+Copy the entire RiftboundCombined02 folder, including Riftbound_Data and DLLs. Keep internet access available. Distinct networks, such as home broadband and a phone hotspot, establish a stronger internet acceptance test than two local instances.
 
 1. PC1 selects Host Online and creates a private session. Share the displayed join code privately.
 2. PC2 selects Join Online and enters that code. Up to4 players are supported; a further participant should receive session-full feedback.

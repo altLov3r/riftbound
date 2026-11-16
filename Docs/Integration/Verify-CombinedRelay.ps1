@@ -1,11 +1,17 @@
 param(
     [ValidateSet('Ui','InvalidCode','Resilience','Combat','Authority','Progression','LateJoin','FullAcceptance','ClientLeave','Capacity')]
-    [string[]]$Cases=@('Ui','InvalidCode','Resilience','Combat','Authority','Progression','LateJoin','FullAcceptance','ClientLeave','Capacity')
+    [string[]]$Cases=@('Ui','InvalidCode','Resilience','Combat','Authority','Progression','LateJoin','FullAcceptance','ClientLeave','Capacity'),
+    [ValidatePattern('^Builds[/\\][A-Za-z0-9_-]+$')]
+    [string]$BuildDirectory='Builds/RiftboundCombined02',
+    [ValidatePattern('^[0-9a-fA-F]{40}$')]
+    [string]$SourceCommit
 )
 $ErrorActionPreference='Stop'
 $taskRoot=Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
-$taskExe=Join-Path $taskRoot 'Builds/RiftboundCombined01/Riftbound.exe'
+$taskExe=Join-Path $taskRoot ($BuildDirectory+'/Riftbound.exe')
 if(-not(Test-Path -LiteralPath $taskExe)){throw 'Build the combined executable first.'}
+$taskManagedHash=(Get-FileHash -LiteralPath (Join-Path $taskRoot ($BuildDirectory+'/Riftbound_Data/Managed/Assembly-CSharp.dll')) -Algorithm SHA256).Hash
+$taskSceneHash=(Get-FileHash -LiteralPath (Join-Path $taskRoot ($BuildDirectory+'/Riftbound_Data/level0')) -Algorithm SHA256).Hash
 $taskStamp=Get-Date -Format 'yyyyMMdd-HHmmss'
 $taskProfileRun=[Guid]::NewGuid().ToString('N').Substring(0,8)
 $taskFolder=Join-Path $taskRoot ".code-check/integration/relay-$taskStamp"
@@ -22,6 +28,7 @@ function Start-Game([string]$role,[string]$flags){
     $taskProc=Start-Process -FilePath $taskExe -ArgumentList $taskArgs -WorkingDirectory $taskRoot -WindowStyle Hidden -PassThru
     $taskChild=[pscustomobject]@{role=$role;process=$taskProc;log=$taskLog}
     $script:taskChildren.Add($taskChild)
+    $script:taskChildren | ForEach-Object {[pscustomobject]@{role=$_.role;pid=$_.process.Id;log=$_.log}} | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $taskFolder 'processes.json')
     Write-Host "$role started PID=$($taskProc.Id)"
     return $taskChild
 }
@@ -54,8 +61,10 @@ function Wait-Games($children,[int]$seconds=115){
 function Save-Results{
     $script:taskResults | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $taskFolder 'results.json')
     $taskText=@('# Combined standalone online verification','','Headless automated Sessions/Relay checks on the exact combined executable. Not manual GUI, rendered performance or two-PC cross-network acceptance. Raw logs remain local; join codes/authentication details are not published.','',"Run: $taskStamp",'', '| Scenario | Result | Exit codes | Sanitized assertions |','| --- | --- | --- | --- |')
+    $taskIdentity=@("Build: $BuildDirectory/Riftbound.exe", "Source supplied by build owner: $SourceCommit", "Managed Assembly-CSharp SHA256: $taskManagedHash", "Packaged level0 SHA256: $taskSceneHash",'')
+    $taskText=$taskText[0..5]+$taskIdentity+$taskText[6..($taskText.Length-1)]
     foreach($taskRow in $script:taskResults){$taskText+='| '+$taskRow.scenario+' | '+$taskRow.result+' | '+$taskRow.exits+' | '+(($taskRow.assertions -join '; ').Replace('|','/'))+' |'}
-    $taskText+=@('','Untested scenarios are NOT RUN, including any remaining requested cases after a runner failure. Expected session-full rejection is checked separately from successful participants. No runtime assertion is modified by this runner.','', 'Private local evidence folder: '+$taskFolder)
+    $taskText+=@('','Untested scenarios are NOT RUN, including any remaining requested cases after a runner failure. Expected session-full rejection is checked separately from successful participants. No runtime assertion is modified by this runner.','', ('Private local evidence folder: '+$taskFolder))
     $taskText | Set-Content -LiteralPath (Join-Path $taskRoot 'Docs/Integration/ONLINE_TEST_RESULTS.md')
 }
 try{
@@ -84,7 +93,7 @@ try{
             $taskExit=$taskChild.process.ExitCode
             $taskExitText+="$($taskChild.role)=$taskExit"
             $taskAssertions=@(($taskRaw -split '\r?\n') | Where-Object {$_ -match '^(PASS|FAIL) '} | Select-Object -Unique)
-            $taskLines+=($taskAssertions | ForEach-Object {[regex]::Replace($_,'(?i)code[12]?=[A-Z0-9]+','code=[redacted]')})
+            $taskLines+=($taskAssertions | ForEach-Object {[regex]::Replace($_,'(?i)\bcode(?:s|[12])?=[A-Z0-9]+(?:->[A-Z0-9]+)?','code=[redacted]')})
             if($taskExit -eq 0 -and ($taskAssertions | Where-Object {$_ -match '^PASS '})){$taskOk++}
             elseif($taskCase -eq 'Capacity' -and $taskChild.role -notlike '*-H' -and $taskExit -eq 1 -and $taskRaw -match '(?i)session is full'){$taskFull++}
             else{$taskPass=$false}

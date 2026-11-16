@@ -1,7 +1,7 @@
 PASS Player, health and animator survive startup
 PASS Camera follows the player
 PASS HUD references the live player
-Initial frame=424, background=True, focused=False, editorPaused=False
+Initial frame=433, background=True, focused=False, editorPaused=False
 PASS Frontend exists
 PASS Startup opens the title screen
 PASS Painted ability atlas is packaged as a square texture
@@ -9,13 +9,13 @@ PASS Class and shared actions map to sixteen distinct icon cells
 PASS Player, health and animator survive startup
 PASS Camera follows the player
 PASS HUD references the live player
-Initial frame=611, background=True, focused=False, editorPaused=False
+Initial frame=646, background=True, focused=False, editorPaused=False
 PASS Frontend exists
 PASS Play opens character selection while gameplay stays gated
 PASS Player, health and animator survive startup
 PASS Camera follows the player
 PASS HUD references the live player
-Initial frame=801, background=True, focused=False, editorPaused=False
+Initial frame=855, background=True, focused=False, editorPaused=False
 PASS Frontend exists
 PASS Menu or direct-play controls are available
 Initial character selection shown: True
@@ -26,7 +26,7 @@ PASS HUD references the live player
 PASS Player, health and animator survive startup
 PASS Camera follows the player
 PASS HUD references the live player
-World state: menu=False, paused=False, timeScale=1, name=BuildCheck, frames=1447
+World state: menu=False, paused=False, timeScale=1, name=BuildCheck, frames=1706
 PASS Entering the world restores gameplay time and camera control
 PASS Selected character is applied after scene reload
 PASS Fresh test character retains its selected race
@@ -107,7 +107,7 @@ PASS Character has a visible model
 PASS Player, health and animator survive startup
 PASS Camera follows the player
 PASS HUD references the live player
-PASS W moves the player (7.01m)
+PASS W moves the player (8.19m)
 PASS No RPG runtime exceptions during startup and movement
 PASS World boss is available independently of Abe's quest
 PASS Abe dialogue opens through interaction (current loot: none)

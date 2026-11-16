@@ -6,9 +6,9 @@ PASS GP01 Calibrated Walk cadence (animSpd=1.77)
 PASS GP02 Slash toggles Walking=false (back to Run)
 PASS GP02 Backpedal S moves backward (1.97m)
 PASS GP01 RunBack state active on backpedal
-PASS GP02 RMB+A strafes left (2.74m)
+PASS GP02 RMB+A strafes left (2.75m)
 PASS GP01 Strafe aligns visual mesh into travel direction (52.0 deg)
-PASS GP01 Turn-in-place plays Walk instead of frozen Idle (yawDelta=76.3 deg)
+PASS GP01 Turn-in-place plays Walk instead of frozen Idle (yawDelta=76.5 deg)
 PASS GP02 ChatOpen blocks Z mount trigger
 PASS GP02 Z begins mount cast on clear ground
 PASS GP02 W interrupts mount cast cleanly

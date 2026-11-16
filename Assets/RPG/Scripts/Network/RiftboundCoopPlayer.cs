@@ -176,9 +176,10 @@ namespace Riftbound.Network
             float angle = (slot - 1) * 65f * Mathf.Deg2Rad;
             Vector3 offset = new Vector3(Mathf.Cos(angle) * 2.6f, 0f, Mathf.Sin(angle) * 2.6f);
             Vector3 candidate = basePos + offset;
-            if (Terrain.activeTerrain)
+            var terrain = WorldRegions.TerrainAt(candidate);
+            if (terrain)
             {
-                float h = Terrain.activeTerrain.SampleHeight(candidate) + Terrain.activeTerrain.transform.position.y;
+                float h = terrain.SampleHeight(candidate) + terrain.transform.position.y;
                 candidate.y = Mathf.Max(h + 0.05f, basePos.y);
             }
             return candidate;
