@@ -255,11 +255,19 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--catalog", type=Path, default=CATALOG_PATH)
     parser.add_argument("--fixtures", action="store_true")
+    parser.add_argument("--source-audit", action="store_true", help="also check exact source bindings and reviewed snapshot")
     args = parser.parse_args()
     catalog = load_json(args.catalog)
     result = validate_catalog(catalog)
     if args.fixtures:
         result["authoringScenarios"] = run_fixtures(catalog)
+    if args.source_audit:
+        import audit_story_sources as source
+        current = source.audit_project(ROOT)
+        require(current["status"] == "ok", "source binding audit failed or requires review; run audit_story_sources.py for details")
+        drift = source.compare_snapshot(current, load_json(HERE / "source-snapshot.json"))
+        require(not drift, "reviewed source snapshot drifted; inspect changes before updating it")
+        result["sourceAudit"] = {"status": "ok", "scope": "saved/source bindings only; NOT native hierarchy or gameplay"}
     result["scope"] = "read-only authoring/source checks; NOT Unity/gameplay/adapter verification"
     print(json.dumps(result))
 

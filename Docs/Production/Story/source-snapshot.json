@@ -1,0 +1,257 @@
+{
+  "evidence_kind": "read_only_source_authoring_not_native_or_gameplay",
+  "faction_quests": {
+    "definition_count": 35,
+    "limit": "3 first-five giver definitions checked, not all quest behavior.",
+    "selected": {
+      "alliance_highspire_dispatch": {
+        "faction": "\"Alliance\"",
+        "giverNpc": "\"Abe\"",
+        "prerequisiteQuestId": "\"\"",
+        "requiredCount": "1",
+        "rewardGold": "45",
+        "rewardItem": "\"alliance-war-banner\"",
+        "rewardXP": "110",
+        "targetId": "\"Grand Duke Ronald\"",
+        "targetType": "\"talk_npc\""
+      },
+      "frontier_cartography": {
+        "faction": "\"Any\"",
+        "giverNpc": "ExplorationSites.CartographerName",
+        "nextQuestId": "\"river_reaver_bounty\"",
+        "prerequisiteQuestId": "\"\"",
+        "requiredCount": "3",
+        "rewardGold": "75",
+        "rewardItem": "\"travel-charm\"",
+        "rewardXP": "150",
+        "targetId": "\"frontier-vistas\"",
+        "targetType": "\"discover_landmark\""
+      },
+      "river_reaver_bounty": {
+        "faction": "\"Any\"",
+        "giverNpc": "ExplorationSites.CartographerName",
+        "prerequisiteQuestId": "\"frontier_cartography\"",
+        "requiredCount": "1",
+        "rewardGold": "60",
+        "rewardItem": "\"riverwarden-signet\"",
+        "rewardXP": "140",
+        "targetId": "RiverReaverCamp.CaptainId",
+        "targetType": "\"defeat_enemy\""
+      }
+    }
+  },
+  "issues": [],
+  "limitations": [
+    "Not general Unity YAML/C# parsing, compilation, hierarchy/physics or gameplay proof.",
+    "Saved positions require identity/unit ancestors; no terrain grounding inferred.",
+    "Source hashes include explicit allowlisted files only; changes require review.",
+    "No narrative schema/adapter acceptance or runtime content admission."
+  ],
+  "main_quests": {
+    "expectations_matched": true,
+    "expected_stages": [
+      {
+        "gold": 25,
+        "index": 0,
+        "required": "3 road-raider kills",
+        "xp": 80
+      },
+      {
+        "gold": 35,
+        "index": 1,
+        "required": "3 supply crates",
+        "xp": 100
+      },
+      {
+        "gold": 60,
+        "index": 2,
+        "required": "BossDefeated (Ashwood captain, not Selvek)",
+        "xp": 180
+      }
+    ],
+    "observed_expressions": {
+      "QuestExperience": "QuestIndex == 0 ? 80 : QuestIndex == 1 ? 100 : 180",
+      "QuestGold": "QuestIndex == 0 ? 25 : QuestIndex == 1 ? 35 : 60",
+      "QuestName": "QuestIndex == 0 ? \"The Forest Road\" : QuestIndex == 1 ? \"Stolen Supplies\" : QuestIndex == 2 ? \"The Ashwood Captain\" : \"Hero of Emberwatch\"",
+      "QuestReady": "QuestAccepted && (QuestIndex == 0 ? Kills >= 3 : QuestIndex == 1 ? Supplies >= 3 : QuestIndex == 2 && BossDefeated)"
+    }
+  },
+  "runtime_bindings": {
+    "checks": {
+      "elara_grounded_source_anchor": true,
+      "elara_name": true,
+      "elara_npc_name_assignment": true,
+      "elara_survey_ids": true,
+      "elara_townnpc_binding": true,
+      "hud_start_ensures": true,
+      "selvek_cache_id": true,
+      "selvek_creation_call": true,
+      "selvek_id": true
+    },
+    "elara": {
+      "component_kind": "TownNPC",
+      "creation": "ExplorationSites.EnsureCartographer",
+      "lookup_key": "Cartographer Elara",
+      "position_rule": "WorldRegions.Greenhollow + (-6,0,-3); Y=GroundHeight; not native-verified",
+      "survey_ids": [
+        "westbank-overlook",
+        "bloodrock-vista",
+        "wyrmcrest-lookout"
+      ]
+    },
+    "selvek": {
+      "cache_id": "river-reaver-lockbox",
+      "class": "Rogue",
+      "creation": "RiverReaverCamp.Ensure/CreateEnemy",
+      "enemy_id": "westbank-reaver-captain",
+      "race": "Undead",
+      "source_call": [
+        [
+          "root",
+          "player",
+          "CaptainId",
+          "\"Captain Selvek\"",
+          "\"Undead\"",
+          "\"Rogue\"",
+          "Position",
+          "true"
+        ]
+      ]
+    }
+  },
+  "scene": {
+    "actors": {
+      "abe": {
+        "active_in_serialized_chain": true,
+        "ancestors": [
+          {
+            "active_self": true,
+            "game_object": 1754071919,
+            "identity_rotation": true,
+            "transform": 1754071920,
+            "unit_scale": true
+          }
+        ],
+        "component": 351378611,
+        "component_kind": "QuestGiver",
+        "component_line": 99986,
+        "game_object": 351378609,
+        "game_object_name": "Abe - Outpost Quest Giver",
+        "local_position": [
+          -3.0,
+          0.0,
+          2.0
+        ],
+        "lookup_key": "Abe",
+        "script_guid": "c41dab07fc4e11c4ebe64bc708047082",
+        "transform": 351378610,
+        "world_position": [
+          -3.0,
+          0.0,
+          2.0
+        ]
+      },
+      "mira": {
+        "active_in_serialized_chain": true,
+        "ancestors": [
+          {
+            "active_self": true,
+            "game_object": 561147575,
+            "identity_rotation": true,
+            "transform": 561147576,
+            "unit_scale": true
+          }
+        ],
+        "component": 1934746515,
+        "component_kind": "Merchant",
+        "component_line": 541126,
+        "game_object": 1934746513,
+        "game_object_name": "Provisioner Mira",
+        "local_position": [
+          -25.0,
+          5.400336,
+          160.0
+        ],
+        "lookup_key": "Provisioner Mira",
+        "script_guid": "cd973004245351b4aa7ceae909b2be54",
+        "transform": 1934746514,
+        "world_position": [
+          -42.0,
+          13.0500004,
+          404.0
+        ]
+      },
+      "rowan": {
+        "active_in_serialized_chain": true,
+        "ancestors": [],
+        "component": 2124646073,
+        "component_kind": "Merchant",
+        "component_line": 598726,
+        "game_object": 2124646072,
+        "game_object_name": "Quartermaster Rowan",
+        "local_position": [
+          -7.0,
+          -0.05,
+          -2.0
+        ],
+        "lookup_key": "Quartermaster Rowan",
+        "script_guid": "cd973004245351b4aa7ceae909b2be54",
+        "transform": 2124646075,
+        "world_position": [
+          -7.0,
+          -0.05,
+          -2.0
+        ]
+      }
+    },
+    "category_counts": {
+      "Merchant": 2,
+      "QuestGiver": 1,
+      "TownNPC": 37
+    },
+    "count_limit": "Explicit saved component records for3 GUID-bound categories only; not total actors or runtime hierarchy.",
+    "issues": [],
+    "runtime_saved": {
+      "elara": {
+        "expected_creation": "runtime_ensure",
+        "saved_identity_matches": 0
+      },
+      "selvek": {
+        "expected_creation": "runtime_ensure",
+        "saved_identity_matches": 0
+      }
+    },
+    "saved_runtime_roots": [],
+    "status": "ok"
+  },
+  "script_guids": {
+    "EnemyController": "76558e0a6bc4324489fa99aeafb15793",
+    "Merchant": "cd973004245351b4aa7ceae909b2be54",
+    "QuestGiver": "c41dab07fc4e11c4ebe64bc708047082",
+    "TownNPC": "18d5b6dbccaffc34bbaa7eaf595a1446"
+  },
+  "snapshot_version": 1,
+  "source_hashes": {
+    "Assets/RPG/Scenes/Outpost-Expanded.unity": "7c9a1244d6c63c6f383311eaa041405aada73b7bd373493d2c3393cd9ba2af63",
+    "Assets/RPG/Scripts/AdventurePanels.cs": "3b0524e15389ac3f67be26f350e6c9386b633230eb3a6941bd4101f13c2366bb",
+    "Assets/RPG/Scripts/EnemyController.cs": "7021a4b8f0f24fa6d73efced2aa96f6cfb85c0bfbb8281532a356c9681b3908a",
+    "Assets/RPG/Scripts/EnemyController.cs.meta": "920a8a31375be41962a25f9a8646f62fdef9a21f455feee42742de72240e91c2",
+    "Assets/RPG/Scripts/ExplorationSites.cs": "7a056e223feb315c5ae96d57117b767834f3ab262e0ba745df6d512e0c8b00c6",
+    "Assets/RPG/Scripts/FactionQuestSystem.cs": "d33e88cea483fd5e7e9e2055839f80a01dd19068715c94ec0a9848d468821a9e",
+    "Assets/RPG/Scripts/Merchant.cs": "6730212e310991b55613cb1455ea122a966bc2bbf69047d23b33f8447703f3fc",
+    "Assets/RPG/Scripts/Merchant.cs.meta": "4cba7ad6bced41bd90a8b9b46de2fba7a03dfdea8ece20f392e6289ab4903b17",
+    "Assets/RPG/Scripts/PlayerController.cs": "268128cb3c438c368e7a5ac26dc3ce5f1d5ad661aae78510b416057d43d7398c",
+    "Assets/RPG/Scripts/PlayerDiscovery.cs": "4ebcaf3957109a38a302872529598265ff8d741cfb986767dcdfeb749a97e9dc",
+    "Assets/RPG/Scripts/PlayerExploration.cs": "a03f94b75c5f188e47554acbbafa8f6d91bd5dca4b26767d9e9139a7645524f8",
+    "Assets/RPG/Scripts/PlayerProgress.cs": "719a860652e2412da48489454eae2bd42414909fa6076f8827e7b842391c4b77",
+    "Assets/RPG/Scripts/PlayerServices.cs": "1c8f1719360b1e7271fbcd09d83c61c0d7c20912fa843543dee2b709b957b8a2",
+    "Assets/RPG/Scripts/PrototypeHUD.cs": "57b2b15155fdbc651285431a6cc298b25aa23add1d0c836b4974ee8d25f47cb7",
+    "Assets/RPG/Scripts/QuestGiver.cs": "7a7437e489408ab13f64d94387bd16e8124216931fa849bb63f41fe4da530cb2",
+    "Assets/RPG/Scripts/QuestGiver.cs.meta": "313c82e8d60584bcbad927b2c5aa3fa0f874f96186bd55f5f1285ae3f34b9e87",
+    "Assets/RPG/Scripts/RiverReaverCamp.cs": "448600a2627291ba45e38a015b6381dafa186f3f073c48814c21eaceebc07d3e",
+    "Assets/RPG/Scripts/TownNPC.cs": "4c675e32f242c9dba4e27dd72bd307b95db9669b76606a0f6baed4a1e220b454",
+    "Assets/RPG/Scripts/TownNPC.cs.meta": "b32be190cd0b87c71def0870058c80b840507410d5e45203f6e0006c8c9136c0",
+    "Assets/RPG/Scripts/WorldRegions.cs": "b204f71c4989724548c7376d28251b308acceaf6f987d1907391d2f227b3d529"
+  },
+  "status": "ok"
+}

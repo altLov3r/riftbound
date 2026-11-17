@@ -1,0 +1,2058 @@
+{
+  "formatVersion": 1,
+  "catalogId": "riftbound.first-five.v1",
+  "identities": {
+    "contractSha256": "8d88fd16f18042a793acf1d8d0f7e4b6b33f12a8f53b10080dc95410a65d971d",
+    "schemaSha256": "a894d204bfd497acb2dd986fffa3d0804db2ea04bc5cae8ba7b46ea850b24e10",
+    "catalogSha256": "9b7e38f26e1153a45c6ce0032ede3dd39acc536e0ba09594561de06e7c5b7f73",
+    "fixturesSha256": "adf636845713368f289d43626fd1ef119834eb471db7d7b8d844dc50ef025c3e"
+  },
+  "cases": [
+    {
+      "caseId": "abe-0-offer",
+      "actor": {
+        "actorKind": "main_quest_giver",
+        "legacyName": "Abe",
+        "enemyId": ""
+      },
+      "channel": "main_body",
+      "topicId": "",
+      "eligible": true,
+      "knownValues": [
+        {
+          "field": "main.accepted",
+          "key": "",
+          "boolValue": false,
+          "intValue": 0
+        },
+        {
+          "field": "main.complete",
+          "key": "",
+          "boolValue": false,
+          "intValue": 0
+        },
+        {
+          "field": "main.index",
+          "key": "",
+          "boolValue": false,
+          "intValue": 0
+        },
+        {
+          "field": "main.ready",
+          "key": "",
+          "boolValue": false,
+          "intValue": 0
+        }
+      ],
+      "expected": {
+        "resolution": "line",
+        "lineId": "abe.main0.offer",
+        "resolvedProfileId": "abe"
+      }
+    },
+    {
+      "caseId": "abe-title-0-offer",
+      "actor": {
+        "actorKind": "main_quest_giver",
+        "legacyName": "Abe",
+        "enemyId": ""
+      },
+      "channel": "main_title",
+      "topicId": "",
+      "eligible": true,
+      "knownValues": [
+        {
+          "field": "main.accepted",
+          "key": "",
+          "boolValue": false,
+          "intValue": 0
+        },
+        {
+          "field": "main.complete",
+          "key": "",
+          "boolValue": false,
+          "intValue": 0
+        },
+        {
+          "field": "main.index",
+          "key": "",
+          "boolValue": false,
+          "intValue": 0
+        },
+        {
+          "field": "main.ready",
+          "key": "",
+          "boolValue": false,
+          "intValue": 0
+        }
+      ],
+      "expected": {
+        "resolution": "line",
+        "lineId": "abe.main0.title",
+        "resolvedProfileId": "abe"
+      }
+    },
+    {
+      "caseId": "abe-0-progress",
+      "actor": {
+        "actorKind": "main_quest_giver",
+        "legacyName": "Abe",
+        "enemyId": ""
+      },
+      "channel": "main_body",
+      "topicId": "",
+      "eligible": true,
+      "knownValues": [
+        {
+          "field": "main.accepted",
+          "key": "",
+          "boolValue": true,
+          "intValue": 0
+        },
+        {
+          "field": "main.complete",
+          "key": "",
+          "boolValue": false,
+          "intValue": 0
+        },
+        {
+          "field": "main.index",
+          "key": "",
+          "boolValue": false,
+          "intValue": 0
+        },
+        {
+          "field": "main.ready",
+          "key": "",
+          "boolValue": false,
+          "intValue": 0
+        }
+      ],
+      "expected": {
+        "resolution": "line",
+        "lineId": "abe.main0.progress",
+        "resolvedProfileId": "abe"
+      }
+    },
+    {
+      "caseId": "abe-title-0-progress",
+      "actor": {
+        "actorKind": "main_quest_giver",
+        "legacyName": "Abe",
+        "enemyId": ""
+      },
+      "channel": "main_title",
+      "topicId": "",
+      "eligible": true,
+      "knownValues": [
+        {
+          "field": "main.accepted",
+          "key": "",
+          "boolValue": true,
+          "intValue": 0
+        },
+        {
+          "field": "main.complete",
+          "key": "",
+          "boolValue": false,
+          "intValue": 0
+        },
+        {
+          "field": "main.index",
+          "key": "",
+          "boolValue": false,
+          "intValue": 0
+        },
+        {
+          "field": "main.ready",
+          "key": "",
+          "boolValue": false,
+          "intValue": 0
+        }
+      ],
+      "expected": {
+        "resolution": "line",
+        "lineId": "abe.main0.title",
+        "resolvedProfileId": "abe"
+      }
+    },
+    {
+      "caseId": "abe-0-ready",
+      "actor": {
+        "actorKind": "main_quest_giver",
+        "legacyName": "Abe",
+        "enemyId": ""
+      },
+      "channel": "main_body",
+      "topicId": "",
+      "eligible": true,
+      "knownValues": [
+        {
+          "field": "main.accepted",
+          "key": "",
+          "boolValue": true,
+          "intValue": 0
+        },
+        {
+          "field": "main.complete",
+          "key": "",
+          "boolValue": false,
+          "intValue": 0
+        },
+        {
+          "field": "main.index",
+          "key": "",
+          "boolValue": false,
+          "intValue": 0
+        },
+        {
+          "field": "main.ready",
+          "key": "",
+          "boolValue": true,
+          "intValue": 0
+        }
+      ],
+      "expected": {
+        "resolution": "line",
+        "lineId": "abe.main0.ready",
+        "resolvedProfileId": "abe"
+      }
+    },
+    {
+      "caseId": "abe-title-0-ready",
+      "actor": {
+        "actorKind": "main_quest_giver",
+        "legacyName": "Abe",
+        "enemyId": ""
+      },
+      "channel": "main_title",
+      "topicId": "",
+      "eligible": true,
+      "knownValues": [
+        {
+          "field": "main.accepted",
+          "key": "",
+          "boolValue": true,
+          "intValue": 0
+        },
+        {
+          "field": "main.complete",
+          "key": "",
+          "boolValue": false,
+          "intValue": 0
+        },
+        {
+          "field": "main.index",
+          "key": "",
+          "boolValue": false,
+          "intValue": 0
+        },
+        {
+          "field": "main.ready",
+          "key": "",
+          "boolValue": true,
+          "intValue": 0
+        }
+      ],
+      "expected": {
+        "resolution": "line",
+        "lineId": "abe.main0.title",
+        "resolvedProfileId": "abe"
+      }
+    },
+    {
+      "caseId": "abe-1-offer",
+      "actor": {
+        "actorKind": "main_quest_giver",
+        "legacyName": "Abe",
+        "enemyId": ""
+      },
+      "channel": "main_body",
+      "topicId": "",
+      "eligible": true,
+      "knownValues": [
+        {
+          "field": "main.accepted",
+          "key": "",
+          "boolValue": false,
+          "intValue": 0
+        },
+        {
+          "field": "main.complete",
+          "key": "",
+          "boolValue": false,
+          "intValue": 0
+        },
+        {
+          "field": "main.index",
+          "key": "",
+          "boolValue": false,
+          "intValue": 1
+        },
+        {
+          "field": "main.ready",
+          "key": "",
+          "boolValue": false,
+          "intValue": 0
+        }
+      ],
+      "expected": {
+        "resolution": "line",
+        "lineId": "abe.main1.offer",
+        "resolvedProfileId": "abe"
+      }
+    },
+    {
+      "caseId": "abe-title-1-offer",
+      "actor": {
+        "actorKind": "main_quest_giver",
+        "legacyName": "Abe",
+        "enemyId": ""
+      },
+      "channel": "main_title",
+      "topicId": "",
+      "eligible": true,
+      "knownValues": [
+        {
+          "field": "main.accepted",
+          "key": "",
+          "boolValue": false,
+          "intValue": 0
+        },
+        {
+          "field": "main.complete",
+          "key": "",
+          "boolValue": false,
+          "intValue": 0
+        },
+        {
+          "field": "main.index",
+          "key": "",
+          "boolValue": false,
+          "intValue": 1
+        },
+        {
+          "field": "main.ready",
+          "key": "",
+          "boolValue": false,
+          "intValue": 0
+        }
+      ],
+      "expected": {
+        "resolution": "line",
+        "lineId": "abe.main1.title",
+        "resolvedProfileId": "abe"
+      }
+    },
+    {
+      "caseId": "abe-1-progress",
+      "actor": {
+        "actorKind": "main_quest_giver",
+        "legacyName": "Abe",
+        "enemyId": ""
+      },
+      "channel": "main_body",
+      "topicId": "",
+      "eligible": true,
+      "knownValues": [
+        {
+          "field": "main.accepted",
+          "key": "",
+          "boolValue": true,
+          "intValue": 0
+        },
+        {
+          "field": "main.complete",
+          "key": "",
+          "boolValue": false,
+          "intValue": 0
+        },
+        {
+          "field": "main.index",
+          "key": "",
+          "boolValue": false,
+          "intValue": 1
+        },
+        {
+          "field": "main.ready",
+          "key": "",
+          "boolValue": false,
+          "intValue": 0
+        }
+      ],
+      "expected": {
+        "resolution": "line",
+        "lineId": "abe.main1.progress",
+        "resolvedProfileId": "abe"
+      }
+    },
+    {
+      "caseId": "abe-title-1-progress",
+      "actor": {
+        "actorKind": "main_quest_giver",
+        "legacyName": "Abe",
+        "enemyId": ""
+      },
+      "channel": "main_title",
+      "topicId": "",
+      "eligible": true,
+      "knownValues": [
+        {
+          "field": "main.accepted",
+          "key": "",
+          "boolValue": true,
+          "intValue": 0
+        },
+        {
+          "field": "main.complete",
+          "key": "",
+          "boolValue": false,
+          "intValue": 0
+        },
+        {
+          "field": "main.index",
+          "key": "",
+          "boolValue": false,
+          "intValue": 1
+        },
+        {
+          "field": "main.ready",
+          "key": "",
+          "boolValue": false,
+          "intValue": 0
+        }
+      ],
+      "expected": {
+        "resolution": "line",
+        "lineId": "abe.main1.title",
+        "resolvedProfileId": "abe"
+      }
+    },
+    {
+      "caseId": "abe-1-ready",
+      "actor": {
+        "actorKind": "main_quest_giver",
+        "legacyName": "Abe",
+        "enemyId": ""
+      },
+      "channel": "main_body",
+      "topicId": "",
+      "eligible": true,
+      "knownValues": [
+        {
+          "field": "main.accepted",
+          "key": "",
+          "boolValue": true,
+          "intValue": 0
+        },
+        {
+          "field": "main.complete",
+          "key": "",
+          "boolValue": false,
+          "intValue": 0
+        },
+        {
+          "field": "main.index",
+          "key": "",
+          "boolValue": false,
+          "intValue": 1
+        },
+        {
+          "field": "main.ready",
+          "key": "",
+          "boolValue": true,
+          "intValue": 0
+        }
+      ],
+      "expected": {
+        "resolution": "line",
+        "lineId": "abe.main1.ready",
+        "resolvedProfileId": "abe"
+      }
+    },
+    {
+      "caseId": "abe-title-1-ready",
+      "actor": {
+        "actorKind": "main_quest_giver",
+        "legacyName": "Abe",
+        "enemyId": ""
+      },
+      "channel": "main_title",
+      "topicId": "",
+      "eligible": true,
+      "knownValues": [
+        {
+          "field": "main.accepted",
+          "key": "",
+          "boolValue": true,
+          "intValue": 0
+        },
+        {
+          "field": "main.complete",
+          "key": "",
+          "boolValue": false,
+          "intValue": 0
+        },
+        {
+          "field": "main.index",
+          "key": "",
+          "boolValue": false,
+          "intValue": 1
+        },
+        {
+          "field": "main.ready",
+          "key": "",
+          "boolValue": true,
+          "intValue": 0
+        }
+      ],
+      "expected": {
+        "resolution": "line",
+        "lineId": "abe.main1.title",
+        "resolvedProfileId": "abe"
+      }
+    },
+    {
+      "caseId": "abe-2-offer",
+      "actor": {
+        "actorKind": "main_quest_giver",
+        "legacyName": "Abe",
+        "enemyId": ""
+      },
+      "channel": "main_body",
+      "topicId": "",
+      "eligible": true,
+      "knownValues": [
+        {
+          "field": "main.accepted",
+          "key": "",
+          "boolValue": false,
+          "intValue": 0
+        },
+        {
+          "field": "main.complete",
+          "key": "",
+          "boolValue": false,
+          "intValue": 0
+        },
+        {
+          "field": "main.index",
+          "key": "",
+          "boolValue": false,
+          "intValue": 2
+        },
+        {
+          "field": "main.ready",
+          "key": "",
+          "boolValue": false,
+          "intValue": 0
+        }
+      ],
+      "expected": {
+        "resolution": "line",
+        "lineId": "abe.main2.offer",
+        "resolvedProfileId": "abe"
+      }
+    },
+    {
+      "caseId": "abe-title-2-offer",
+      "actor": {
+        "actorKind": "main_quest_giver",
+        "legacyName": "Abe",
+        "enemyId": ""
+      },
+      "channel": "main_title",
+      "topicId": "",
+      "eligible": true,
+      "knownValues": [
+        {
+          "field": "main.accepted",
+          "key": "",
+          "boolValue": false,
+          "intValue": 0
+        },
+        {
+          "field": "main.complete",
+          "key": "",
+          "boolValue": false,
+          "intValue": 0
+        },
+        {
+          "field": "main.index",
+          "key": "",
+          "boolValue": false,
+          "intValue": 2
+        },
+        {
+          "field": "main.ready",
+          "key": "",
+          "boolValue": false,
+          "intValue": 0
+        }
+      ],
+      "expected": {
+        "resolution": "line",
+        "lineId": "abe.main2.title",
+        "resolvedProfileId": "abe"
+      }
+    },
+    {
+      "caseId": "abe-2-progress",
+      "actor": {
+        "actorKind": "main_quest_giver",
+        "legacyName": "Abe",
+        "enemyId": ""
+      },
+      "channel": "main_body",
+      "topicId": "",
+      "eligible": true,
+      "knownValues": [
+        {
+          "field": "main.accepted",
+          "key": "",
+          "boolValue": true,
+          "intValue": 0
+        },
+        {
+          "field": "main.complete",
+          "key": "",
+          "boolValue": false,
+          "intValue": 0
+        },
+        {
+          "field": "main.index",
+          "key": "",
+          "boolValue": false,
+          "intValue": 2
+        },
+        {
+          "field": "main.ready",
+          "key": "",
+          "boolValue": false,
+          "intValue": 0
+        }
+      ],
+      "expected": {
+        "resolution": "line",
+        "lineId": "abe.main2.progress",
+        "resolvedProfileId": "abe"
+      }
+    },
+    {
+      "caseId": "abe-title-2-progress",
+      "actor": {
+        "actorKind": "main_quest_giver",
+        "legacyName": "Abe",
+        "enemyId": ""
+      },
+      "channel": "main_title",
+      "topicId": "",
+      "eligible": true,
+      "knownValues": [
+        {
+          "field": "main.accepted",
+          "key": "",
+          "boolValue": true,
+          "intValue": 0
+        },
+        {
+          "field": "main.complete",
+          "key": "",
+          "boolValue": false,
+          "intValue": 0
+        },
+        {
+          "field": "main.index",
+          "key": "",
+          "boolValue": false,
+          "intValue": 2
+        },
+        {
+          "field": "main.ready",
+          "key": "",
+          "boolValue": false,
+          "intValue": 0
+        }
+      ],
+      "expected": {
+        "resolution": "line",
+        "lineId": "abe.main2.title",
+        "resolvedProfileId": "abe"
+      }
+    },
+    {
+      "caseId": "abe-2-ready",
+      "actor": {
+        "actorKind": "main_quest_giver",
+        "legacyName": "Abe",
+        "enemyId": ""
+      },
+      "channel": "main_body",
+      "topicId": "",
+      "eligible": true,
+      "knownValues": [
+        {
+          "field": "main.accepted",
+          "key": "",
+          "boolValue": true,
+          "intValue": 0
+        },
+        {
+          "field": "main.complete",
+          "key": "",
+          "boolValue": false,
+          "intValue": 0
+        },
+        {
+          "field": "main.index",
+          "key": "",
+          "boolValue": false,
+          "intValue": 2
+        },
+        {
+          "field": "main.ready",
+          "key": "",
+          "boolValue": true,
+          "intValue": 0
+        }
+      ],
+      "expected": {
+        "resolution": "line",
+        "lineId": "abe.main2.ready",
+        "resolvedProfileId": "abe"
+      }
+    },
+    {
+      "caseId": "abe-title-2-ready",
+      "actor": {
+        "actorKind": "main_quest_giver",
+        "legacyName": "Abe",
+        "enemyId": ""
+      },
+      "channel": "main_title",
+      "topicId": "",
+      "eligible": true,
+      "knownValues": [
+        {
+          "field": "main.accepted",
+          "key": "",
+          "boolValue": true,
+          "intValue": 0
+        },
+        {
+          "field": "main.complete",
+          "key": "",
+          "boolValue": false,
+          "intValue": 0
+        },
+        {
+          "field": "main.index",
+          "key": "",
+          "boolValue": false,
+          "intValue": 2
+        },
+        {
+          "field": "main.ready",
+          "key": "",
+          "boolValue": true,
+          "intValue": 0
+        }
+      ],
+      "expected": {
+        "resolution": "line",
+        "lineId": "abe.main2.title",
+        "resolvedProfileId": "abe"
+      }
+    },
+    {
+      "caseId": "abe-complete",
+      "actor": {
+        "actorKind": "main_quest_giver",
+        "legacyName": "Abe",
+        "enemyId": ""
+      },
+      "channel": "main_body",
+      "topicId": "",
+      "eligible": true,
+      "knownValues": [
+        {
+          "field": "main.accepted",
+          "key": "",
+          "boolValue": false,
+          "intValue": 0
+        },
+        {
+          "field": "main.complete",
+          "key": "",
+          "boolValue": true,
+          "intValue": 0
+        },
+        {
+          "field": "main.index",
+          "key": "",
+          "boolValue": false,
+          "intValue": 3
+        },
+        {
+          "field": "main.ready",
+          "key": "",
+          "boolValue": false,
+          "intValue": 0
+        }
+      ],
+      "expected": {
+        "resolution": "line",
+        "lineId": "abe.main3.complete",
+        "resolvedProfileId": "abe"
+      }
+    },
+    {
+      "caseId": "abe-complete-title",
+      "actor": {
+        "actorKind": "main_quest_giver",
+        "legacyName": "Abe",
+        "enemyId": ""
+      },
+      "channel": "main_title",
+      "topicId": "",
+      "eligible": true,
+      "knownValues": [
+        {
+          "field": "main.complete",
+          "key": "",
+          "boolValue": true,
+          "intValue": 0
+        },
+        {
+          "field": "main.index",
+          "key": "",
+          "boolValue": false,
+          "intValue": 3
+        }
+      ],
+      "expected": {
+        "resolution": "line",
+        "lineId": "abe.main3.title",
+        "resolvedProfileId": "abe"
+      }
+    },
+    {
+      "caseId": "abe-complete-greeting",
+      "actor": {
+        "actorKind": "main_quest_giver",
+        "legacyName": "Abe",
+        "enemyId": ""
+      },
+      "channel": "greeting",
+      "topicId": "",
+      "eligible": true,
+      "knownValues": [
+        {
+          "field": "main.complete",
+          "key": "",
+          "boolValue": true,
+          "intValue": 0
+        },
+        {
+          "field": "main.index",
+          "key": "",
+          "boolValue": false,
+          "intValue": 3
+        }
+      ],
+      "expected": {
+        "resolution": "line",
+        "lineId": "abe.greeting.after-main",
+        "resolvedProfileId": "abe"
+      }
+    },
+    {
+      "caseId": "abe-new-greeting",
+      "actor": {
+        "actorKind": "main_quest_giver",
+        "legacyName": "Abe",
+        "enemyId": ""
+      },
+      "channel": "greeting",
+      "topicId": "",
+      "eligible": true,
+      "knownValues": [],
+      "expected": {
+        "resolution": "line",
+        "lineId": "abe.greeting.public",
+        "resolvedProfileId": "abe"
+      }
+    },
+    {
+      "caseId": "abe-unknown-not-false",
+      "actor": {
+        "actorKind": "main_quest_giver",
+        "legacyName": "Abe",
+        "enemyId": ""
+      },
+      "channel": "main_body",
+      "topicId": "",
+      "eligible": true,
+      "knownValues": [
+        {
+          "field": "main.accepted",
+          "key": "",
+          "boolValue": true,
+          "intValue": 0
+        },
+        {
+          "field": "main.complete",
+          "key": "",
+          "boolValue": false,
+          "intValue": 0
+        },
+        {
+          "field": "main.index",
+          "key": "",
+          "boolValue": false,
+          "intValue": 0
+        }
+      ],
+      "expected": {
+        "resolution": "existing",
+        "lineId": "",
+        "resolvedProfileId": "abe"
+      }
+    },
+    {
+      "caseId": "abe-inconsistent-ready",
+      "actor": {
+        "actorKind": "main_quest_giver",
+        "legacyName": "Abe",
+        "enemyId": ""
+      },
+      "channel": "main_body",
+      "topicId": "",
+      "eligible": true,
+      "knownValues": [
+        {
+          "field": "main.accepted",
+          "key": "",
+          "boolValue": false,
+          "intValue": 0
+        },
+        {
+          "field": "main.complete",
+          "key": "",
+          "boolValue": false,
+          "intValue": 0
+        },
+        {
+          "field": "main.index",
+          "key": "",
+          "boolValue": false,
+          "intValue": 0
+        },
+        {
+          "field": "main.ready",
+          "key": "",
+          "boolValue": true,
+          "intValue": 0
+        }
+      ],
+      "expected": {
+        "resolution": "existing",
+        "lineId": "",
+        "resolvedProfileId": "abe"
+      }
+    },
+    {
+      "caseId": "abe-inconsistent-complete",
+      "actor": {
+        "actorKind": "main_quest_giver",
+        "legacyName": "Abe",
+        "enemyId": ""
+      },
+      "channel": "main_body",
+      "topicId": "",
+      "eligible": true,
+      "knownValues": [
+        {
+          "field": "main.complete",
+          "key": "",
+          "boolValue": true,
+          "intValue": 0
+        },
+        {
+          "field": "main.index",
+          "key": "",
+          "boolValue": false,
+          "intValue": 0
+        }
+      ],
+      "expected": {
+        "resolution": "existing",
+        "lineId": "",
+        "resolvedProfileId": "abe"
+      }
+    },
+    {
+      "caseId": "abe-no-mara-topic",
+      "actor": {
+        "actorKind": "main_quest_giver",
+        "legacyName": "Abe",
+        "enemyId": ""
+      },
+      "channel": "public_topic",
+      "topicId": "mara",
+      "eligible": true,
+      "knownValues": [
+        {
+          "field": "main.complete",
+          "key": "",
+          "boolValue": true,
+          "intValue": 0
+        },
+        {
+          "field": "main.index",
+          "key": "",
+          "boolValue": false,
+          "intValue": 3
+        }
+      ],
+      "expected": {
+        "resolution": "fallback",
+        "lineId": "",
+        "resolvedProfileId": "abe"
+      }
+    },
+    {
+      "caseId": "abe-truce-topic",
+      "actor": {
+        "actorKind": "main_quest_giver",
+        "legacyName": "Abe",
+        "enemyId": ""
+      },
+      "channel": "public_topic",
+      "topicId": "roadward-truce",
+      "eligible": true,
+      "knownValues": [],
+      "expected": {
+        "resolution": "line",
+        "lineId": "abe.topic.truce",
+        "resolvedProfileId": "abe"
+      }
+    },
+    {
+      "caseId": "abe-ineligible",
+      "actor": {
+        "actorKind": "main_quest_giver",
+        "legacyName": "Abe",
+        "enemyId": ""
+      },
+      "channel": "main_body",
+      "topicId": "",
+      "eligible": false,
+      "knownValues": [
+        {
+          "field": "main.accepted",
+          "key": "",
+          "boolValue": false,
+          "intValue": 0
+        },
+        {
+          "field": "main.complete",
+          "key": "",
+          "boolValue": false,
+          "intValue": 0
+        },
+        {
+          "field": "main.index",
+          "key": "",
+          "boolValue": false,
+          "intValue": 0
+        },
+        {
+          "field": "main.ready",
+          "key": "",
+          "boolValue": false,
+          "intValue": 0
+        }
+      ],
+      "expected": {
+        "resolution": "denied",
+        "lineId": "",
+        "resolvedProfileId": "abe"
+      }
+    },
+    {
+      "caseId": "rowan-public",
+      "actor": {
+        "actorKind": "merchant",
+        "legacyName": "Quartermaster Rowan",
+        "enemyId": ""
+      },
+      "channel": "greeting",
+      "topicId": "",
+      "eligible": true,
+      "knownValues": [],
+      "expected": {
+        "resolution": "line",
+        "lineId": "rowan.greeting.public",
+        "resolvedProfileId": "rowan"
+      }
+    },
+    {
+      "caseId": "rowan-no-purchase-history",
+      "actor": {
+        "actorKind": "merchant",
+        "legacyName": "Quartermaster Rowan",
+        "enemyId": ""
+      },
+      "channel": "public_topic",
+      "topicId": "purchase-success",
+      "eligible": true,
+      "knownValues": [],
+      "expected": {
+        "resolution": "fallback",
+        "lineId": "",
+        "resolvedProfileId": "rowan"
+      }
+    },
+    {
+      "caseId": "mira-public",
+      "actor": {
+        "actorKind": "merchant",
+        "legacyName": "Provisioner Mira",
+        "enemyId": ""
+      },
+      "channel": "greeting",
+      "topicId": "",
+      "eligible": true,
+      "knownValues": [],
+      "expected": {
+        "resolution": "line",
+        "lineId": "mira.greeting.public",
+        "resolvedProfileId": "mira"
+      }
+    },
+    {
+      "caseId": "mira-no-purchase-history",
+      "actor": {
+        "actorKind": "merchant",
+        "legacyName": "Provisioner Mira",
+        "enemyId": ""
+      },
+      "channel": "public_topic",
+      "topicId": "purchase-success",
+      "eligible": true,
+      "knownValues": [],
+      "expected": {
+        "resolution": "fallback",
+        "lineId": "",
+        "resolvedProfileId": "mira"
+      }
+    },
+    {
+      "caseId": "survey-offer",
+      "actor": {
+        "actorKind": "faction_quest_giver",
+        "legacyName": "Cartographer Elara",
+        "enemyId": ""
+      },
+      "channel": "quest_offer",
+      "topicId": "frontier_cartography",
+      "eligible": true,
+      "knownValues": [
+        {
+          "field": "quest.available",
+          "key": "frontier_cartography",
+          "boolValue": true,
+          "intValue": 0
+        }
+      ],
+      "expected": {
+        "resolution": "line",
+        "lineId": "elara.survey.offer",
+        "resolvedProfileId": "elara"
+      }
+    },
+    {
+      "caseId": "survey-wrong-offer",
+      "actor": {
+        "actorKind": "faction_quest_giver",
+        "legacyName": "Cartographer Elara",
+        "enemyId": ""
+      },
+      "channel": "quest_offer",
+      "topicId": "frontier_cartography",
+      "eligible": true,
+      "knownValues": [
+        {
+          "field": "quest.available",
+          "key": "frontier_cartography",
+          "boolValue": false,
+          "intValue": 0
+        }
+      ],
+      "expected": {
+        "resolution": "existing",
+        "lineId": "",
+        "resolvedProfileId": "elara"
+      }
+    },
+    {
+      "caseId": "survey-unknown-offer",
+      "actor": {
+        "actorKind": "faction_quest_giver",
+        "legacyName": "Cartographer Elara",
+        "enemyId": ""
+      },
+      "channel": "quest_offer",
+      "topicId": "frontier_cartography",
+      "eligible": true,
+      "knownValues": [],
+      "expected": {
+        "resolution": "existing",
+        "lineId": "",
+        "resolvedProfileId": "elara"
+      }
+    },
+    {
+      "caseId": "survey-progress",
+      "actor": {
+        "actorKind": "faction_quest_giver",
+        "legacyName": "Cartographer Elara",
+        "enemyId": ""
+      },
+      "channel": "quest_progress",
+      "topicId": "frontier_cartography",
+      "eligible": true,
+      "knownValues": [
+        {
+          "field": "quest.active",
+          "key": "frontier_cartography",
+          "boolValue": true,
+          "intValue": 0
+        },
+        {
+          "field": "quest.ready",
+          "key": "frontier_cartography",
+          "boolValue": false,
+          "intValue": 0
+        }
+      ],
+      "expected": {
+        "resolution": "line",
+        "lineId": "elara.survey.progress",
+        "resolvedProfileId": "elara"
+      }
+    },
+    {
+      "caseId": "survey-unknown-progress",
+      "actor": {
+        "actorKind": "faction_quest_giver",
+        "legacyName": "Cartographer Elara",
+        "enemyId": ""
+      },
+      "channel": "quest_progress",
+      "topicId": "frontier_cartography",
+      "eligible": true,
+      "knownValues": [
+        {
+          "field": "quest.active",
+          "key": "frontier_cartography",
+          "boolValue": true,
+          "intValue": 0
+        }
+      ],
+      "expected": {
+        "resolution": "existing",
+        "lineId": "",
+        "resolvedProfileId": "elara"
+      }
+    },
+    {
+      "caseId": "survey-ready",
+      "actor": {
+        "actorKind": "faction_quest_giver",
+        "legacyName": "Cartographer Elara",
+        "enemyId": ""
+      },
+      "channel": "quest_ready",
+      "topicId": "frontier_cartography",
+      "eligible": true,
+      "knownValues": [
+        {
+          "field": "quest.active",
+          "key": "frontier_cartography",
+          "boolValue": true,
+          "intValue": 0
+        },
+        {
+          "field": "quest.ready",
+          "key": "frontier_cartography",
+          "boolValue": true,
+          "intValue": 0
+        }
+      ],
+      "expected": {
+        "resolution": "line",
+        "lineId": "elara.survey.ready",
+        "resolvedProfileId": "elara"
+      }
+    },
+    {
+      "caseId": "survey-not-ready",
+      "actor": {
+        "actorKind": "faction_quest_giver",
+        "legacyName": "Cartographer Elara",
+        "enemyId": ""
+      },
+      "channel": "quest_ready",
+      "topicId": "frontier_cartography",
+      "eligible": true,
+      "knownValues": [
+        {
+          "field": "quest.active",
+          "key": "frontier_cartography",
+          "boolValue": true,
+          "intValue": 0
+        },
+        {
+          "field": "quest.ready",
+          "key": "frontier_cartography",
+          "boolValue": false,
+          "intValue": 0
+        }
+      ],
+      "expected": {
+        "resolution": "existing",
+        "lineId": "",
+        "resolvedProfileId": "elara"
+      }
+    },
+    {
+      "caseId": "survey-aftermath",
+      "actor": {
+        "actorKind": "faction_quest_giver",
+        "legacyName": "Cartographer Elara",
+        "enemyId": ""
+      },
+      "channel": "quest_after",
+      "topicId": "frontier_cartography",
+      "eligible": true,
+      "knownValues": [
+        {
+          "field": "quest.completed",
+          "key": "frontier_cartography",
+          "boolValue": true,
+          "intValue": 0
+        }
+      ],
+      "expected": {
+        "resolution": "line",
+        "lineId": "elara.survey.after",
+        "resolvedProfileId": "elara"
+      }
+    },
+    {
+      "caseId": "survey-guest-unearned",
+      "actor": {
+        "actorKind": "faction_quest_giver",
+        "legacyName": "Cartographer Elara",
+        "enemyId": ""
+      },
+      "channel": "quest_after",
+      "topicId": "frontier_cartography",
+      "eligible": true,
+      "knownValues": [
+        {
+          "field": "quest.completed",
+          "key": "frontier_cartography",
+          "boolValue": false,
+          "intValue": 0
+        }
+      ],
+      "expected": {
+        "resolution": "existing",
+        "lineId": "",
+        "resolvedProfileId": "elara"
+      }
+    },
+    {
+      "caseId": "survey-unknown-aftermath",
+      "actor": {
+        "actorKind": "faction_quest_giver",
+        "legacyName": "Cartographer Elara",
+        "enemyId": ""
+      },
+      "channel": "quest_after",
+      "topicId": "frontier_cartography",
+      "eligible": true,
+      "knownValues": [],
+      "expected": {
+        "resolution": "existing",
+        "lineId": "",
+        "resolvedProfileId": "elara"
+      }
+    },
+    {
+      "caseId": "reavers-offer",
+      "actor": {
+        "actorKind": "faction_quest_giver",
+        "legacyName": "Cartographer Elara",
+        "enemyId": ""
+      },
+      "channel": "quest_offer",
+      "topicId": "river_reaver_bounty",
+      "eligible": true,
+      "knownValues": [
+        {
+          "field": "quest.available",
+          "key": "river_reaver_bounty",
+          "boolValue": true,
+          "intValue": 0
+        }
+      ],
+      "expected": {
+        "resolution": "line",
+        "lineId": "elara.reavers.offer",
+        "resolvedProfileId": "elara"
+      }
+    },
+    {
+      "caseId": "reavers-wrong-offer",
+      "actor": {
+        "actorKind": "faction_quest_giver",
+        "legacyName": "Cartographer Elara",
+        "enemyId": ""
+      },
+      "channel": "quest_offer",
+      "topicId": "river_reaver_bounty",
+      "eligible": true,
+      "knownValues": [
+        {
+          "field": "quest.available",
+          "key": "river_reaver_bounty",
+          "boolValue": false,
+          "intValue": 0
+        }
+      ],
+      "expected": {
+        "resolution": "existing",
+        "lineId": "",
+        "resolvedProfileId": "elara"
+      }
+    },
+    {
+      "caseId": "reavers-unknown-offer",
+      "actor": {
+        "actorKind": "faction_quest_giver",
+        "legacyName": "Cartographer Elara",
+        "enemyId": ""
+      },
+      "channel": "quest_offer",
+      "topicId": "river_reaver_bounty",
+      "eligible": true,
+      "knownValues": [],
+      "expected": {
+        "resolution": "existing",
+        "lineId": "",
+        "resolvedProfileId": "elara"
+      }
+    },
+    {
+      "caseId": "reavers-progress",
+      "actor": {
+        "actorKind": "faction_quest_giver",
+        "legacyName": "Cartographer Elara",
+        "enemyId": ""
+      },
+      "channel": "quest_progress",
+      "topicId": "river_reaver_bounty",
+      "eligible": true,
+      "knownValues": [
+        {
+          "field": "quest.active",
+          "key": "river_reaver_bounty",
+          "boolValue": true,
+          "intValue": 0
+        },
+        {
+          "field": "quest.ready",
+          "key": "river_reaver_bounty",
+          "boolValue": false,
+          "intValue": 0
+        }
+      ],
+      "expected": {
+        "resolution": "line",
+        "lineId": "elara.reavers.progress",
+        "resolvedProfileId": "elara"
+      }
+    },
+    {
+      "caseId": "reavers-unknown-progress",
+      "actor": {
+        "actorKind": "faction_quest_giver",
+        "legacyName": "Cartographer Elara",
+        "enemyId": ""
+      },
+      "channel": "quest_progress",
+      "topicId": "river_reaver_bounty",
+      "eligible": true,
+      "knownValues": [
+        {
+          "field": "quest.active",
+          "key": "river_reaver_bounty",
+          "boolValue": true,
+          "intValue": 0
+        }
+      ],
+      "expected": {
+        "resolution": "existing",
+        "lineId": "",
+        "resolvedProfileId": "elara"
+      }
+    },
+    {
+      "caseId": "reavers-ready",
+      "actor": {
+        "actorKind": "faction_quest_giver",
+        "legacyName": "Cartographer Elara",
+        "enemyId": ""
+      },
+      "channel": "quest_ready",
+      "topicId": "river_reaver_bounty",
+      "eligible": true,
+      "knownValues": [
+        {
+          "field": "quest.active",
+          "key": "river_reaver_bounty",
+          "boolValue": true,
+          "intValue": 0
+        },
+        {
+          "field": "quest.ready",
+          "key": "river_reaver_bounty",
+          "boolValue": true,
+          "intValue": 0
+        }
+      ],
+      "expected": {
+        "resolution": "line",
+        "lineId": "elara.reavers.ready",
+        "resolvedProfileId": "elara"
+      }
+    },
+    {
+      "caseId": "reavers-not-ready",
+      "actor": {
+        "actorKind": "faction_quest_giver",
+        "legacyName": "Cartographer Elara",
+        "enemyId": ""
+      },
+      "channel": "quest_ready",
+      "topicId": "river_reaver_bounty",
+      "eligible": true,
+      "knownValues": [
+        {
+          "field": "quest.active",
+          "key": "river_reaver_bounty",
+          "boolValue": true,
+          "intValue": 0
+        },
+        {
+          "field": "quest.ready",
+          "key": "river_reaver_bounty",
+          "boolValue": false,
+          "intValue": 0
+        }
+      ],
+      "expected": {
+        "resolution": "existing",
+        "lineId": "",
+        "resolvedProfileId": "elara"
+      }
+    },
+    {
+      "caseId": "reavers-aftermath",
+      "actor": {
+        "actorKind": "faction_quest_giver",
+        "legacyName": "Cartographer Elara",
+        "enemyId": ""
+      },
+      "channel": "quest_after",
+      "topicId": "river_reaver_bounty",
+      "eligible": true,
+      "knownValues": [
+        {
+          "field": "quest.completed",
+          "key": "river_reaver_bounty",
+          "boolValue": true,
+          "intValue": 0
+        }
+      ],
+      "expected": {
+        "resolution": "line",
+        "lineId": "elara.reavers.after",
+        "resolvedProfileId": "elara"
+      }
+    },
+    {
+      "caseId": "reavers-guest-unearned",
+      "actor": {
+        "actorKind": "faction_quest_giver",
+        "legacyName": "Cartographer Elara",
+        "enemyId": ""
+      },
+      "channel": "quest_after",
+      "topicId": "river_reaver_bounty",
+      "eligible": true,
+      "knownValues": [
+        {
+          "field": "quest.completed",
+          "key": "river_reaver_bounty",
+          "boolValue": false,
+          "intValue": 0
+        }
+      ],
+      "expected": {
+        "resolution": "existing",
+        "lineId": "",
+        "resolvedProfileId": "elara"
+      }
+    },
+    {
+      "caseId": "reavers-unknown-aftermath",
+      "actor": {
+        "actorKind": "faction_quest_giver",
+        "legacyName": "Cartographer Elara",
+        "enemyId": ""
+      },
+      "channel": "quest_after",
+      "topicId": "river_reaver_bounty",
+      "eligible": true,
+      "knownValues": [],
+      "expected": {
+        "resolution": "existing",
+        "lineId": "",
+        "resolvedProfileId": "elara"
+      }
+    },
+    {
+      "caseId": "elara-new-greeting",
+      "actor": {
+        "actorKind": "faction_quest_giver",
+        "legacyName": "Cartographer Elara",
+        "enemyId": ""
+      },
+      "channel": "greeting",
+      "topicId": "",
+      "eligible": true,
+      "knownValues": [],
+      "expected": {
+        "resolution": "line",
+        "lineId": "elara.greeting.public",
+        "resolvedProfileId": "elara"
+      }
+    },
+    {
+      "caseId": "elara-complete-survey-greeting",
+      "actor": {
+        "actorKind": "faction_quest_giver",
+        "legacyName": "Cartographer Elara",
+        "enemyId": ""
+      },
+      "channel": "greeting",
+      "topicId": "",
+      "eligible": true,
+      "knownValues": [
+        {
+          "field": "quest.completed",
+          "key": "frontier_cartography",
+          "boolValue": true,
+          "intValue": 0
+        },
+        {
+          "field": "quest.completed",
+          "key": "river_reaver_bounty",
+          "boolValue": false,
+          "intValue": 0
+        }
+      ],
+      "expected": {
+        "resolution": "line",
+        "lineId": "elara.greeting.after-survey",
+        "resolvedProfileId": "elara"
+      }
+    },
+    {
+      "caseId": "elara-complete-bounty-greeting",
+      "actor": {
+        "actorKind": "faction_quest_giver",
+        "legacyName": "Cartographer Elara",
+        "enemyId": ""
+      },
+      "channel": "greeting",
+      "topicId": "",
+      "eligible": true,
+      "knownValues": [
+        {
+          "field": "quest.completed",
+          "key": "frontier_cartography",
+          "boolValue": true,
+          "intValue": 0
+        },
+        {
+          "field": "quest.completed",
+          "key": "river_reaver_bounty",
+          "boolValue": true,
+          "intValue": 0
+        }
+      ],
+      "expected": {
+        "resolution": "line",
+        "lineId": "elara.greeting.after-bounty",
+        "resolvedProfileId": "elara"
+      }
+    },
+    {
+      "caseId": "elara-inconsistent-active-completed",
+      "actor": {
+        "actorKind": "faction_quest_giver",
+        "legacyName": "Cartographer Elara",
+        "enemyId": ""
+      },
+      "channel": "quest_ready",
+      "topicId": "river_reaver_bounty",
+      "eligible": true,
+      "knownValues": [
+        {
+          "field": "quest.active",
+          "key": "river_reaver_bounty",
+          "boolValue": true,
+          "intValue": 0
+        },
+        {
+          "field": "quest.completed",
+          "key": "river_reaver_bounty",
+          "boolValue": true,
+          "intValue": 0
+        },
+        {
+          "field": "quest.ready",
+          "key": "river_reaver_bounty",
+          "boolValue": true,
+          "intValue": 0
+        }
+      ],
+      "expected": {
+        "resolution": "existing",
+        "lineId": "",
+        "resolvedProfileId": "elara"
+      }
+    },
+    {
+      "caseId": "elara-unknown-not-host-history",
+      "actor": {
+        "actorKind": "faction_quest_giver",
+        "legacyName": "Cartographer Elara",
+        "enemyId": ""
+      },
+      "channel": "quest_after",
+      "topicId": "river_reaver_bounty",
+      "eligible": true,
+      "knownValues": [],
+      "expected": {
+        "resolution": "existing",
+        "lineId": "",
+        "resolvedProfileId": "elara"
+      }
+    },
+    {
+      "caseId": "selvek-alive",
+      "actor": {
+        "actorKind": "hostile_enemy",
+        "legacyName": "Captain Selvek",
+        "enemyId": "westbank-reaver-captain"
+      },
+      "channel": "encounter_bark",
+      "topicId": "aggro",
+      "eligible": true,
+      "knownValues": [
+        {
+          "field": "enemy.alive",
+          "key": "westbank-reaver-captain",
+          "boolValue": true,
+          "intValue": 0
+        }
+      ],
+      "expected": {
+        "resolution": "line",
+        "lineId": "selvek.encounter.toll",
+        "resolvedProfileId": "selvek"
+      }
+    },
+    {
+      "caseId": "selvek-dead",
+      "actor": {
+        "actorKind": "hostile_enemy",
+        "legacyName": "Captain Selvek",
+        "enemyId": "westbank-reaver-captain"
+      },
+      "channel": "encounter_bark",
+      "topicId": "aggro",
+      "eligible": true,
+      "knownValues": [
+        {
+          "field": "enemy.alive",
+          "key": "westbank-reaver-captain",
+          "boolValue": false,
+          "intValue": 0
+        }
+      ],
+      "expected": {
+        "resolution": "none",
+        "lineId": "",
+        "resolvedProfileId": "selvek"
+      }
+    },
+    {
+      "caseId": "selvek-missing",
+      "actor": {
+        "actorKind": "hostile_enemy",
+        "legacyName": "Captain Selvek",
+        "enemyId": "westbank-reaver-captain"
+      },
+      "channel": "encounter_bark",
+      "topicId": "aggro",
+      "eligible": true,
+      "knownValues": [],
+      "expected": {
+        "resolution": "none",
+        "lineId": "",
+        "resolvedProfileId": "selvek"
+      }
+    },
+    {
+      "caseId": "selvek-no-friendly-greeting",
+      "actor": {
+        "actorKind": "hostile_enemy",
+        "legacyName": "Captain Selvek",
+        "enemyId": "westbank-reaver-captain"
+      },
+      "channel": "greeting",
+      "topicId": "",
+      "eligible": true,
+      "knownValues": [
+        {
+          "field": "enemy.alive",
+          "key": "westbank-reaver-captain",
+          "boolValue": true,
+          "intValue": 0
+        }
+      ],
+      "expected": {
+        "resolution": "denied",
+        "lineId": "",
+        "resolvedProfileId": "selvek"
+      }
+    },
+    {
+      "caseId": "unknown-profile",
+      "actor": {
+        "actorKind": "unknown",
+        "legacyName": "Unknown actor",
+        "enemyId": ""
+      },
+      "channel": "greeting",
+      "topicId": "",
+      "eligible": true,
+      "knownValues": [],
+      "expected": {
+        "resolution": "fallback",
+        "lineId": "",
+        "resolvedProfileId": ""
+      }
+    },
+    {
+      "caseId": "identity-abe-case",
+      "actor": {
+        "actorKind": "main_quest_giver",
+        "legacyName": "aBE",
+        "enemyId": ""
+      },
+      "channel": "main_body",
+      "topicId": "",
+      "eligible": true,
+      "knownValues": [
+        {
+          "field": "main.accepted",
+          "key": "",
+          "boolValue": false,
+          "intValue": 0
+        },
+        {
+          "field": "main.complete",
+          "key": "",
+          "boolValue": false,
+          "intValue": 0
+        },
+        {
+          "field": "main.index",
+          "key": "",
+          "boolValue": false,
+          "intValue": 0
+        },
+        {
+          "field": "main.ready",
+          "key": "",
+          "boolValue": false,
+          "intValue": 0
+        }
+      ],
+      "expected": {
+        "resolution": "line",
+        "lineId": "abe.main0.offer",
+        "resolvedProfileId": "abe"
+      }
+    },
+    {
+      "caseId": "identity-rowan-case",
+      "actor": {
+        "actorKind": "merchant",
+        "legacyName": "QUARTERMASTER ROWAN",
+        "enemyId": ""
+      },
+      "channel": "greeting",
+      "topicId": "",
+      "eligible": true,
+      "knownValues": [],
+      "expected": {
+        "resolution": "line",
+        "lineId": "rowan.greeting.public",
+        "resolvedProfileId": "rowan"
+      }
+    },
+    {
+      "caseId": "identity-mira-wrong-kind",
+      "actor": {
+        "actorKind": "faction_quest_giver",
+        "legacyName": "Provisioner Mira",
+        "enemyId": ""
+      },
+      "channel": "greeting",
+      "topicId": "",
+      "eligible": true,
+      "knownValues": [],
+      "expected": {
+        "resolution": "fallback",
+        "lineId": "",
+        "resolvedProfileId": ""
+      }
+    },
+    {
+      "caseId": "identity-rowan-suffix",
+      "actor": {
+        "actorKind": "merchant",
+        "legacyName": "Quartermaster Rowan Jr.",
+        "enemyId": ""
+      },
+      "channel": "greeting",
+      "topicId": "",
+      "eligible": true,
+      "knownValues": [],
+      "expected": {
+        "resolution": "fallback",
+        "lineId": "",
+        "resolvedProfileId": ""
+      }
+    },
+    {
+      "caseId": "identity-selvek-renamed",
+      "actor": {
+        "actorKind": "hostile_enemy",
+        "legacyName": "Renamed encounter object",
+        "enemyId": "westbank-reaver-captain"
+      },
+      "channel": "encounter_bark",
+      "topicId": "aggro",
+      "eligible": true,
+      "knownValues": [
+        {
+          "field": "enemy.alive",
+          "key": "westbank-reaver-captain",
+          "boolValue": true,
+          "intValue": 0
+        }
+      ],
+      "expected": {
+        "resolution": "line",
+        "lineId": "selvek.encounter.toll",
+        "resolvedProfileId": "selvek"
+      }
+    },
+    {
+      "caseId": "identity-selvek-wrong-id",
+      "actor": {
+        "actorKind": "hostile_enemy",
+        "legacyName": "Captain Selvek",
+        "enemyId": "not-the-reaver-captain"
+      },
+      "channel": "encounter_bark",
+      "topicId": "aggro",
+      "eligible": true,
+      "knownValues": [
+        {
+          "field": "enemy.alive",
+          "key": "westbank-reaver-captain",
+          "boolValue": true,
+          "intValue": 0
+        }
+      ],
+      "expected": {
+        "resolution": "none",
+        "lineId": "",
+        "resolvedProfileId": ""
+      }
+    },
+    {
+      "caseId": "identity-unknown-ineligible",
+      "actor": {
+        "actorKind": "unknown",
+        "legacyName": "Unknown actor",
+        "enemyId": ""
+      },
+      "channel": "greeting",
+      "topicId": "",
+      "eligible": false,
+      "knownValues": [],
+      "expected": {
+        "resolution": "denied",
+        "lineId": "",
+        "resolvedProfileId": ""
+      }
+    },
+    {
+      "caseId": "identity-selvek-renamed-no-talk",
+      "actor": {
+        "actorKind": "hostile_enemy",
+        "legacyName": "Renamed encounter object",
+        "enemyId": "westbank-reaver-captain"
+      },
+      "channel": "greeting",
+      "topicId": "",
+      "eligible": true,
+      "knownValues": [
+        {
+          "field": "enemy.alive",
+          "key": "westbank-reaver-captain",
+          "boolValue": true,
+          "intValue": 0
+        }
+      ],
+      "expected": {
+        "resolution": "denied",
+        "lineId": "",
+        "resolvedProfileId": "selvek"
+      }
+    }
+  ]
+}
