@@ -78,7 +78,13 @@ namespace Riftbound.Network
         bool serverTemperedWeapon;
         float lastServerPotionTime = -10f;
         float lastServerRespawnTime = -10f;
+        bool serverBlocking;
+        float serverBlockUntil;
+        float serverDodgeUntil;
+        float serverLastDodgeTime = -10f;
         static GUIStyle nameplateStyle;
+
+        bool IsServerBlocking => serverBlocking && Time.time <= serverBlockUntil;
 
         public override void OnNetworkSpawn()
         {
@@ -500,6 +506,10 @@ namespace Riftbound.Network
 
             string key = string.IsNullOrEmpty(abilityId) ? "melee" : abilityId.ToLowerInvariant();
             string cls = ClassName.Value.ToString();
+            bool knownId = key == "melee" || key == "fireball" || key == "frostnova" || key == "eviscerate" ||
+                           key == "consecration" || key == "whirlwind" || key == "interrupt";
+            if (!knownId) return;
+
             if ((key == "fireball" || key == "frostnova") && cls != "Mage") return;
             if (key == "eviscerate" && cls != "Rogue") return;
             if (key == "consecration" && cls != "Paladin") return;
@@ -507,11 +517,22 @@ namespace Riftbound.Network
 
             bool isAoe = key == "frostnova" || key == "consecration" || key == "whirlwind";
             string cdKey = isAoe ? $"{key}:{enemy.NetworkKey}" : key;
-            float cd = key == "melee" ? 0.35f : 0.8f;
+            float cd = key switch
+            {
+                "melee" => 0.35f,
+                "fireball" => 1.1f,
+                "whirlwind" => 1.45f,
+                "eviscerate" => 3.5f,
+                "frostnova" => 5.5f,
+                "consecration" => 5.5f,
+                "interrupt" => 11.5f,
+                _ => 0.8f
+            };
             if (serverAbilityCooldowns.TryGetValue(cdKey, out float readyAt) && Time.time < readyAt) return;
-            serverAbilityCooldowns[cdKey] = Time.time + cd;
 
-            float maxRange = key == "fireball" ? 30f : (isAoe ? 8.5f : 5.0f);
+            float maxRange = key == "fireball" ? 30f :
+                             key == "interrupt" ? (cls == "Mage" ? 25f : 5.0f) :
+                             (isAoe ? 8.5f : 5.0f);
             if (Vector3.Distance(transform.position, enemy.transform.position) > maxRange) return;
 
             // LOS check (ignore triggers/characters)
@@ -525,10 +546,14 @@ namespace Riftbound.Network
 
             if (key == "interrupt")
             {
-                CastBarSystem.InterruptTarget(stats, "Interrupt");
+                if (!CastBarSystem.IsTargetCasting(stats)) return;
+                bool interrupted = CastBarSystem.InterruptTarget(stats, "Interrupt");
+                if (interrupted) serverAbilityCooldowns[cdKey] = Time.time + cd;
                 BroadcastActionAnimClientRpc("Attack");
                 return;
             }
+
+            serverAbilityCooldowns[cdKey] = Time.time + cd;
 
             float baseDmg = key switch
             {
@@ -542,9 +567,25 @@ namespace Riftbound.Network
             float computedDamage = baseDmg + (Level.Value - 1) * 4f;
             if (Race.Value.ToString() == "Brute") computedDamage *= 1.15f;
 
+            float hpBeforeHit = stats.Health;
             stats.Damage(computedDamage);
+            float actualApplied = Mathf.Max(0f, hpBeforeHit - stats.Health);
+            if (key == "melee" && actualApplied > 0f && Race.Value.ToString() == "Undead" && Health.Value > 0)
+                Health.Value = Mathf.Min(MaxHealth.Value, Health.Value + 6);
+
+            if (actualApplied > 0f)
+                ConfirmAbilityHitClientRpc(enemy.NetworkKey, Mathf.RoundToInt(actualApplied), RpcTarget.Single(OwnerClientId, RpcTargetUse.Temp));
             BroadcastActionAnimClientRpc(key == "fireball" || key == "frostnova" || key == "consecration" ? "Cast" : "Attack");
             BroadcastEnemyState(enemy);
+        }
+
+        [Rpc(SendTo.SpecifiedInParams)]
+        void ConfirmAbilityHitClientRpc(string enemyKey, int serverDamage, RpcParams rpcParams = default)
+        {
+            if (!IsOwner || !localPlayer) return;
+            var enemy = EnemyController.FindByKey(enemyKey);
+            var enemyCombatant = enemy ? enemy.GetComponent<Combatant>() : null;
+            if (enemyCombatant) localPlayer.ApplyConfirmedHitPresentation(enemyCombatant, serverDamage, false);
         }
 
         public void RequestAbilityHeal(int amount, string abilityId)
@@ -559,19 +600,63 @@ namespace Riftbound.Network
 
         void ApplyServerAbilityHeal(int amount, string abilityId)
         {
-            if (!IsServer || Health.Value <= 0) return;
-            string key = string.IsNullOrEmpty(abilityId) ? "heal" : abilityId.ToLowerInvariant();
+            if (!IsServer || Health.Value <= 0 || Health.Value >= MaxHealth.Value) return;
+            string key = string.IsNullOrEmpty(abilityId) ? "" : abilityId.ToLowerInvariant();
             string cls = ClassName.Value.ToString();
-            if (key == "arcane_ward" && cls != "Mage") return;
-            if (key == "holy_light" && cls != "Paladin") return;
-            if (key == "second_wind" && cls != "Warrior") return;
+            int serverHeal = 0;
+            if (key == "arcane_ward" && cls == "Mage") serverHeal = 40;
+            else if (key == "holy_light" && cls == "Paladin") serverHeal = 60;
+            else if (key == "second_wind" && cls == "Warrior") serverHeal = 45;
+            else return;
 
             if (serverAbilityCooldowns.TryGetValue("heal:" + key, out float readyAt) && Time.time < readyAt) return;
             serverAbilityCooldowns["heal:" + key] = Time.time + 8.0f;
             if (key == "arcane_ward") lastServerMoveTime -= 0.85f; // Allow 7.5m Blink displacement once per validated arcane_ward cast
 
-            int clamped = Mathf.Clamp(amount, 1, 65);
-            Health.Value = Mathf.Min(MaxHealth.Value, Health.Value + clamped);
+            Health.Value = Mathf.Min(MaxHealth.Value, Health.Value + serverHeal);
+        }
+
+        public void SyncDefenseState(bool blocking, bool dodgeTriggered)
+        {
+            if (!CoopSessionConfig.IsMultiplayer || !IsSpawned || !IsOwner) return;
+            if (IsServer) ApplyServerDefenseState(blocking, dodgeTriggered);
+            else SubmitDefenseStateServerRpc(blocking, dodgeTriggered);
+        }
+
+        [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Owner)]
+        void SubmitDefenseStateServerRpc(bool blocking, bool dodgeTriggered) => ApplyServerDefenseState(blocking, dodgeTriggered);
+
+        void ApplyServerDefenseState(bool blocking, bool dodgeTriggered)
+        {
+            if (!IsServer || Health.Value <= 0) return;
+            if (blocking)
+            {
+                if (!serverBlocking) serverBlockUntil = Time.time + 3.2f;
+                serverBlocking = true;
+            }
+            else
+            {
+                serverBlocking = false;
+            }
+
+            if (dodgeTriggered && Time.time >= serverLastDodgeTime + 3.1f)
+            {
+                serverLastDodgeTime = Time.time;
+                serverDodgeUntil = Time.time + 0.42f;
+            }
+        }
+
+        public void BroadcastVisualEnemyProjectile(Vector3 origin, Vector3 direction)
+        {
+            if (!IsServer || !IsSpawned) return;
+            BroadcastVisualEnemyProjectileClientRpc(origin, direction);
+        }
+
+        [Rpc(SendTo.Everyone)]
+        void BroadcastVisualEnemyProjectileClientRpc(Vector3 origin, Vector3 direction)
+        {
+            if (IsServer) return;
+            EnemyProjectile.LaunchVisualOnly(origin, direction);
         }
 
         public void BroadcastEnemyState(EnemyController enemy)
@@ -593,18 +678,26 @@ namespace Riftbound.Network
         public static void DispatchEnemyHitToPlayer(ulong targetClientId, float damage, string enemyKey)
         {
             var avatar = FindByClientId(targetClientId);
-            if (!avatar || !avatar.IsServer) return;
+            if (!avatar || !avatar.IsServer || avatar.Health.Value <= 0) return;
 
-            int dmgInt = Mathf.Max(1, Mathf.RoundToInt(damage));
+            if (Time.time < avatar.serverDodgeUntil)
+            {
+                avatar.ReceiveEnemyHitClientRpc(0f, enemyKey, true, avatar.RpcTarget.Single(targetClientId, RpcTargetUse.Temp));
+                return;
+            }
+
+            float mitigated = damage;
+            if (avatar.IsServerBlocking) mitigated *= 0.5f;
+            int dmgInt = Mathf.Max(1, Mathf.RoundToInt(mitigated));
             avatar.Health.Value = Mathf.Max(0, avatar.Health.Value - dmgInt);
-            avatar.ReceiveEnemyHitClientRpc(damage, enemyKey, avatar.RpcTarget.Single(targetClientId, RpcTargetUse.Temp));
+            avatar.ReceiveEnemyHitClientRpc(dmgInt, enemyKey, false, avatar.RpcTarget.Single(targetClientId, RpcTargetUse.Temp));
         }
 
         [Rpc(SendTo.SpecifiedInParams)]
-        void ReceiveEnemyHitClientRpc(float damage, string enemyKey, RpcParams rpcParams = default)
+        void ReceiveEnemyHitClientRpc(float damage, string enemyKey, bool dodged, RpcParams rpcParams = default)
         {
             if (!IsOwner || !localPlayer || !localPlayer.Stats) return;
-            localPlayer.Stats.Damage(damage);
+            localPlayer.Stats.ApplyAuthoritativeNetHit(damage, dodged);
         }
 
         public void RequestRespawn()

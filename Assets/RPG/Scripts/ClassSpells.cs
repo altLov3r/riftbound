@@ -77,8 +77,6 @@ namespace Riftbound
                 if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner != null)
                 {
                     Network.RiftboundCoopPlayer.LocalOwner.RequestAbilityAttack(target, "fireball");
-                    AudioEffects.PlayBladeHit();
-                    SpellFX.CreateHitSparks(target.transform.position + Vector3.up * 1.1f, false);
                 }
                 else
                 {

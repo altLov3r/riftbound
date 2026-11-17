@@ -6,8 +6,11 @@ namespace Riftbound
     public partial class PrototypeHUD
     {
         static PrototypeHUD activeGossipHud;
-        int gossipMenuState = 0; // 0: Main, 1: Lore, 2: Threats, 3: Directions
+        int gossipMenuState = 0; // 0: Main, 1: Lore, 2: Threats, 3: Directions, 4: Offer, 5: TurnIn, 6: PublicTopic/Aftermath
         string gossipFeedback = "";
+        string activeNarrativeTopicId = "";
+        string activeNarrativeTopicChannel = "";
+        string activeNarrativeTopicTitle = "";
         Vector2 gossipScroll = Vector2.zero;
 
         public static void ResetGossipState()
@@ -16,6 +19,9 @@ namespace Riftbound
             if (!activeGossipHud) return;
             activeGossipHud.gossipMenuState = 0;
             activeGossipHud.gossipFeedback = "";
+            activeGossipHud.activeNarrativeTopicId = "";
+            activeGossipHud.activeNarrativeTopicChannel = "";
+            activeGossipHud.activeNarrativeTopicTitle = "";
             activeGossipHud.gossipScroll = Vector2.zero;
         }
 
@@ -100,7 +106,10 @@ namespace Riftbound
             if (gossipMenuState == 0)
             {
                 // Main Greeting & Dialogue Options
-                GUILayout.Label($"\"{npc.greeting}\"", quoteStyle);
+                var npcProfile = Narrative.NarrativeCatalog.ResolveTownNPC(npc);
+                var greetingSel = Narrative.NarrativeCatalog.SelectText(npcProfile, "greeting", "", player);
+                string greetingLine = !string.IsNullOrEmpty(greetingSel.text) ? greetingSel.text : npc.greeting;
+                GUILayout.Label($"\"{greetingLine}\"", quoteStyle);
                 GUILayout.Space(10f);
 
                 // Divider line
@@ -116,7 +125,7 @@ namespace Riftbound
                 GUILayout.Label("Choose a topic of inquiry:", bodyStyle);
                 GUILayout.Space(6f);
 
-                var fqs = FactionQuestSystem.Instance;
+                var fqs = player.GetComponent<FactionQuestSystem>();
                 if (fqs != null && fqs.HasActiveQuestToComplete(npc.npcName, player))
                 {
                     var q = fqs.GetActiveQuest();
@@ -128,6 +137,14 @@ namespace Riftbound
                         AudioEffects.PlayClick();
                     }
                     GUI.backgroundColor = oldBg;
+                    GUILayout.Space(6f);
+                }
+                else if (fqs != null && fqs.GetActiveQuest() is var activeQ && activeQ != null && (string.Equals(activeQ.giverNpc, npc.npcName, StringComparison.OrdinalIgnoreCase) || string.Equals(activeQ.targetId, npc.npcName, StringComparison.OrdinalIgnoreCase)))
+                {
+                    GUILayout.Label($"<b>Active Mission:</b> {activeQ.title} ({fqs.CurrentProgress}/{activeQ.requiredCount} {activeQ.targetName})", feedbackStyle);
+                    var progSel = Narrative.NarrativeCatalog.SelectText(npcProfile, "quest_progress", activeQ.id, player);
+                    if (progSel.matched && !string.IsNullOrEmpty(progSel.text))
+                        GUILayout.Label(progSel.text, bodyStyle);
                     GUILayout.Space(6f);
                 }
                 else if (fqs != null && fqs.HasAvailableQuest(npc.npcName, player))
@@ -143,10 +160,41 @@ namespace Riftbound
                     GUI.backgroundColor = oldBg;
                     GUILayout.Space(6f);
                 }
-                else if (fqs != null && fqs.GetActiveQuest() is var activeQ && activeQ != null && (string.Equals(activeQ.giverNpc, npc.npcName, StringComparison.OrdinalIgnoreCase) || string.Equals(activeQ.targetId, npc.npcName, StringComparison.OrdinalIgnoreCase)))
+                else if (fqs != null && npcProfile != null && npcProfile.entries != null)
                 {
-                    GUILayout.Label($"<b>Active Mission:</b> {activeQ.title} ({fqs.CurrentProgress}/{activeQ.requiredCount} {activeQ.targetName})", feedbackStyle);
-                    GUILayout.Space(6f);
+                    var seenAfter = new System.Collections.Generic.HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    foreach (var entry in npcProfile.entries)
+                    {
+                        if (entry == null || !string.Equals(entry.channel, "quest_after", StringComparison.Ordinal) || string.IsNullOrEmpty(entry.topicId) || seenAfter.Contains(entry.topicId))
+                            continue;
+                        seenAfter.Add(entry.topicId);
+                        var afterSel = Narrative.NarrativeCatalog.SelectText(npcProfile, "quest_after", entry.topicId, player);
+                        if (!afterSel.matched) continue;
+                        string qTitle = FactionQuestSystem.GetQuest(entry.topicId)?.title ?? entry.topicId;
+                        if (GUILayout.Button($"📜 \"Discuss aftermath: [{qTitle}]\"", optionStyle, GUILayout.Height(28f)))
+                        {
+                            activeNarrativeTopicChannel = "quest_after";
+                            activeNarrativeTopicId = entry.topicId;
+                            activeNarrativeTopicTitle = $"AFTERWARDS: {qTitle.ToUpperInvariant()}";
+                            gossipMenuState = 6;
+                            AudioEffects.PlayClick();
+                        }
+                    }
+                }
+
+                if (npcProfile != null)
+                {
+                    foreach (var topic in Narrative.NarrativeCatalog.GetPublicTopics(npcProfile, player))
+                    {
+                        if (GUILayout.Button($"💬 \"{topic.label}\"", optionStyle, GUILayout.Height(28f)))
+                        {
+                            activeNarrativeTopicChannel = "public_topic";
+                            activeNarrativeTopicId = topic.topicId;
+                            activeNarrativeTopicTitle = npc.npcName.ToUpperInvariant();
+                            gossipMenuState = 6;
+                            AudioEffects.PlayClick();
+                        }
+                    }
                 }
 
                 if (GUILayout.Button("💬 \"Tell me about this settlement.\"", optionStyle, GUILayout.Height(28f)))
@@ -267,7 +315,7 @@ namespace Riftbound
 
                 if (GUILayout.Button("✈ Flight Master Taxi Post", optionStyle, GUILayout.Height(28f)))
                 {
-                    var fm = FlightMaster.GetNearby(player.transform.position, 120f);
+                    var fm = FlightMaster.GetNearby(player.transform.position, 160f) ?? FindNearestComponent<FlightMaster>(player.transform.position);
                     if (fm)
                     {
                         MinimapRadar.SetWaypoint(fm.transform.position, $"Flight Master ({fm.nodeName})");
@@ -275,18 +323,23 @@ namespace Riftbound
                     }
                     else
                     {
-                        MinimapRadar.SetWaypoint(new Vector3(2f, 0f, 10f), "Emberwatch Flight Master");
-                        gossipFeedback = "✔ Waypoint pinned: Emberwatch Flight Master";
+                        gossipFeedback = "No Flight Master post located nearby.";
                     }
                     gossipMenuState = 0;
                 }
 
                 if (GUILayout.Button("🏛 Auction House & Mailbox", optionStyle, GUILayout.Height(28f)))
                 {
-                    var mb = Mailbox.GetNearby(player.transform.position, 120f);
-                    Vector3 wp = mb ? mb.transform.position : new Vector3(8.5f, 0f, 6.5f);
-                    MinimapRadar.SetWaypoint(wp, "Auction House & Mailbox");
-                    gossipFeedback = "✔ Waypoint pinned: Auctioneer & Mailbox";
+                    var mb = Mailbox.GetNearby(player.transform.position, 160f) ?? FindNearestComponent<Mailbox>(player.transform.position);
+                    if (mb)
+                    {
+                        MinimapRadar.SetWaypoint(mb.transform.position, "Auction House & Mailbox");
+                        gossipFeedback = "✔ Waypoint pinned: Auctioneer & Mailbox";
+                    }
+                    else
+                    {
+                        gossipFeedback = "No Auction House or Mailbox located nearby.";
+                    }
                     gossipMenuState = 0;
                 }
 
@@ -308,10 +361,16 @@ namespace Riftbound
 
                 if (GUILayout.Button("🍺 Innkeeper & Traveling Merchant", optionStyle, GUILayout.Height(28f)))
                 {
-                    var merchant = player.NearbyMerchant();
-                    Vector3 mPos = merchant ? merchant.transform.position : new Vector3(-8f, 0f, 10f);
-                    MinimapRadar.SetWaypoint(mPos, "Town Inn & Provisions");
-                    gossipFeedback = "✔ Waypoint pinned: Town Inn & Merchant";
+                    var merchant = player.NearbyMerchant() ?? FindNearestComponent<Merchant>(player.transform.position);
+                    if (merchant)
+                    {
+                        MinimapRadar.SetWaypoint(merchant.transform.position, merchant.npcName);
+                        gossipFeedback = $"✔ Waypoint pinned: {merchant.npcName}";
+                    }
+                    else
+                    {
+                        gossipFeedback = "No merchant post located nearby.";
+                    }
                     gossipMenuState = 0;
                 }
 
@@ -328,17 +387,21 @@ namespace Riftbound
             else if (gossipMenuState == 4)
             {
                 // Quest Offer View
-                var fqsOffer = FactionQuestSystem.Instance;
+                var fqsOffer = player.GetComponent<FactionQuestSystem>();
                 var q = fqsOffer != null ? fqsOffer.GetAvailableQuestForNPC(npc.npcName, player) : null;
                 if (q != null)
                 {
+                    var npcProfile = Narrative.NarrativeCatalog.ResolveTownNPC(npc);
+                    var offerSel = Narrative.NarrativeCatalog.SelectText(npcProfile, "quest_offer", q.id, player);
+                    string offerBody = offerSel.matched && !string.IsNullOrEmpty(offerSel.text) ? offerSel.text : q.description;
+
                     GUILayout.Label($"<b>MISSION: {q.title.ToUpperInvariant()}</b>", bodyStyle);
                     GUILayout.Label($"<i>Zone: {q.zone}  •  Faction: {q.faction}</i>", subStyle);
                     GUILayout.Space(8f);
                     DrawParchmentDivider();
                     GUILayout.Space(8f);
 
-                    GUILayout.Label(q.description, bodyStyle);
+                    GUILayout.Label(offerBody, bodyStyle);
                     GUILayout.Space(12f);
 
                     GUILayout.Label($"<b>OBJECTIVE:</b>\n• {q.targetName}: 0 / {q.requiredCount}", bodyStyle);
@@ -380,17 +443,23 @@ namespace Riftbound
             else if (gossipMenuState == 5)
             {
                 // Quest Turn-in View
-                var fqsTurnIn = FactionQuestSystem.Instance;
+                var fqsTurnIn = player.GetComponent<FactionQuestSystem>();
                 var q = fqsTurnIn != null ? fqsTurnIn.GetActiveQuest() : null;
                 if (q != null)
                 {
+                    var npcProfile = Narrative.NarrativeCatalog.ResolveTownNPC(npc);
+                    var readySel = Narrative.NarrativeCatalog.SelectText(npcProfile, "quest_ready", q.id, player);
+                    string readyBody = readySel.matched && !string.IsNullOrEmpty(readySel.text)
+                        ? readySel.text
+                        : "Outstanding work, traveler. You met the mark and brought safe passage back to our frontier post. Take these spoils with our gratitude.";
+
                     GUILayout.Label($"<b>COMPLETE MISSION: {q.title.ToUpperInvariant()}</b>", bodyStyle);
                     GUILayout.Label($"<i>Zone: {q.zone}</i>", subStyle);
                     GUILayout.Space(8f);
                     DrawParchmentDivider();
                     GUILayout.Space(8f);
 
-                    GUILayout.Label("Outstanding work, warrior! You have broken our enemies' advance and brought glory to our faction. Take these spoils with our gratitude.", bodyStyle);
+                    GUILayout.Label(readyBody, bodyStyle);
                     GUILayout.Space(12f);
 
                     string rewardsText = $"<b>REWARDS EARNED:</b>\n• +{q.rewardGold} Gold\n• +{q.rewardXP} Experience";
@@ -419,6 +488,23 @@ namespace Riftbound
                     gossipMenuState = 0;
                 }
             }
+            else if (gossipMenuState == 6)
+            {
+                var npcProfile = Narrative.NarrativeCatalog.ResolveTownNPC(npc);
+                var topicSel = Narrative.NarrativeCatalog.SelectText(npcProfile, activeNarrativeTopicChannel, activeNarrativeTopicId, player);
+                string heading = string.IsNullOrEmpty(activeNarrativeTopicTitle) ? npc.npcName.ToUpperInvariant() : activeNarrativeTopicTitle;
+                GUILayout.Label($"<b>{heading}</b>", bodyStyle);
+                GUILayout.Space(6f);
+                GUILayout.Label(!string.IsNullOrEmpty(topicSel.text) ? topicSel.text : (npcProfile?.fallbackText ?? npc.greeting), bodyStyle);
+                GUILayout.Space(14f);
+                DrawParchmentDivider();
+                GUILayout.Space(8f);
+                if (GUILayout.Button("◄ Back to Inquiries", optionStyle, GUILayout.Height(28f)))
+                {
+                    gossipMenuState = 0;
+                    AudioEffects.PlayClick();
+                }
+            }
 
             GUILayout.EndScrollView();
             GUILayout.EndArea();
@@ -445,49 +531,65 @@ namespace Riftbound
             return "🛡";
         }
 
+        static T FindNearestComponent<T>(Vector3 origin) where T : Component
+        {
+            T best = null;
+            float bestDist = float.MaxValue;
+            foreach (var comp in FindObjectsByType<T>(FindObjectsSortMode.None))
+            {
+                if (!comp) continue;
+                float d = Vector3.Distance(origin, comp.transform.position);
+                if (d < bestDist) { bestDist = d; best = comp; }
+            }
+            return best;
+        }
+
         string GetNPCLore(TownNPC npc)
         {
-            string name = npc.npcName;
-            string role = npc.roleTag;
+            var profile = Narrative.NarrativeCatalog.ResolveTownNPC(npc);
+            if (profile != null)
+            {
+                var topics = Narrative.NarrativeCatalog.GetPublicTopics(profile, player);
+                if (topics.Count > 0)
+                {
+                    var firstTopic = Narrative.NarrativeCatalog.SelectText(profile, "public_topic", topics[0].topicId, player);
+                    if (!string.IsNullOrEmpty(firstTopic.text)) return firstTopic.text;
+                }
+                if (!string.IsNullOrEmpty(profile.fallbackText)) return profile.fallbackText;
+            }
 
-            if (name.Contains("Ronald") || role.Contains("Highspire"))
-                return "Highspire Keep stands tall upon the northern crags of Aethelgard. For three hundred years, the Royal Knights and the Archmagi of Kirin Tor have guarded this bastion. The Lion crest of the Alliance flies proudly over our ramparts, reminding the realm that justice and honor shall endure.";
-
-            if (name.Contains("Mor'gok") || role.Contains("Gor'Kresh") || role.Contains("Horde"))
-                return "Gor'Kresh was forged from blood and dark timber in the heat of the red canyons. The Ashen Pact welcomes those whom the world discarded: the proud crag orcs, the resurrected Forsaken, and the cunning goblins. Strength and honor guide our blades!";
-
-            if (name.Contains("Karen") || name.Contains("Aldous") || name.Contains("Kaelen"))
-                return "The arcane currents running through this continent originate deep beneath the mountains. Ancient ley lines intersect at Mount Wyrmcrest and branch outward toward the Scarlet Crypts. Those who master the weave of Mana can turn the tides of any war.";
-
-            if (name.Contains("Kelsey") || role.Contains("Shaman"))
-                return "The elements here are restless. Fire spirits surge in the Redridge chasms, while stone and air whisper warnings of an ancient predator waking at the highest summit. Keep your spirit centered, young hero.";
-
-            if (name.Contains("Ironbrow") || name.Contains("Torvald") || role.Contains("Smith"))
-                return "A warrior is only as stout as their tempered steel! Deep beneath the peaks lie veins of Copper, Dark Iron, and Obsidian Core. Heat the forge, strike while the iron is red, and your armor will turn aside any raider's blade.";
-
-            if (name.Contains("Thalorien") || role.Contains("Silverglen"))
-                return "Silverglen Sanctum preserves the harmony of the eternal groves. Even in exile across these rugged lands, the descendants of the High Elves maintain the ancient vigilance over sacred fonts and runestones.";
-
-            if (name.Contains("Morzan") || name.Contains("Alyssa"))
-                return "Death is not an end — it is a crucible. The Forsaken hold no delusions about the cruelty of this realm. We walk the razor's edge between the Light that burned us and the Shadow that gave us second breath.";
-
-            if (name.Contains("Griznak") || name.Contains("Fizzlebang"))
-                return "Bilgewater Cartel policy is simple: if it doesn't turn a profit, replace it! If it explodes, sell tickets! Our turbo-copters and clockwork sentries are cutting-edge goblin engineering — ninety percent tested, ten percent thrilling mystery!";
-
-            return "Emberwatch Outpost was founded by veterans of the border campaigns. We shelter farmers, prospectors, and traveling heroes who journey between the Alliance plains of Amber Vale and the contested frontier.";
+            string role = npc.roleTag ?? "";
+            if (role.Contains("Highspire") || role.Contains("Alliance"))
+                return "Highspire Keep commands the western crags above Willowmere, sheltering caravans that brave the fractured frontier roads.";
+            if (role.Contains("Gor'Kresh") || role.Contains("Horde"))
+                return "Gor'Kresh rises along the red canyon approaches of Bloodrock, where vanguard scouts hold the passes against beasts and raiders.";
+            if (role.Contains("Smith") || role.Contains("Provision"))
+                return "Stamped steel and dry rations keep the frontier relays open when storm and raiding parties cut the supply trails.";
+            return !string.IsNullOrEmpty(npc.greeting)
+                ? $"{npc.greeting}\n\nEmberwatch Outpost shelters travelers holding the roads between Greenhollow, Highspire, and Bloodrock."
+                : "Emberwatch Outpost shelters travelers holding the roads between Greenhollow, Highspire, and Bloodrock.";
         }
 
         string GetNPCThreats(TownNPC npc)
         {
-            string name = npc.npcName;
+            var profile = Narrative.NarrativeCatalog.ResolveTownNPC(npc);
+            if (profile != null)
+            {
+                var topics = Narrative.NarrativeCatalog.GetPublicTopics(profile, player);
+                if (topics.Count > 1)
+                {
+                    var secondTopic = Narrative.NarrativeCatalog.SelectText(profile, "public_topic", topics[1].topicId, player);
+                    if (!string.IsNullOrEmpty(secondTopic.text)) return secondTopic.text;
+                }
+            }
 
-            if (name.Contains("Ronald") || name.Contains("Lucian") || name.Contains("Brian"))
-                return "The greatest immediate threat lies within <b>The Scarlet Crypts</b> (-55, 215). High Inquisitor Malakar has succumbed to fanatic corruption, turning his zealous followers into undead abominations. Only heroes clad in tempered gear should venture beyond the crimson gateway.";
+            string name = npc.npcName ?? "";
+            if (string.Equals(name, "Commander Ronald", StringComparison.OrdinalIgnoreCase) || string.Equals(name, "Scout Brian", StringComparison.OrdinalIgnoreCase))
+                return "Fanatic forces gather within The Scarlet Crypts beyond Highspire. Travel prepared before challenging the crypt locks.";
+            if (string.Equals(name, "Warlord Mor'gok", StringComparison.OrdinalIgnoreCase) || string.Equals(name, "Vindicator Gorgash", StringComparison.OrdinalIgnoreCase))
+                return "Mount Wyrmcrest rises high above the eastern crags, where Vermithrax holds the frostbound summit dais.";
 
-            if (name.Contains("Mor'gok") || name.Contains("Gorgash") || name.Contains("Kelsey"))
-                return "Beyond the crags of Camp Bloodrock (55, 215) looms <b>Mount Wyrmcrest</b> (0, 48, 225). At the snowy summit roosts <b>Vermithrax the Ember Sovereign</b>, an ancient dragon of terrifying fury. He incinerates any traveler who approaches without wings.";
-
-            return "Watch your step on the northern highway. The Ashwood raiders have fortified a ruined watchtower with bone raiders, boneguards, and hexers. Further east in the Redridge canyons, crag orcs ambush any patrol caught separated from their mount.";
+            return "Watch your step along the Ashwood north road and the Westbank crossings near Willowmere. Raiders and hexers patrol off the main flagstones.";
         }
     }
 }

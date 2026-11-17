@@ -39,7 +39,10 @@ namespace Riftbound
                 float x = width / 2 - 330, y = height / 2 - 250;
                 Panel(new Rect(x, y, 660, 500));
                 GUI.Label(new Rect(x + 24, y + 20, 600, 36), player.ActiveMerchant.npcName.ToUpperInvariant(), title);
-                GUI.Label(new Rect(x + 24, y + 65, 600, 55), $"Supplies for the forest road. Your purse: {player.Gold} gold.\nPotions: {player.Potions}/10   /   Weapon bonus: +{player.WeaponBonus}", label);
+                var merchantProfile = Narrative.NarrativeCatalog.ResolveMerchant(player.ActiveMerchant);
+                var merchantGreeting = Narrative.NarrativeCatalog.SelectText(merchantProfile, "greeting", "", player);
+                string headerCopy = !string.IsNullOrEmpty(merchantGreeting.text) ? merchantGreeting.text : "Supplies for the forest road.";
+                GUI.Label(new Rect(x + 24, y + 65, 600, 55), $"{headerCopy}\nYour purse: {player.Gold} gold.   Potions: {player.Potions}/10   /   Weapon bonus: +{player.WeaponBonus}", label);
                 GUI.Label(new Rect(x + 24, y + 143, 400, 30), "Health potion / restores 70 HP", label);
                 GUI.enabled = player.Gold >= 10 && player.Potions < 10 && !player.InCombat();
                 if (GUI.Button(new Rect(x + 455, y + 137, 180, 36), "BUY / 10 GOLD", questButton)) player.BuyPotion();

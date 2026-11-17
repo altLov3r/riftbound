@@ -551,8 +551,13 @@ namespace Riftbound
             Fill(new Rect(x + 3, y + 3, w - 6, 45), new Color(.12f, .14f, .11f));
             GUI.Label(new Rect(x + 19, y + 8, w - 70, 34), npc.npcName.ToUpperInvariant() + "  ·  QUESTS", title);
             if (GUI.Button(new Rect(x + w - 37, y + 11, 24, 25), "X", questButton)) player.CloseDialogue();
-            GUI.Label(new Rect(x + 22, y + 64, w - 44, 38), player.QuestName, questHeading);
-            GUI.Label(new Rect(x + 22, y + 110, w - 44, 166), player.QuestDescription, questBody);
+            var mainProfile = Narrative.NarrativeCatalog.ResolveMainQuestGiver(npc);
+            var titleSel = Narrative.NarrativeCatalog.SelectText(mainProfile, "main_title", "", player);
+            var bodySel = Narrative.NarrativeCatalog.SelectText(mainProfile, "main_body", "", player);
+            string displayTitle = titleSel.matched && !string.IsNullOrEmpty(titleSel.text) ? titleSel.text : player.QuestName;
+            string displayBody = bodySel.matched && !string.IsNullOrEmpty(bodySel.text) ? bodySel.text : player.QuestDescription;
+            GUI.Label(new Rect(x + 22, y + 64, w - 44, 38), displayTitle, questHeading);
+            GUI.Label(new Rect(x + 22, y + 110, w - 44, 166), displayBody, questBody);
             Fill(new Rect(x + 22, y + 286, w - 44, 1), new Color(.55f, .43f, .25f));
             GUI.Label(new Rect(x + 22, y + 301, w - 44, 30), "Quest Objectives", questHeading);
             GUI.Label(new Rect(x + 22, y + 337, w - 44, 52), player.QuestObjective, questBody);

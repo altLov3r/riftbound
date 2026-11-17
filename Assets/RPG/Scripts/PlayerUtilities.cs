@@ -24,6 +24,8 @@ namespace Riftbound
             {
                 Blocking = true; GuardEnds = Time.time + 3; Stats.incomingDamageMultiplier = .5f;
                 moveVelocity = Vector3.zero; if (animator) animator.speed = 1; Play("Block", true);
+                if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner != null)
+                    Network.RiftboundCoopPlayer.LocalOwner.SyncDefenseState(true, false);
             }
             if (keys.hKey.wasPressedThisFrame && !ReturningHome && !Blocking && !uiBlocked && Time.time >= busyUntil)
             {
@@ -54,8 +56,11 @@ namespace Riftbound
         }
         void StopGuard()
         {
+            bool wasBlocking = Blocking;
             if (Blocking) GuardReady = Time.time + 6;
             Blocking = false; if (Stats) Stats.incomingDamageMultiplier = 1;
+            if (wasBlocking && Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner != null)
+                Network.RiftboundCoopPlayer.LocalOwner.SyncDefenseState(false, false);
         }
         public void ToggleGuardPublic()
         {
@@ -64,6 +69,8 @@ namespace Riftbound
             {
                 Blocking = true; GuardEnds = Time.time + 3; Stats.incomingDamageMultiplier = .5f;
                 moveVelocity = Vector3.zero; if (animator) animator.speed = 1; Play("Block", true);
+                if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner != null)
+                    Network.RiftboundCoopPlayer.LocalOwner.SyncDefenseState(true, false);
             }
         }
         public void TriggerHearthstonePublic()

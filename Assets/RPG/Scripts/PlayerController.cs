@@ -44,6 +44,11 @@ namespace Riftbound
         float dodgeReadyTime, dodgeEnds;
         Vector3 dodgeDir;
         public float DodgeCooldownRemaining => Mathf.Max(0f, dodgeReadyTime - Time.time);
+        int bufferedAbilitySlot;
+        float bufferedAbilityExpiresAt;
+        int combatActionEpoch;
+        public int BufferedAbilitySlot => Time.time < bufferedAbilityExpiresAt ? bufferedAbilitySlot : 0;
+        public void ClearCombatInputBuffer() { bufferedAbilitySlot = 0; bufferedAbilityExpiresAt = 0f; }
         Vector3 moveVelocity;
         Quaternion visualBaseRotation = Quaternion.identity;
         bool hasVisualBaseRotation;
@@ -458,8 +463,18 @@ namespace Riftbound
                     animator.speed = playback;
                 }
             }
-            bool attack = keys.digit1Key.wasPressedThisFrame;
-            if (attack && !Blocking && !InventoryOpen && motor.isGrounded) CastAbility1();
+            if (bufferedAbilitySlot == 1 && Time.time < bufferedAbilityExpiresAt && Time.time >= attackReady)
+            {
+                ClearCombatInputBuffer();
+                if (!Blocking && !InventoryOpen && !AnyBlockingWindowOpen() && motor.isGrounded && Stats && Stats.Alive)
+                    CastAbility1();
+            }
+            else if (bufferedAbilitySlot != 0 && (Time.time >= bufferedAbilityExpiresAt || !Stats || !Stats.Alive || Blocking || AnyBlockingWindowOpen() || !Target || !Target.Alive))
+            {
+                ClearCombatInputBuffer();
+            }
+
+            if (keys.digit1Key.wasPressedThisFrame) RequestPrimaryAttackInput();
             if (keys.digit2Key.wasPressedThisFrame && !Blocking && !InventoryOpen && motor.isGrounded) CastAbility2();
             if (keys.digit3Key.wasPressedThisFrame) CastAbility3();
             if (keys.fKey.wasPressedThisFrame && !Blocking && !InventoryOpen) CastInterruptPublic();
@@ -467,14 +482,39 @@ namespace Riftbound
             if (keys.eKey.wasPressedThisFrame) Interact();
         }
 
+        public void RequestPrimaryAttackInput()
+        {
+            if (!Stats || !Stats.Alive || Blocking || InventoryOpen || AnyBlockingWindowOpen() || (motor && !motor.isGrounded))
+            {
+                ClearCombatInputBuffer();
+                return;
+            }
+            if (Time.time >= attackReady)
+            {
+                ClearCombatInputBuffer();
+                CastAbility1();
+                return;
+            }
+            if (attackReady - Time.time <= 0.35f)
+            {
+                bufferedAbilitySlot = 1;
+                bufferedAbilityExpiresAt = Time.time + 0.16f;
+            }
+        }
+
         void PerformDodgeRoll(Vector3 inputDir)
         {
             if (Stats && !Stats.Alive) return;
             if (Time.time < dodgeReadyTime) return;
+            ClearCombatInputBuffer();
+            combatActionEpoch++;
+            busyUntil = Mathf.Min(busyUntil, Time.time);
             dodgeReadyTime = Time.time + 3.5f;
             dodgeEnds = Time.time + 0.32f;
             dodgeDir = inputDir.sqrMagnitude > 0.05f ? inputDir.normalized : transform.forward;
             if (Stats) Stats.invulnerableUntil = Time.time + 0.38f;
+            if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner != null)
+                Network.RiftboundCoopPlayer.LocalOwner.SyncDefenseState(Blocking, true);
             SpellFX.CreateArcaneBurst(transform.position);
             CombatTextManager.Spawn(transform.position + Vector3.up * 1.8f, "DODGE!", new Color(0.55f, 0.95f, 1f), false);
         }
@@ -551,7 +591,7 @@ namespace Riftbound
         {
             if (!npc) return;
             if (Stats && !Stats.Alive) return;
-            FactionQuestSystem.Instance?.OnTalkedToNPC(npc.npcName);
+            (GetComponent<FactionQuestSystem>() ?? FactionQuestSystem.Instance)?.OnTalkedToNPC(npc.npcName);
             PrototypeHUD.ResetGossipState();
             ActiveTownNPC = npc;
             ActiveQuestGiver = null;
@@ -645,21 +685,30 @@ namespace Riftbound
                 FireballSpell.Cast(this, Target, dmg);
                 Message = "Fireball launched!";
             }
-            else if (CharacterClass == "Rogue")
+            else
             {
-                if (ClassResource < 40) { Message = "Not enough Energy!"; return; }
-                ClassResource -= 40;
-                StartCoroutine(Attack(false, 0.55f, 20f, "Sinister Strike!"));
-            }
-            else if (CharacterClass == "Paladin")
-            {
-                ClassResource = Mathf.Min(MaxClassResource, ClassResource + 1);
-                StartCoroutine(Attack(false, 1.1f, 26f, "Crusader Strike! (+1 Holy Power)"));
-            }
-            else // Warrior
-            {
-                ClassResource = Mathf.Min(MaxClassResource, ClassResource + 15);
-                StartCoroutine(Attack(false, attackDuration, 24f, "Strike! (+15 Rage)"));
+                if (!Target || !Target.Alive) SelectTarget();
+                if (!Target || !Target.Alive || Vector3.Distance(transform.position, Target.transform.position) > 3.2f)
+                {
+                    Message = "Move closer to an enemy. TAB selects the nearest target.";
+                    return;
+                }
+                if (CharacterClass == "Rogue")
+                {
+                    if (ClassResource < 40) { Message = "Not enough Energy!"; return; }
+                    ClassResource -= 40;
+                    StartCoroutine(Attack(false, 0.55f, 20f, "Sinister Strike!"));
+                }
+                else if (CharacterClass == "Paladin")
+                {
+                    ClassResource = Mathf.Min(MaxClassResource, ClassResource + 1);
+                    StartCoroutine(Attack(false, 1.1f, 26f, "Crusader Strike! (+1 Holy Power)"));
+                }
+                else // Warrior
+                {
+                    ClassResource = Mathf.Min(MaxClassResource, ClassResource + 15);
+                    StartCoroutine(Attack(false, attackDuration, 24f, "Strike! (+15 Rage)"));
+                }
             }
         }
 
@@ -825,13 +874,14 @@ namespace Riftbound
             attackReady = Time.time + duration + .08f;
             if (cleave) CleaveReady = Time.time + Mathf.Max(1.5f, 5f - TalentSystem.GetWhirlwindCooldownReduction(this));
             busyUntil = Time.time + duration * .78f;
+            int actionEpoch = combatActionEpoch;
             if (animator) animator.speed = 1;
             string swingAnim = cleave ? "Cleave" : "Attack";
             Play(swingAnim, true);
             if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner != null)
                 Network.RiftboundCoopPlayer.LocalOwner.TriggerActionAnim(swingAnim);
             yield return new WaitForSeconds(duration * .45f);
-            if (!Stats.Alive || Blocking) yield break;
+            if (!Stats.Alive || Blocking || actionEpoch != combatActionEpoch || Time.time < dodgeEnds) yield break;
             if (cleave)
             {
                 SpellFX.CreateCleaveArc(transform.position, 3.8f, CharacterClass);
@@ -876,6 +926,12 @@ namespace Riftbound
         void Hit(Combatant enemy, float damage, string abilityId = "melee")
         {
             if (!enemy || !enemy.Alive) return;
+            if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner != null)
+            {
+                Network.RiftboundCoopPlayer.LocalOwner.RequestAbilityAttack(enemy, abilityId);
+                return;
+            }
+
             float finalDmg = damage + (Level - 1) * 3 + WeaponBonus;
             if (CharacterRace == "Brute") finalDmg *= 1.15f;
             finalDmg *= TalentSystem.GetDamageMultiplier(this);
@@ -885,16 +941,20 @@ namespace Riftbound
             bool isCrit = UnityEngine.Random.value < critChance;
             if (isCrit) finalDmg *= 1.8f;
 
+            enemy.Damage(finalDmg);
+            ApplyConfirmedHitPresentation(enemy, finalDmg, isCrit);
+            if (CharacterRace == "Undead" && Stats && Stats.Alive) Stats.Heal(6);
+        }
+
+        public void ApplyConfirmedHitPresentation(Combatant enemy, float confirmedDamage, bool isCrit)
+        {
+            if (!enemy) return;
             AudioEffects.PlayBladeHit();
             SpellFX.CreateHitSparks(enemy.transform.position + Vector3.up * 1.1f, isCrit);
             if (isCrit) OrbitCamera.Shake(0.13f, 0.14f);
-            CombatTextManager.SpawnDamage(enemy.transform.position, finalDmg, isCrit);
+            CombatTextManager.SpawnDamage(enemy.transform.position, confirmedDamage, isCrit);
             string critMsg = isCrit ? " [CRITICAL!]" : "";
-            ChatSystem.LogCombat($"Your strike hits {enemy.displayName} for {Mathf.RoundToInt(finalDmg)} Physical damage{critMsg}.");
-            if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner != null)
-                Network.RiftboundCoopPlayer.LocalOwner.RequestAbilityAttack(enemy, abilityId);
-            else
-                enemy.Damage(finalDmg);
+            ChatSystem.LogCombat($"Your strike hits {enemy.displayName} for {Mathf.RoundToInt(confirmedDamage)} damage{critMsg}.");
             if (CharacterClass == "Warrior")
                 BuffSystem.ApplyTargetDebuff(enemy, "rend", "Rend", "Suffering 6 Physical bleed damage every second.", "🩸", new Color(0.85f, 0.2f, 0.2f), 5f, 6f, 1f);
             else if (CharacterClass == "Rogue")
@@ -903,7 +963,6 @@ namespace Riftbound
                 BuffSystem.ApplyTargetDebuff(enemy, "judgement", "Judgement", "Weakened against Holy power for 6 seconds.", "✝", new Color(1f, 0.85f, 0.3f), 6f, 4f, 1.5f);
             else if (CharacterClass == "Mage")
                 BuffSystem.ApplyTargetDebuff(enemy, "ignite", "Ignite", "Burning for 8 Fire damage every second.", "🔥", new Color(1f, 0.45f, 0.1f), 4f, 8f, 1f);
-            if (CharacterRace == "Undead" && Stats && Stats.Alive) Stats.Heal(6);
         }
         public void SelectTarget()
         {

@@ -331,13 +331,17 @@ namespace Riftbound
                             continue;
                         }
 
-                        // Periodic tick
+                        // Periodic tick (host-authoritative in multiplayer)
+                        bool authoritativeTick = !Network.CoopSessionConfig.IsMultiplayer || (Unity.Netcode.NetworkManager.Singleton && Unity.Netcode.NetworkManager.Singleton.IsServer);
                         if (d.damagePerTick > 0f && Time.time >= d.nextTickTime)
                         {
                             d.nextTickTime = Time.time + d.tickInterval;
-                            float dmg = d.damagePerTick * d.stacks;
-                            target.Damage(dmg);
-                            CombatTextManager.Spawn(target.transform.position, $"-{Mathf.RoundToInt(dmg)} {d.icon}", d.color, false);
+                            if (authoritativeTick)
+                            {
+                                float dmg = d.damagePerTick * d.stacks;
+                                target.Damage(dmg);
+                                CombatTextManager.Spawn(target.transform.position, $"-{Mathf.RoundToInt(dmg)} {d.icon}", d.color, false);
+                            }
                         }
                     }
 

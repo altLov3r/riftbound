@@ -214,7 +214,7 @@ namespace Riftbound
                     else
                     {
                         OpenTownNPCDialogue(townNpc);
-                        townNpc.TriggerGreetingBark();
+                        townNpc.TriggerGreetingBark(this, explicitInteract: true);
                     }
                 });
             }

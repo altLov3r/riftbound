@@ -33,6 +33,7 @@ namespace Riftbound
         Quaternion homeRotation;
         float nextAttack, deathTime, attackEnds, damageAt;
         bool pendingDamage, dying, evading, initialized, resetPoseOnEnable, wasChasing;
+        float nextEncounterBarkAt;
         string state;
         float heavyUntil, nextHeavy;
         Vector3 heavyCenter;
@@ -154,6 +155,7 @@ namespace Riftbound
             Play("Idle"); if (animator) animator.speed = 1;
             string spell = heavyAttacker ? "Crushing Blow" : (ranged ? "Shadow Bolt" : "Savage Strike");
             string icon = heavyAttacker ? "🔨" : (ranged ? "💀" : "⚔");
+            GameSound.Play(SoundCue.Rune, transform.position);
             CastBarSystem.StartTargetCast(stats, spell, icon, 1.8f, null, true);
         }
         void Update()
@@ -243,7 +245,26 @@ namespace Riftbound
             if (evading && homeDistance <= 1.2f) { evading = false; stats.Restore(); }
             bool chasing = inPursuitRange && !evading;
             if (chasing && !wasChasing)
+            {
                 CombatTextManager.Spawn(transform.position + Vector3.up * 2.2f, "!", new Color(1f, 0.25f, 0.15f), true);
+                if (Time.time >= nextEncounterBarkAt)
+                {
+                    var enemyProfile = Narrative.NarrativeCatalog.ResolveHostileEnemy(this);
+                    if (enemyProfile != null)
+                    {
+                        var barkSel = Narrative.NarrativeCatalog.SelectText(enemyProfile, "encounter_bark", "aggro", player, this);
+                        if (!barkSel.matched)
+                            barkSel = Narrative.NarrativeCatalog.SelectText(enemyProfile, "encounter_bark", "", player, this);
+                        if (barkSel.matched && !string.IsNullOrEmpty(barkSel.text))
+                        {
+                            nextEncounterBarkAt = Time.time + 25f;
+                            CombatTextManager.Spawn(transform.position + Vector3.up * 2.65f, $"\"{barkSel.text}\"", new Color(1f, 0.78f, 0.35f), false);
+                            if (ChatSystem.Instance)
+                                ChatSystem.Instance.AddMessage(ChatSystem.Channel.Say, stats ? stats.displayName : name, barkSel.text, new Color(1f, 0.45f, 0.35f));
+                        }
+                    }
+                }
+            }
             wasChasing = chasing;
             if (!chasing) CancelAttack();
             if (heavyUntil > 0)
@@ -251,7 +272,9 @@ namespace Riftbound
                 if (CastBarSystem.GetTargetCast(stats) is var tCast && tCast != null && tCast.isInterrupted)
                 {
                     heavyUntil = 0;
+                    attackEnds = Time.time + 1.6f;
                     if (warning) warning.enabled = false;
+                    Play("Idle", true);
                     return;
                 }
                 if (Time.time < heavyUntil) { FacePoint(targetTransform.position); return; }
@@ -285,16 +308,16 @@ namespace Riftbound
             {
                 pendingDamage = false;
                 CastBarSystem.CancelTargetCast(stats);
-                if (targetAlive && ranged && range < attackRange + 2 && (targetIsRemote || ClearSightForTarget(targetTransform)))
+                if (targetAlive && ranged && range < attackRange + 2 && ClearSightForTarget(targetTransform))
                 {
                     if (targetIsRemote)
-                        Network.RiftboundCoopPlayer.DispatchEnemyHitToPlayer(targetClientId, attackDamage, NetworkKey);
+                        EnemyProjectile.LaunchForRemotePlayer(transform.position + Vector3.up * 1.25f, targetClientId, targetTransform, attackDamage, NetworkKey);
                     else if (player)
                     {
                         EnemyProjectile.Launch(transform.position + Vector3.up * 1.25f, player, attackDamage);
                     }
                 }
-                else if (targetAlive && !ranged && range < 2.8f && (targetIsRemote || ClearSightForTarget(targetTransform)))
+                else if (targetAlive && !ranged && range < 2.8f && ClearSightForTarget(targetTransform))
                 {
                     if (targetIsRemote)
                     {
@@ -327,7 +350,8 @@ namespace Riftbound
                 if (Time.time >= nextAttack)
                 {
                     nextAttack = Time.time + Mathf.Max(attackInterval, attackDuration + .1f);
-                    attackEnds = Time.time + attackDuration; damageAt = Time.time + attackDuration * .45f;
+                    attackEnds = Time.time + attackDuration;
+                    damageAt = Time.time + (ranged ? attackDuration * 0.85f : attackDuration * .45f);
                     if (animator) animator.speed = 1;
                     pendingDamage = true; Play("Attack", true);
                     if (ranged)
@@ -393,7 +417,9 @@ namespace Riftbound
             Vector3 heading = Vector3.ProjectOnPlane(delta, Vector3.up);
             if (heading.sqrMagnitude >= .01f && Vector3.Dot(transform.forward, heading.normalized) <= .25f) return false;
             return !Physics.Raycast(origin, delta.normalized, out var hit, delta.magnitude, ~(1 << 2), QueryTriggerInteraction.Ignore) ||
-                hit.collider.GetComponentInParent<PlayerController>() != null || hit.collider.transform.IsChildOf(t);
+                hit.collider.GetComponentInParent<PlayerController>() != null ||
+                hit.collider.GetComponentInParent<Network.RiftboundCoopPlayer>() != null ||
+                hit.collider.transform.IsChildOf(t);
         }
         void FacePlayer()
         {

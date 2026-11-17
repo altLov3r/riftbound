@@ -20,6 +20,7 @@ namespace Riftbound
         PlayerController player;
         Quaternion baseRotation;
         float barkUntil;
+        float nextBarkChatAllowedAt;
 
         public static TownNPC FindNearby(Vector3 point, float maxDistance = 3.1f)
         {
@@ -79,14 +80,26 @@ namespace Riftbound
             questTransform.gameObject.SetActive(false);
         }
 
-        public void TriggerGreetingBark()
+        public void TriggerGreetingBark(PlayerController viewer = null, bool explicitInteract = false)
         {
-            if (string.IsNullOrEmpty(greeting)) return;
+            var resolvedViewer = viewer ? viewer : player;
+            if (!explicitInteract && resolvedViewer && (resolvedViewer.InCombat() || resolvedViewer.AnyBlockingWindowOpen() || !resolvedViewer.Stats || !resolvedViewer.Stats.Alive))
+                return;
+
+            var profile = Narrative.NarrativeCatalog.ResolveTownNPC(this);
+            var sel = Narrative.NarrativeCatalog.SelectText(profile, "greeting", "", resolvedViewer);
+            string line = !string.IsNullOrEmpty(sel.text) ? sel.text : greeting;
+            if (string.IsNullOrEmpty(line)) return;
+
             barkUntil = Time.time + 4.5f;
-            if (barkMesh) barkMesh.text = $"\"{greeting}\"";
-            GameSound.Play(SoundCue.Guard, transform.position);
-            if (ChatSystem.Instance)
-                ChatSystem.Instance.AddMessage(ChatSystem.Channel.Say, npcName, greeting, new Color(0.95f, 0.95f, 0.95f));
+            if (barkMesh) barkMesh.text = $"\"{line}\"";
+            if (Time.time >= nextBarkChatAllowedAt)
+            {
+                nextBarkChatAllowedAt = Time.time + 10f;
+                GameSound.Play(SoundCue.Guard, transform.position);
+                if (ChatSystem.Instance)
+                    ChatSystem.Instance.AddMessage(ChatSystem.Channel.Say, npcName, line, new Color(0.95f, 0.95f, 0.95f));
+            }
         }
 
         void LateUpdate()
@@ -108,25 +121,29 @@ namespace Riftbound
                 labelTransform.rotation = cam.transform.rotation;
 
             if (!player) player = FindFirstObjectByType<PlayerController>();
+            bool isTalkingToMe = player && player.DialogueOpen && player.ActiveTownNPC == this;
+            bool pauseAmbient = !player || !player.Stats || !player.Stats.Alive || player.InCombat() || (player.AnyBlockingWindowOpen() && !isTalkingToMe);
             if (player && player.Stats && player.Stats.Alive)
             {
                 float playerDist = Vector3.Distance(player.transform.position, transform.position);
 
-                bool isTalkingToMe = player && player.DialogueOpen && player.ActiveTownNPC == this;
-                if ((Time.time < barkUntil || isTalkingToMe) && playerDist < 8f)
+                if (isTalkingToMe || (!pauseAmbient && Time.time < barkUntil && playerDist < 8f))
                 {
-                    Vector3 look = player.transform.position - transform.position;
-                    look.y = 0f;
-                    if (look.sqrMagnitude > 0.05f)
-                        transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(look), Time.deltaTime * 5f);
+                    if (playerDist < 8f)
+                    {
+                        Vector3 look = player.transform.position - transform.position;
+                        look.y = 0f;
+                        if (look.sqrMagnitude > 0.05f)
+                            transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(look), Time.deltaTime * 5f);
+                    }
                 }
-                else
+                else if (!pauseAmbient)
                 {
                     transform.rotation = Quaternion.Slerp(transform.rotation, baseRotation, Time.deltaTime * 3f);
                 }
             }
 
-            bool showBark = Time.time < barkUntil && camDist < 22f;
+            bool showBark = !isTalkingToMe && !pauseAmbient && Time.time < barkUntil && camDist < 22f;
             if (barkTransform.gameObject.activeSelf != showBark)
                 barkTransform.gameObject.SetActive(showBark);
             if (showBark)
@@ -150,9 +167,8 @@ namespace Riftbound
                     else if (player.QuestAccepted && player.QuestReady) icon = "?";
                 }
             }
-            else if (FactionQuestSystem.Instance != null && player)
+            else if (player && player.GetComponent<FactionQuestSystem>() is var fqs && fqs != null)
             {
-                var fqs = FactionQuestSystem.Instance;
                 var curQ = fqs.GetActiveQuest();
                 if (fqs.HasActiveQuestToComplete(npcName, player) ||
                     (curQ != null && curQ.targetType == "talk_npc" && string.Equals(curQ.targetId, npcName, StringComparison.OrdinalIgnoreCase)))

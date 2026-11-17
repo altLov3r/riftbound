@@ -1545,6 +1545,11 @@ namespace Riftbound.Network
                         float wtNear = Time.realtimeSinceStartup;
                         while (Time.realtimeSinceStartup - wtNear < 8f && Vector3.Distance(lp.transform.position, targetEnemy.transform.position) > 5f)
                             yield return new WaitForSeconds(0.15f);
+                        float hpBeforeUnk = eStats.Health;
+                        me.RequestAbilityAttack(eStats, "spoof_unknown_ab");
+                        yield return new WaitForSeconds(0.45f);
+                        bool unknownAtkRej = Mathf.Approximately(eStats.Health, hpBeforeUnk);
+
                         float hpBeforeCd = eStats.Health;
                         me.RequestAbilityAttack(eStats, rightAb);
                         yield return new WaitForSeconds(0.05f);
@@ -1675,12 +1680,13 @@ namespace Riftbound.Network
 
                             int hpAfterPot = me.Health.Value;
                             me.RequestUsePotion(); // Within 1.5s server cooldown -> must reject with zero local potion/HP desync
+                            me.RequestAbilityHeal(60, "spoof_unknown_heal"); // Unknown heal ID must reject cleanly
                             yield return new WaitForSeconds(0.5f);
                             potCdRej = lp.Potions == potsBeforeUse - 1 && me.Health.Value == hpAfterPot;
                         }
 
-                        authorityPass = posClampOk && outRangeRej && cooldownRej && goldAfterChest > 0 && aliveRespRej && restFullRej && dupLmRej && zebraBlockedEarly && zebraUnlockedOk && temperOk && deadRejOk && revBackOk && restDmgOk && potOk && potCdRej;
-                        combatInfo += $", clientAuth={(authorityPass ? "PASS" : "FAIL")}(clamp={posClampOk},rngRej={outRangeRej},cdRej={cooldownRej},aliveRespRej={aliveRespRej},restRej={restFullRej},dupLmRej={dupLmRej},zEarly={zebraBlockedEarly},zOk={zebraUnlockedOk},temper={temperOk},deadRej={deadRejOk},rev={revBackOk},restOk={restDmgOk}[g={restG0}->{me.Gold.Value},h={restH0}->{me.Health.Value}/{me.MaxHealth.Value}],potOk={potOk},potCdRej={potCdRej})";
+                        authorityPass = posClampOk && outRangeRej && unknownAtkRej && cooldownRej && goldAfterChest > 0 && aliveRespRej && restFullRej && dupLmRej && zebraBlockedEarly && zebraUnlockedOk && temperOk && deadRejOk && revBackOk && restDmgOk && potOk && potCdRej;
+                        combatInfo += $", clientAuth={(authorityPass ? "PASS" : "FAIL")}(clamp={posClampOk},rngRej={outRangeRej},unkAtkRej={unknownAtkRej},cdRej={cooldownRej},aliveRespRej={aliveRespRej},restRej={restFullRej},dupLmRej={dupLmRej},zEarly={zebraBlockedEarly},zOk={zebraUnlockedOk},temper={temperOk},deadRej={deadRejOk},rev={revBackOk},restOk={restDmgOk}[g={restG0}->{me.Gold.Value},h={restH0}->{me.Health.Value}/{me.MaxHealth.Value}],potOk={potOk},potCdRej={potCdRej})";
                     }
                 }
                 else

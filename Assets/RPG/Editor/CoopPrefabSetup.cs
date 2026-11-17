@@ -126,6 +126,12 @@ namespace Riftbound.Editor
             BuildStandaloneTo("Builds/OvernightAntigravityOnline", "Overnight");
         }
 
+        [MenuItem("Riftbound/Build Combat Antigravity Refinement 01")]
+        public static void BuildCombatRefinement01()
+        {
+            BuildStandaloneTo("Builds/RiftboundCombat01", "CombatRefinement01");
+        }
+
         static void BuildStandaloneTo(string buildDir, string label)
         {
             Directory.CreateDirectory(buildDir);
