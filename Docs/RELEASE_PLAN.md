@@ -10,6 +10,15 @@ This plan covers the diploma demonstration, competition build and a possible pub
 - Supported scope is a compact fantasy RPG with offline play and up to **four human players total**, including the host, in an online session.
 - Online progression is session-only. Host departure ends the session; durable online characters, host migration and a persistent MMO world are not release promises.
 
+### Current presentation findings
+
+- The reviewed maintenance baseline is `f4ce09fcecb5a7ca4d3986f40a24aa584f3aea41`. Follow-up diagnostic changes do not constitute a newly verified combined runtime build.
+- Native Idle/Ride samples cover 20 Humanoid character variants. The Human Mage remains upright in the isolated saddle bench; the reported severe tilt is **not reproduced** there. Actual local/observer transitions remain required before closure. Four Generic Undead variants need their separate rig-specific checks.
+- A running-world contact fixture reproduces four unsupported actors after scene reload. The three summit enemies are displaced from their saved roots and are not motor-grounded; Lyra is below terrain. Their names do not establish intentional flight.
+- The summit dais artwork reaches Y=75.6 while its scaled capsule reaches Y=90.4. The pit artwork reaches Y=75.2 while its capsule reaches Y=79.55. Review mesh-shaped collision and localized actor heights; do not enlarge visual correction bounds to conceal the mismatch.
+- An unsaved native repair preview restores support for all four scoped actors and keeps all three enemy motors grounded through bounded downward steps. **The authored repair is not applied.** Scene approval, real traversal, encounter behavior and host/guest validation remain outstanding.
+- The contact fixture completed with advancing frames, but the editor emitted a search-index startup exception. No source compilation error was reported; do not describe the entire console as clean.
+
 ## Priorities
 
 | Priority | Required outcome | Responsible area |

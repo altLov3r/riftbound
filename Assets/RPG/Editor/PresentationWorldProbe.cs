@@ -39,6 +39,8 @@ namespace Riftbound.Editor
         {
             public string actor, state, support;
             public bool hasFeet, hasSoleEstimate, hasSupport;
+            public bool hasMotor, motorGrounded;
+            public Vector3 root;
             public float soleY, supportY, estimatedGap;
         }
 
@@ -133,7 +135,10 @@ namespace Riftbound.Editor
                 {
                     var animator = grounding.animator;
                     if (!animator) continue;
-                    var row = new Row { actor = grounding.name, state = animator.GetCurrentAnimatorStateInfo(0).IsName("Idle") ? "Idle" : "non_idle" };
+                    var motor = grounding.GetComponent<CharacterController>();
+                    var row = new Row { actor = grounding.name, root = grounding.transform.position,
+                        hasMotor = motor, motorGrounded = motor && motor.isGrounded,
+                        state = animator.GetCurrentAnimatorStateInfo(0).IsName("Idle") ? "Idle" : "non_idle" };
                     receipt.actors.Add(row);
                     Transform left = null, right = null;
                     if (animator.isHuman)
@@ -157,6 +162,11 @@ namespace Riftbound.Editor
                         row.hasSupport = true; row.supportY = hit.point.y; row.support = hit.collider.name; break;
                     }
                     if (row.hasSoleEstimate && row.hasSupport) row.estimatedGap = row.soleY - row.supportY;
+                    if (!row.hasSupport && SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Null)
+                    {
+                        string name = "unsupported-" + receipt.actors.Count + ".png";
+                        Capture(grounding.transform, name); receipt.captures.Add(name);
+                    }
                 }
                 var player = Object.FindAnyObjectByType<PlayerController>();
                 if (!player || groundings.Length < 1) throw new InvalidOperationException("Expected running world actors are missing.");

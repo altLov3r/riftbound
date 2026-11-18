@@ -16,8 +16,13 @@ Run batch methods with `-batchmode -projectPath <checkout> -executeMethod <metho
 | Riftbound.Editor.GroundedVisualChecks.Run |19native contact/root/rebinding/support fixtures |
 | Riftbound.Editor.PresentationAssetAudit.Run | Prefab/rig/clip and sampled-pose inventory |
 | Riftbound.Editor.PresentationWorldProbe.Run | Running-world contact observation with explicit synthetic idle/title fixture and scene reload |
+| Riftbound.Editor.RiderPoseAudit.Run | Idle/Ride samples and optional GPU bench renders for Humanoid resource characters; reports excluded rigs |
+| Riftbound.Editor.SupportSurfaceAudit.Run | Saved-scene summit/Lyra collider bounds, filtered short/long rays and scene hash preservation |
+| Riftbound.Editor.SupportSurfaceAudit.RunBoth | Saved baseline plus an unsaved, temporary two-platform/four-actor repair preview with bounded native motor steps |
 
 GPU rendering methods require a real graphics device; omit `-nographics`. Native physics, sampled poses, rendered captures, scripted movement, headless online sessions and manual two-PC play are distinct evidence categories.
+
+The support preview does not save the scene. Its successful motor steps establish a candidate for review, not permission to apply it or proof of encounter/traversal acceptance. `ClosestPoint` containment is reported only for supported primitive/convex shapes; a terrain or non-convex mesh result is not classified as containment.
 
 ## Manual acceptance
 
