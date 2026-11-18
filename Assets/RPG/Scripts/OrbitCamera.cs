@@ -88,6 +88,9 @@ namespace Riftbound
             var mouse = Mouse.current;
             bool blocked = !target || FrontendMenu.IsOpen || Paused || FlightMaster.IsAnyTaxiMapOpen ||
                 (player && player.AnyBlockingWindowOpen()) || PrototypeHUD.MenuOpen ||
+                (MailboxSystem.Instance && MailboxSystem.Instance.IsOpen) ||
+                (BattlegroundSystem.Instance && BattlegroundSystem.Instance.IsWindowOpen) ||
+                (MacroSystem.Instance && MacroSystem.Instance.IsOpen) ||
                 (PartySystem.Instance && PartySystem.Instance.IsCompanionMenuOpen);
             if (blocked || mouse == null)
             {

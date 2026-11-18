@@ -18,6 +18,8 @@ Z summons/dismisses the selected unlocked mount and V cycles mounts. Movement, d
 
 The primary ability accepts one queued press near the end of its recovery. It executes once when recovery ends and the character can act on the ground; a brief contact interruption can defer it within the queue grace period. Invalid targets, death and blocking windows cancel pending actions. A queued press does not grant damage or resources before the ability executes.
 
+Enemy swings, heavy warnings and interrupt reactions keep their finite presentation windows on observers instead of being immediately replaced by running or idle. Heavy attacks validate cover at contact, and losing a valid target or returning home cancels pending attacks. Enemy damage and outcomes remain controlled by the host. Remote presentation clocks currently begin on receipt, so visual timing under real network latency still needs playtesting.
+
 Travel between Emberwatch, Highspire, Westbank and the Reaver camp, or north to Greenhollow. Test bridge decks, steep approaches and camera clearance when reporting movement defects; a location on the map is not proof it is traversable.
 
 ## Groups
