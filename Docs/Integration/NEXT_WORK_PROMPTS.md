@@ -1,5 +1,11 @@
 # Lore and combat — next two workstreams
 
+## Latest queue —18 November2026
+
+For the user's reported remote horse placeholder, combat animation mismatch, hovering models and party polish, use **[MULTIPLAYER_PRESENTATION_PARTY_PLAN.md](../Design/MULTIPLAYER_PRESENTATION_PARTY_PLAN.md)**. Its sections11–12 contain the next Codex/Antigravity prompts and its ownership table supersedes this older queue only after explicit file release. This is a plan, not started implementation. Latest inspected AG runtime033e154 includes formal narrative schema acceptance; the prior pending observation on the story branch is historical. Preserve the accepted content and earlier deliverables.
+
+## Previous queue —17 November2026
+
 Prepared 17 November 2026. These start bounded implementation when the user submits them; writing this file has not started runtime changes. Both workers start from the same latest published integration/combined-20261116, including this plan. Main and the finished world/gameplay branches remain preserved.
 
 ## Chosen split
