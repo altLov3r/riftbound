@@ -9,6 +9,14 @@ namespace Riftbound
         public static readonly Dictionary<string, EnemyController> AllByKey = new Dictionary<string, EnemyController>();
         public string NetworkKey => !string.IsNullOrEmpty(enemyId) ? enemyId : gameObject.name;
         public static EnemyController FindByKey(string key) => !string.IsNullOrEmpty(key) && AllByKey.TryGetValue(key, out var e) ? e : null;
+        public const byte ActionCancel = 0;
+        public const byte ActionAttack = 1;
+        public const byte ActionHeavyWindup = 2;
+        public const byte ActionCleave = 3;
+        public const byte ActionHit = 4;
+        public const byte ActionInterrupt = 5;
+        public const byte ActionDeath = 6;
+
         public Animator animator;
         public float attackDuration = 1.2f;
         public PlayerController player;
@@ -42,6 +50,25 @@ namespace Riftbound
         Vector3 replicatedPos;
         float replicatedYaw;
         float netBroadcastTimer;
+        uint serverActionSeq;
+        uint lastRemoteActionSeq;
+        byte remoteActiveAction;
+        float remoteActionUntil;
+        float lastRemoteHitAt = -10f;
+        string activeSpellName = "";
+        string activeSpellIcon = "";
+#if UNITY_EDITOR
+        bool simulateNetClientForTest;
+        public void SetNetClientSimulationForTest(bool enabled) => simulateNetClientForTest = enabled;
+#endif
+
+        public string CurrentAnimState => state ?? "";
+        public byte ActiveRemoteActionKind => remoteActiveAction;
+        public float RemainingRemoteAction => Mathf.Max(0f, remoteActionUntil - Time.time);
+        public uint LastRemoteActionSeq => lastRemoteActionSeq;
+        public bool IsWarningActive => warning != null && warning.enabled;
+        public bool HasPendingAttack => pendingDamage || heavyUntil > 0f;
+        public bool IsEvading => evading;
         void Awake() { Initialize(); }
         void Initialize()
         {
@@ -67,6 +94,7 @@ namespace Riftbound
         {
             Initialize();
             CancelAttack(); dying = false; evading = false;
+            remoteActiveAction = 0; remoteActionUntil = 0f; lastRemoteActionSeq = 0;
             nextAttack = nextHeavy = deathTime = damageAt = 0;
             motor.enabled = false;
             transform.SetPositionAndRotation(home, homeRotation);
@@ -81,14 +109,21 @@ namespace Riftbound
             if (!animator) { resetPoseOnEnable = false; return; }
             animator.speed = 1;
             if (!animator.isActiveAndEnabled) return;
+            string idleState = ResolveAnimState("Idle", "Default");
             animator.Rebind();
-            animator.Play("Idle", 0, 0);
+            if (!string.IsNullOrEmpty(idleState))
+            {
+                animator.Play(idleState, 0, 0);
+                state = idleState;
+            }
             animator.Update(0);
-            state = "Idle"; resetPoseOnEnable = false;
+            resetPoseOnEnable = false;
         }
         void Defeated(Combatant _)
         {
             CancelAttack();
+            if (!IsNetClientRuntime() && Network.CoopSessionConfig.IsMultiplayer && Unity.Netcode.NetworkManager.Singleton && Unity.Netcode.NetworkManager.Singleton.IsServer)
+                BroadcastNetAction(ActionDeath, 0f, transform.position);
             if (!trainingDummy && player)
             {
                 if (Network.CoopSessionConfig.IsMultiplayer && Unity.Netcode.NetworkManager.Singleton && Unity.Netcode.NetworkManager.Singleton.IsListening)
@@ -115,9 +150,17 @@ namespace Riftbound
         void OnDisable() { CancelAttack(); evading = false; }
         void CancelAttack()
         {
+            bool hadActive = pendingDamage || heavyUntil > 0f || (warning && warning.enabled);
             heavyUntil = 0; pendingDamage = false; attackEnds = 0;
+            activeSpellName = ""; activeSpellIcon = "";
             if (warning) warning.enabled = false;
             CastBarSystem.CancelTargetCast(stats);
+            if (hadActive && gameObject.scene.IsValid() && !IsNetClientRuntime()
+                && Network.CoopSessionConfig.IsMultiplayer && Unity.Netcode.NetworkManager.Singleton
+                && Unity.Netcode.NetworkManager.Singleton.IsListening && Unity.Netcode.NetworkManager.Singleton.IsServer)
+            {
+                BroadcastNetAction(ActionCancel, 0f, transform.position);
+            }
         }
         void OnDestroy()
         {
@@ -126,16 +169,171 @@ namespace Riftbound
             if (warning) { Destroy(warning.material); Destroy(warning.gameObject); }
         }
 
+        bool IsNetClientRuntime() =>
+#if UNITY_EDITOR
+            simulateNetClientForTest ||
+#endif
+            (Network.CoopSessionConfig.IsMultiplayer
+            && Unity.Netcode.NetworkManager.Singleton
+            && Unity.Netcode.NetworkManager.Singleton.IsListening
+            && !Unity.Netcode.NetworkManager.Singleton.IsServer);
+
+        void BroadcastNetAction(byte actionKind, float duration, Vector3 origin, string spellName = "", string icon = "")
+        {
+            if (
+#if UNITY_EDITOR
+                simulateNetClientForTest ||
+#endif
+                !Network.CoopSessionConfig.IsMultiplayer
+                || !Unity.Netcode.NetworkManager.Singleton || !Unity.Netcode.NetworkManager.Singleton.IsListening
+                || !Unity.Netcode.NetworkManager.Singleton.IsServer)
+                return;
+            if (Network.RiftboundCoopPlayer.LocalOwner)
+                Network.RiftboundCoopPlayer.LocalOwner.BroadcastEnemyAction(this, actionKind, duration, origin, spellName, icon, ++serverActionSeq);
+        }
+
+        public bool TryGetActiveActionSnapshot(out byte kind, out float remaining, out Vector3 origin, out string spellName, out string icon, out uint seq)
+        {
+            if (stats && stats.Alive)
+            {
+                if (heavyUntil > Time.time)
+                {
+                    kind = ActionHeavyWindup;
+                    remaining = Mathf.Clamp(heavyUntil - Time.time, 0.1f, 3.0f);
+                    origin = heavyCenter;
+                    spellName = string.IsNullOrEmpty(activeSpellName) ? (heavyAttacker ? "Crushing Blow" : "Heavy Slam") : activeSpellName;
+                    icon = string.IsNullOrEmpty(activeSpellIcon) ? "🔨" : activeSpellIcon;
+                    seq = serverActionSeq == 0 ? 1u : serverActionSeq;
+                    return true;
+                }
+                if (pendingDamage && ranged && Time.time < damageAt)
+                {
+                    kind = ActionAttack;
+                    remaining = Mathf.Clamp(attackEnds - Time.time, 0.15f, 3.0f);
+                    origin = transform.position;
+                    spellName = activeSpellName;
+                    icon = activeSpellIcon;
+                    seq = serverActionSeq == 0 ? 1u : serverActionSeq;
+                    return true;
+                }
+            }
+            kind = 0; remaining = 0f; origin = Vector3.zero; spellName = ""; icon = ""; seq = 0;
+            return false;
+        }
+
         public void ApplyReplicatedState(float hp, float maxHp, bool alive, Vector3 pos, float yaw)
         {
             if (!stats) Initialize();
+            float prevHp = stats.Health;
             replicatedPos = pos;
             replicatedYaw = yaw;
             hasReplicatedState = true;
+            if (alive && dying)
+            {
+                dying = false;
+                deathTime = 0f;
+                remoteActiveAction = 0;
+                remoteActionUntil = 0f;
+                if (motor) motor.enabled = true;
+                CancelAttack();
+                ResetIdlePose();
+            }
             stats.SetReplicatedHealth(hp, maxHp);
-            if (alive && !gameObject.activeSelf) ResetForLoad();
+            if (!alive)
+            {
+                remoteActiveAction = 0;
+                remoteActionUntil = 0f;
+                CancelAttack();
+            }
+            else if (hp < prevHp - 0.1f && remoteActiveAction == 0 && Time.time >= lastRemoteHitAt + 0.35f)
+            {
+                lastRemoteHitAt = Time.time;
+                remoteActiveAction = ActionHit;
+                remoteActionUntil = Time.time + 0.28f;
+                Play("Hit", true, "Idle");
+            }
+            if (alive && !gameObject.activeSelf)
+            {
+                gameObject.SetActive(true);
+                ResetForLoad();
+                transform.SetPositionAndRotation(pos, Quaternion.Euler(0f, yaw, 0f));
+                stats.SetReplicatedHealth(hp, maxHp);
+            }
         }
-        void HeavyAttack()
+
+        public void ApplyReplicatedAction(uint seq, byte kind, float duration, Vector3 origin, string spellName, string icon)
+        {
+            if (!stats) Initialize();
+            if (seq != 0 && seq <= lastRemoteActionSeq) return;
+            if (seq != 0) lastRemoteActionSeq = seq;
+
+            float boundedDur = Mathf.Clamp(duration, 0f, 3.5f);
+            if (!stats.Alive && kind != ActionDeath) return;
+
+            switch (kind)
+            {
+                case ActionCancel:
+                    remoteActiveAction = 0;
+                    remoteActionUntil = 0f;
+                    if (warning) warning.enabled = false;
+                    CastBarSystem.CancelTargetCast(stats);
+                    Play("Idle", true, "Default");
+                    break;
+                case ActionDeath:
+                    remoteActiveAction = 0;
+                    remoteActionUntil = 0f;
+                    if (warning) warning.enabled = false;
+                    CastBarSystem.CancelTargetCast(stats);
+                    break;
+                case ActionInterrupt:
+                    if (warning) warning.enabled = false;
+                    CastBarSystem.InterruptTarget(stats, "Interrupt");
+                    remoteActiveAction = ActionInterrupt;
+                    remoteActionUntil = Time.time + Mathf.Clamp(boundedDur > 0.05f ? boundedDur : 1.0f, 0.2f, 2.2f);
+                    Play("Idle", true, "Default");
+                    if (animator) animator.speed = 1f;
+                    break;
+                case ActionHit:
+                    if (remoteActiveAction != 0 && Time.time < remoteActionUntil) return;
+                    lastRemoteHitAt = Time.time;
+                    remoteActiveAction = ActionHit;
+                    remoteActionUntil = Time.time + Mathf.Clamp(boundedDur > 0.05f ? boundedDur : 0.28f, 0.12f, 0.6f);
+                    Play("Hit", true, "Idle");
+                    if (animator) animator.speed = 1f;
+                    break;
+                case ActionHeavyWindup:
+                {
+                    float windupDur = Mathf.Clamp(boundedDur > 0.05f ? boundedDur : 1.8f, 0.2f, 3.0f);
+                    ActivateHeavyWarning(origin, windupDur, spellName, icon);
+                    remoteActiveAction = ActionHeavyWindup;
+                    remoteActionUntil = Time.time + windupDur;
+                    if (animator) animator.speed = 1f;
+                    break;
+                }
+                case ActionCleave:
+                    if (warning) warning.enabled = false;
+                    CastBarSystem.CancelTargetCast(stats);
+                    SpellFX.CreateHeavySlam(origin, 4f);
+                    remoteActiveAction = ActionCleave;
+                    remoteActionUntil = Time.time + Mathf.Clamp(boundedDur > 0.05f ? boundedDur : cleaveDuration, 0.2f, 2.5f);
+                    Play("Cleave", true, "Attack");
+                    if (animator) animator.speed = 1f;
+                    break;
+                case ActionAttack:
+                {
+                    float atkDur = Mathf.Clamp(boundedDur > 0.05f ? boundedDur : attackDuration, 0.15f, 3.0f);
+                    remoteActiveAction = ActionAttack;
+                    remoteActionUntil = Time.time + atkDur;
+                    Play("Attack", true, "Idle");
+                    if (animator) animator.speed = 1f;
+                    if (!string.IsNullOrEmpty(spellName))
+                        CastBarSystem.StartTargetCast(stats, spellName, string.IsNullOrEmpty(icon) ? "✦" : icon, Mathf.Clamp(atkDur * 0.85f, 0.15f, atkDur), null, true);
+                    break;
+                }
+            }
+        }
+
+        void ActivateHeavyWarning(Vector3 center, float duration, string spell, string icon)
         {
             if (!warning)
             {
@@ -144,7 +342,7 @@ namespace Riftbound
                 warning.material.SetColor("_BaseColor", new Color(1, .15f, .04f));
                 warning.positionCount = 65; warning.startWidth = warning.endWidth = .16f;
             }
-            heavyCenter = transform.position; heavyUntil = Time.time + 1.8f; nextHeavy = Time.time + 9;
+            heavyCenter = center;
             CombatTextManager.Spawn(transform.position + Vector3.up * 2.5f, "⚠ HEAVY SLAM!", new Color(1f, 0.45f, 0.1f), true);
             warning.enabled = true;
             for (int i = 0; i < warning.positionCount; i++)
@@ -152,30 +350,50 @@ namespace Riftbound
                 float angle = i * Mathf.PI * 2 / 64;
                 warning.SetPosition(i, heavyCenter + new Vector3(Mathf.Sin(angle) * 4, .1f, Mathf.Cos(angle) * 4));
             }
-            Play("Idle"); if (animator) animator.speed = 1;
-            string spell = heavyAttacker ? "Crushing Blow" : (ranged ? "Shadow Bolt" : "Savage Strike");
-            string icon = heavyAttacker ? "🔨" : (ranged ? "💀" : "⚔");
+            Play("Idle", true, "Default"); if (animator) animator.speed = 1;
             GameSound.Play(SoundCue.Rune, transform.position);
-            CastBarSystem.StartTargetCast(stats, spell, icon, 1.8f, null, true);
+            string resolvedSpell = string.IsNullOrEmpty(spell) ? (heavyAttacker ? "Crushing Blow" : (ranged ? "Shadow Bolt" : "Savage Strike")) : spell;
+            string resolvedIcon = string.IsNullOrEmpty(icon) ? (heavyAttacker ? "🔨" : (ranged ? "💀" : "⚔")) : icon;
+            CastBarSystem.StartTargetCast(stats, resolvedSpell, resolvedIcon, duration, null, true);
+        }
+
+        void HeavyAttack()
+        {
+            heavyUntil = Time.time + 1.8f; nextHeavy = Time.time + 9;
+            activeSpellName = heavyAttacker ? "Crushing Blow" : (ranged ? "Shadow Bolt" : "Savage Strike");
+            activeSpellIcon = heavyAttacker ? "🔨" : (ranged ? "💀" : "⚔");
+            ActivateHeavyWarning(transform.position, 1.8f, activeSpellName, activeSpellIcon);
+            BroadcastNetAction(ActionHeavyWindup, 1.8f, heavyCenter, activeSpellName, activeSpellIcon);
+            if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner)
+                Network.RiftboundCoopPlayer.LocalOwner.BroadcastEnemyState(this);
         }
         void Update()
         {
             if (FrontendMenu.IsOpen || Time.timeScale <= 0) return;
 
-            bool isNetClient = Network.CoopSessionConfig.IsMultiplayer
-                && Unity.Netcode.NetworkManager.Singleton
-                && Unity.Netcode.NetworkManager.Singleton.IsListening
-                && !Unity.Netcode.NetworkManager.Singleton.IsServer;
+            bool isNetClient = IsNetClientRuntime();
 
             if (isNetClient)
             {
                 if (!stats.Alive)
                 {
-                    if (!dying) { dying = true; deathTime = Time.time; motor.enabled = false; if (animator) animator.speed = 1; Play(nativeDeathAnimation ? "Death" : "Hit", true); }
+                    if (!dying)
+                    {
+                        remoteActiveAction = 0; remoteActionUntil = 0f;
+                        if (warning) warning.enabled = false;
+                        CastBarSystem.CancelTargetCast(stats);
+                        dying = true; deathTime = Time.time;
+                        if (motor) motor.enabled = false;
+                        if (animator) animator.speed = 1;
+                        Play(nativeDeathAnimation ? "Death" : "Hit", true, "Hit");
+                    }
                     if (!nativeDeathAnimation) transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.Euler(0, transform.eulerAngles.y, 82), Time.deltaTime * 3);
                     if (Time.time > deathTime + 5) gameObject.SetActive(false);
                     return;
                 }
+
+                bool moving = false;
+                float approxSpeed = 0f;
                 if (hasReplicatedState)
                 {
                     float d = Vector3.Distance(transform.position, replicatedPos);
@@ -183,14 +401,44 @@ namespace Riftbound
                     {
                         Vector3 prevPos = transform.position;
                         transform.position = Vector3.Lerp(transform.position, replicatedPos, Time.deltaTime * 12f);
-                        float approxSpeed = Time.deltaTime > 0.0001f ? Vector3.Distance(prevPos, transform.position) / Time.deltaTime : d * 12f;
-                        Play(approxSpeed > 2.4f ? "Run" : "Walk", false);
+                        approxSpeed = Time.deltaTime > 0.0001f ? Vector3.Distance(prevPos, transform.position) / Time.deltaTime : d * 12f;
+                        moving = approxSpeed > 0.15f;
+                    }
+                    transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.Euler(0f, replicatedYaw, 0f), Time.deltaTime * 12f);
+                }
+
+                // Preserve active remote one-shot/windup/interrupt windows instead of overwriting every frame with Walk/Run/Idle.
+                if (remoteActiveAction != 0 && Time.time < remoteActionUntil)
+                {
+                    if (animator) animator.speed = 1f;
+                    return;
+                }
+                if (remoteActiveAction != 0)
+                {
+                    if (remoteActiveAction == ActionHeavyWindup && warning) warning.enabled = false;
+                    remoteActiveAction = 0;
+                    remoteActionUntil = 0f;
+                }
+
+                if (hasReplicatedState)
+                {
+                    if (moving)
+                    {
+                        string moveState = approxSpeed > 2.4f ? "Run" : "Walk";
+                        Play(moveState, false, "Idle");
+                        if (animator)
+                        {
+                            float stride = approxSpeed > 2.4f
+                                ? (runStrideSpeed > 0 ? runStrideSpeed : (player ? player.runStrideSpeed : 4.2f))
+                                : (walkStrideSpeed > 0 ? walkStrideSpeed : (player ? player.walkStrideSpeed : 0.9f));
+                            animator.speed = Mathf.Clamp(approxSpeed / Mathf.Max(0.1f, stride), 0.65f, 2.25f);
+                        }
                     }
                     else
                     {
-                        Play("Idle", false);
+                        Play("Idle", false, "Default");
+                        if (animator) animator.speed = 1f;
                     }
-                    transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.Euler(0f, replicatedYaw, 0f), Time.deltaTime * 12f);
                 }
                 return;
             }
@@ -204,7 +452,7 @@ namespace Riftbound
             {
                 if (!dying)
                 {
-                    dying = true; deathTime = Time.time; motor.enabled = false; if (animator) animator.speed = 1; Play(nativeDeathAnimation ? "Death" : "Hit", true);
+                    dying = true; deathTime = Time.time; motor.enabled = false; if (animator) animator.speed = 1; Play(nativeDeathAnimation ? "Death" : "Hit", true, "Hit");
                     if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner)
                         Network.RiftboundCoopPlayer.LocalOwner.BroadcastEnemyState(this);
                 }
@@ -236,7 +484,7 @@ namespace Riftbound
                 }
             }
 
-            if (!targetTransform) return;
+            if (!targetTransform) { CancelAttack(); return; }
             motor.Move(Vector3.down * 4 * Time.deltaTime);
             float range = Vector3.Distance(transform.position, targetTransform.position);
             float homeDistance = Vector3.Distance(transform.position, home);
@@ -273,14 +521,21 @@ namespace Riftbound
                 {
                     heavyUntil = 0;
                     attackEnds = Time.time + 1.6f;
+                    activeSpellName = ""; activeSpellIcon = "";
                     if (warning) warning.enabled = false;
-                    Play("Idle", true);
+                    Play("Idle", true, "Default");
+                    BroadcastNetAction(ActionInterrupt, 1.6f, transform.position);
                     return;
                 }
-                if (Time.time < heavyUntil) { FacePoint(targetTransform.position); return; }
+                if (Time.time < heavyUntil)
+                {
+                    if (Time.time < heavyUntil - 0.14f) FacePoint(targetTransform.position);
+                    return;
+                }
                 heavyUntil = 0; warning.enabled = false;
+                activeSpellName = ""; activeSpellIcon = "";
                 SpellFX.CreateHeavySlam(heavyCenter, 4f);
-                if (targetAlive && Vector3.Distance(targetTransform.position, heavyCenter) < 4)
+                if (targetAlive && Vector3.Distance(targetTransform.position, heavyCenter) < 4 && HasUnobstructedSightLine(heavyCenter + Vector3.up * 1.1f, targetTransform))
                 {
                     if (targetIsRemote)
                         Network.RiftboundCoopPlayer.DispatchEnemyHitToPlayer(targetClientId, 38f, NetworkKey);
@@ -291,16 +546,20 @@ namespace Riftbound
                             Network.RiftboundCoopPlayer.LocalOwner.Health.Value = Mathf.Max(0, Mathf.RoundToInt(player.Stats.Health));
                     }
                 }
-                Play("Cleave", true); attackEnds = Time.time + cleaveDuration; return;
+                Play("Cleave", true, "Attack"); attackEnds = Time.time + cleaveDuration;
+                BroadcastNetAction(ActionCleave, cleaveDuration, heavyCenter);
+                return;
             }
-            if (chasing && Time.time < attackEnds) FacePoint(targetTransform.position);
+            if (chasing && pendingDamage && Time.time < damageAt - 0.10f) FacePoint(targetTransform.position);
             if (pendingDamage)
             {
                 if (CastBarSystem.GetTargetCast(stats) is var tCast && tCast != null && tCast.isInterrupted)
                 {
                     pendingDamage = false;
                     attackEnds = Time.time + 2.0f;
-                    Play("Idle", true);
+                    activeSpellName = ""; activeSpellIcon = "";
+                    Play("Idle", true, "Default");
+                    BroadcastNetAction(ActionInterrupt, 2.0f, transform.position);
                     return;
                 }
             }
@@ -353,15 +612,20 @@ namespace Riftbound
                     attackEnds = Time.time + attackDuration;
                     damageAt = Time.time + (ranged ? attackDuration * 0.85f : attackDuration * .45f);
                     if (animator) animator.speed = 1;
-                    pendingDamage = true; Play("Attack", true);
+                    pendingDamage = true; Play("Attack", true, "Idle");
+                    string spellName = ""; string icon = "";
                     if (ranged)
                     {
-                        string spellName = gameObject.name.Contains("Hexer") ? "Shadow Bolt" : gameObject.name.Contains("Sorcerer") ? "Chaos Fire" : "Frost Bolt";
-                        string icon = gameObject.name.Contains("Hexer") ? "💀" : gameObject.name.Contains("Sorcerer") ? "🔥" : "❄";
+                        spellName = gameObject.name.Contains("Hexer") ? "Shadow Bolt" : gameObject.name.Contains("Sorcerer") ? "Chaos Fire" : "Frost Bolt";
+                        icon = gameObject.name.Contains("Hexer") ? "💀" : gameObject.name.Contains("Sorcerer") ? "🔥" : "❄";
                         CastBarSystem.StartTargetCast(stats, spellName, icon, attackDuration * 0.85f, null, true);
                     }
+                    activeSpellName = spellName; activeSpellIcon = icon;
+                    BroadcastNetAction(ActionAttack, attackDuration, transform.position, spellName, icon);
+                    if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner)
+                        Network.RiftboundCoopPlayer.LocalOwner.BroadcastEnemyState(this);
                 }
-                else { Play("Idle"); if (animator) animator.speed = 1; }
+                else { Play("Idle", false, "Default"); if (animator) animator.speed = 1; }
             }
             else if (direction.magnitude > .6f)
             {
@@ -402,10 +666,33 @@ namespace Riftbound
             if (look.sqrMagnitude > .01f)
                 transform.rotation = Quaternion.RotateTowards(transform.rotation, Quaternion.LookRotation(look), 540f * Time.deltaTime);
         }
-        void Play(string value, bool force = false)
+        public string ResolveAnimState(string primary, string fallback = "Idle")
         {
-            if (!animator || (!force && state == value)) return;
-            animator.CrossFadeInFixedTime(value, .18f, 0, 0); state = value;
+            if (!animator || !animator.runtimeAnimatorController) return primary ?? "";
+            if (!string.IsNullOrEmpty(primary) && animator.HasState(0, Animator.StringToHash(primary))) return primary;
+            if (!string.IsNullOrEmpty(fallback) && animator.HasState(0, Animator.StringToHash(fallback))) return fallback;
+            if (primary == "Cleave" && animator.HasState(0, Animator.StringToHash("Attack"))) return "Attack";
+            if (animator.HasState(0, Animator.StringToHash("Idle"))) return "Idle";
+            if (animator.HasState(0, Animator.StringToHash("Default"))) return "Default";
+            return "";
+        }
+
+        void Play(string value, bool force = false, string fallback = "Idle")
+        {
+            if (!animator) return;
+            string resolved = ResolveAnimState(value, fallback);
+            if (string.IsNullOrEmpty(resolved) || (!force && state == resolved)) return;
+            animator.CrossFadeInFixedTime(resolved, .18f, 0, 0); state = resolved;
+        }
+        bool HasUnobstructedSightLine(Vector3 origin, Transform target)
+        {
+            if (!target) return false;
+            Vector3 delta = target.position + Vector3.up - origin;
+            if (delta.sqrMagnitude < 0.0001f) return true;
+            return !Physics.Raycast(origin, delta.normalized, out var hit, delta.magnitude, ~(1 << 2), QueryTriggerInteraction.Ignore) ||
+                hit.collider.GetComponentInParent<PlayerController>() != null ||
+                hit.collider.GetComponentInParent<Network.RiftboundCoopPlayer>() != null ||
+                hit.collider.transform.IsChildOf(target);
         }
         bool ClearSight() => ClearSightForTarget(player ? player.transform : null);
         bool ClearSightForTarget(Transform target)
@@ -416,10 +703,7 @@ namespace Riftbound
             Vector3 delta = t.position + Vector3.up - origin;
             Vector3 heading = Vector3.ProjectOnPlane(delta, Vector3.up);
             if (heading.sqrMagnitude >= .01f && Vector3.Dot(transform.forward, heading.normalized) <= .25f) return false;
-            return !Physics.Raycast(origin, delta.normalized, out var hit, delta.magnitude, ~(1 << 2), QueryTriggerInteraction.Ignore) ||
-                hit.collider.GetComponentInParent<PlayerController>() != null ||
-                hit.collider.GetComponentInParent<Network.RiftboundCoopPlayer>() != null ||
-                hit.collider.transform.IsChildOf(t);
+            return HasUnobstructedSightLine(origin, t);
         }
         void FacePlayer()
         {

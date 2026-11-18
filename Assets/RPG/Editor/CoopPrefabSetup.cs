@@ -150,6 +150,18 @@ namespace Riftbound.Editor
             BuildStandaloneTo("Builds/RiftboundReleaseGate1Runtime01", "ReleaseGate1Runtime01");
         }
 
+        [MenuItem("Riftbound/Build Gameplay Gemini Combat 01")]
+        public static void BuildGameplayGeminiCombat01()
+        {
+            BuildStandaloneTo("Builds/RiftboundCombatRevamp01", "GameplayGeminiCombat01");
+        }
+
+        [MenuItem("Riftbound/Build Gameplay Gemini Combat 02")]
+        public static void BuildGameplayGeminiCombat02()
+        {
+            BuildStandaloneTo("Builds/RiftboundCombatRevamp02", "GameplayGeminiCombat02");
+        }
+
         static void BuildStandaloneTo(string buildDir, string label)
         {
             Directory.CreateDirectory(buildDir);

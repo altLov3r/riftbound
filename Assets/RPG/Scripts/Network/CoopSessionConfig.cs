@@ -34,6 +34,7 @@ namespace Riftbound.Network
         public static bool UiSmoke = false;
         public static bool AuthoritySmoke = false;
         public static bool VisualSmoke = false;
+        public static bool CombatVisualSmoke = false;
         public static string CaptureDir = string.Empty;
         public static int ExpectedMinPlayers = 2;
         public static bool CliParsed { get; private set; }
@@ -137,6 +138,11 @@ namespace Riftbound.Network
                 {
                     VisualSmoke = true;
                     if (AutoSmokeExitSeconds <= 0f) AutoSmokeExitSeconds = 35f;
+                }
+                else if (args[i] == "-coopCombatVisualSmoke")
+                {
+                    CombatVisualSmoke = true;
+                    if (AutoSmokeExitSeconds <= 0f) AutoSmokeExitSeconds = 40f;
                 }
                 else if (args[i] == "-coopCaptureDir" && i + 1 < args.Length && !args[i + 1].StartsWith("-"))
                 {
