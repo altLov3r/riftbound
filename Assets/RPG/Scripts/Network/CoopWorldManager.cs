@@ -451,11 +451,11 @@ namespace Riftbound.Network
 
             if (rosterHeaderStyle == null)
             {
-                rosterHeaderStyle = new GUIStyle(GUI.skin.label) { fontSize = 11, fontStyle = FontStyle.Bold };
+                rosterHeaderStyle = new GUIStyle(GUI.skin.label) { fontSize = 11, fontStyle = FontStyle.Bold, padding = new RectOffset(0, 0, 0, 0) };
                 rosterHeaderStyle.normal.textColor = new Color(0.95f, 0.94f, 0.88f);
-                rosterSubStyle = new GUIStyle(GUI.skin.label) { fontSize = 10 };
+                rosterSubStyle = new GUIStyle(GUI.skin.label) { fontSize = 10, padding = new RectOffset(0, 0, 0, 0) };
                 rosterSubStyle.normal.textColor = new Color(0.84f, 0.86f, 0.88f);
-                rosterRightStyle = new GUIStyle(GUI.skin.label) { fontSize = 10, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleRight };
+                rosterRightStyle = new GUIStyle(GUI.skin.label) { fontSize = 10, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleRight, padding = new RectOffset(0, 0, 0, 0) };
             }
 
             float scale = Mathf.Min(Screen.width / 1280f, Screen.height / 720f);
@@ -538,10 +538,10 @@ namespace Riftbound.Network
             RefreshSortedPeers();
             bool showReadyBadge = readyCheckOpen || Time.time < readySummaryUntil;
 
-            // Stack cleanly below top-left self Player Frame (y=20..72) + Dodge pip (y~76..98) and below any opt-in NPC crew
+            // Stack cleanly below top-left self Player Frame (y=20..92), Dodge pip (y=108..128), and any opt-in NPC crew
             int companionCount = PartySystem.Instance != null ? PartySystem.Instance.Members.Count : 0;
             float startX = 24f;
-            float py = 104f + companionCount * 38f;
+            float py = 134f + companionCount * 38f;
             float cardW = 208f;
             float cardH = 44f;
 
@@ -567,11 +567,13 @@ namespace Riftbound.Network
                 GUI.color = Color.white;
 
                 string leaderTag = p.IsLeader.Value ? "★ " : "";
+                string roleTag = RiftboundCoopPlayer.GetSocialRoleTag(p.SocialRole.Value);
+                string roleSuffix = roleTag.Length > 0 ? $" {roleTag}" : "";
                 string combatTag = p.IsInCombat.Value ? " [CBT]" : "";
                 string mountTag = p.IsMounted.Value ? " [M]" : "";
                 string downTag = p.Health.Value <= 0 ? " [DOWN]" : "";
                 rosterHeaderStyle.normal.textColor = p.Health.Value <= 0 ? new Color(0.82f, 0.35f, 0.35f) : clsCol;
-                GUI.Label(new Rect(startX + 7f, py + 2f, cardW - 34f, 15f), $"{leaderTag}{p.PlayerName.Value} Lv{p.Level.Value}{combatTag}{mountTag}{downTag}", rosterHeaderStyle);
+                GUI.Label(new Rect(startX + 7f, py + 2f, cardW - 34f, 15f), $"{leaderTag}{p.PlayerName.Value} Lv{p.Level.Value}{roleSuffix}{combatTag}{mountTag}{downTag}", rosterHeaderStyle);
                 rosterHeaderStyle.normal.textColor = new Color(0.95f, 0.94f, 0.88f);
 
                 if (showReadyBadge)
@@ -704,7 +706,8 @@ namespace Riftbound.Network
             if (GUI.Button(new Rect(mx + mw - 38f, my + 10f, 24f, 24f), "X"))
                 CloseGroupMenu();
 
-            GUI.Label(new Rect(mx + 16f, my + 36f, mw - 32f, 20f), $"{statusText} · Session-only progress · Host exit ends session", rosterSubStyle);
+            string cleanStatus = System.Text.RegularExpressions.Regex.Replace(statusText ?? "", @"\s*\([A-Z0-9]{4,8}\)", "");
+            GUI.Label(new Rect(mx + 16f, my + 36f, mw - 32f, 20f), $"{cleanStatus} · Session-only progress · Host exit ends session", rosterSubStyle);
 
             float rowY = my + 64f;
             if (CoopSessionConfig.IsOnlineMode && !string.IsNullOrEmpty(OnlineSessionService.ActiveJoinCode))
@@ -733,10 +736,16 @@ namespace Riftbound.Network
                 string selfMark = p.IsOwner ? " (You)" : "";
                 string readyStr = p.ReadyStatus.Value == 1 ? "Ready" : (p.ReadyStatus.Value == 2 ? "Not Ready" : "Idle");
                 string stateStr = p.Health.Value <= 0 ? "DOWN" : (p.IsMounted.Value ? $"Mounted ({p.MountId.Value})" : (p.IsInCombat.Value ? "Combat" : readyStr));
+                string roleStr = RiftboundCoopPlayer.GetSocialRoleName(p.SocialRole.Value);
                 GUI.Label(new Rect(mx + 24f, rowY + 2f, 260f, 18f), $"{leaderMark}{p.PlayerName.Value}{selfMark} · Lv{p.Level.Value} {p.ClassName.Value}");
-                GUI.Label(new Rect(mx + 24f, rowY + 19f, 260f, 17f), $"HP {p.Health.Value}/{p.MaxHealth.Value} · {stateStr}", rosterSubStyle);
+                GUI.Label(new Rect(mx + 24f, rowY + 19f, 260f, 17f), $"HP {p.Health.Value}/{p.MaxHealth.Value} · {roleStr} · {stateStr}", rosterSubStyle);
 
-                if (!p.IsOwner && localOwner != null && localOwner.IsLeader.Value && !p.IsLeader.Value)
+                if (p.IsOwner)
+                {
+                    if (GUI.Button(new Rect(mx + mw - 132f, rowY + 8f, 108f, 22f), $"Role: {roleStr}"))
+                        localOwner.CycleSocialRole();
+                }
+                else if (localOwner != null && localOwner.IsLeader.Value && !p.IsLeader.Value)
                 {
                     if (GUI.Button(new Rect(mx + mw - 132f, rowY + 8f, 108f, 22f), "Make Leader"))
                         localOwner.RequestPromoteLeader(p.OwnerClientId);
@@ -1447,6 +1456,7 @@ namespace Riftbound.Network
                         yield return new WaitForSeconds(1.2f);
 
                         float wait3Kills = Time.realtimeSinceStartup;
+                        float lastFollowSync = wait3Kills;
                         int lastIdx = 0;
                         while (Time.realtimeSinceStartup - wait3Kills < 26f && clientAvatar != null && clientAvatar.QuestKills.Value < 3)
                         {
@@ -1458,7 +1468,15 @@ namespace Riftbound.Network
                                 {
                                     lastIdx++;
                                     if (lastIdx < 3)
+                                    {
                                         clientAvatar.AuthorizeHostTeleport(enemies[lastIdx].transform.position + new Vector3(2.2f, 0f, 0f));
+                                        lastFollowSync = Time.realtimeSinceStartup;
+                                    }
+                                }
+                                else if (est && est.Alive && Time.realtimeSinceStartup - lastFollowSync >= 2.0f && Vector3.Distance(clientAvatar.transform.position, e.transform.position) > 4.6f)
+                                {
+                                    clientAvatar.AuthorizeHostTeleport(e.transform.position + new Vector3(2.2f, 0f, 0f));
+                                    lastFollowSync = Time.realtimeSinceStartup;
                                 }
                             }
                             yield return new WaitForSeconds(0.2f);

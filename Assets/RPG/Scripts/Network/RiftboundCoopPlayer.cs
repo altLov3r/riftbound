@@ -46,6 +46,7 @@ namespace Riftbound.Network
         public NetworkVariable<bool> IsLeader = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
         public NetworkVariable<bool> IsInCombat = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
         public NetworkVariable<uint> ReadyCheckId = new NetworkVariable<uint>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+        public NetworkVariable<byte> SocialRole = new NetworkVariable<byte>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server); // 0=Auto, 1=Tank, 2=Healer, 3=DPS
         public NetworkVariable<int> SpawnSlot = new NetworkVariable<int>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
         public NetworkVariable<int> QuestIndex = new NetworkVariable<int>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
@@ -397,10 +398,49 @@ namespace Riftbound.Network
             }
         }
 
+        public static byte SanitizeSocialRole(int role) => (byte)Mathf.Clamp(role, 0, 3);
+
+        public static string GetSocialRoleName(byte role) => role switch
+        {
+            1 => "Tank",
+            2 => "Healer",
+            3 => "DPS",
+            _ => "Auto"
+        };
+
+        public static string GetSocialRoleTag(byte role) => role switch
+        {
+            1 => "[T]",
+            2 => "[H]",
+            3 => "[D]",
+            _ => ""
+        };
+
+        public static float ComputeRemoteMountGroundOffset(bool airborne, bool hitFound, float hitY, float rootY)
+        {
+            if (airborne || !hitFound) return 0f;
+            return Mathf.Clamp(hitY - rootY + 0.02f, -0.35f, 0.25f);
+        }
+
         void PositionRemoteRider()
         {
             if (!IsMounted.Value || Health.Value <= 0 || !remoteVisualRoot || !remoteMountComp || !remoteMountComp.saddle || !remoteRiderHips)
                 return;
+
+            bool airborne = (LocomotionFlags.Value & 1) != 0;
+            bool groundHitFound = false;
+            float groundHitY = transform.position.y;
+            if (!airborne && Physics.Raycast(transform.position + Vector3.up * 0.5f, Vector3.down, out var ground, 1.2f, ~(1 << 2), QueryTriggerInteraction.Ignore))
+            {
+                if (ground.collider && !ground.collider.transform.IsChildOf(transform))
+                {
+                    groundHitFound = true;
+                    groundHitY = ground.point.y;
+                }
+            }
+            float yOff = ComputeRemoteMountGroundOffset(airborne, groundHitFound, groundHitY, transform.position.y);
+            remoteMountComp.transform.localPosition = Vector3.up * yOff;
+
             Vector3 hipWorldOffset = remoteRiderHips.position - remoteVisualRoot.transform.position;
             remoteVisualRoot.transform.position = remoteMountComp.saddle.position - hipWorldOffset;
         }
@@ -1577,6 +1617,20 @@ namespace Riftbound.Network
         {
             if (!CoopSessionConfig.IsMultiplayer || !IsSpawned) return;
             RequestPromoteLeaderServerRpc(targetClientId);
+        }
+
+        public void CycleSocialRole()
+        {
+            if (!CoopSessionConfig.IsMultiplayer || !IsSpawned || !IsOwner) return;
+            byte next = (byte)((SocialRole.Value + 1) % 4);
+            RequestSetSocialRoleServerRpc(next);
+        }
+
+        [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Owner)]
+        void RequestSetSocialRoleServerRpc(byte role)
+        {
+            // Presentation-only party badge; never modifies Combatant stats or permissions.
+            SocialRole.Value = SanitizeSocialRole(role);
         }
 
         [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Owner)]

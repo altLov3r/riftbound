@@ -138,6 +138,12 @@ namespace Riftbound.Editor
             BuildStandaloneTo("Builds/RiftboundPresentation01", "MultiplayerPresentation01");
         }
 
+        [MenuItem("Riftbound/Build Multiplayer Antigravity Presentation 02")]
+        public static void BuildMultiplayerPolish02()
+        {
+            BuildStandaloneTo("Builds/RiftboundPresentation02", "MultiplayerPresentation02");
+        }
+
         static void BuildStandaloneTo(string buildDir, string label)
         {
             Directory.CreateDirectory(buildDir);

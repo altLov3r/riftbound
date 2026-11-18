@@ -388,6 +388,20 @@ namespace Riftbound.Editor
                     Record("MP04-PartyOptInAndGroupMenuModal", companionCountStart == 0 && (cwm == null || modalBlockedGroup),
                         $"initialCompanions={companionCountStart} cwmPresent={cwm != null} groupModalBlocks={modalBlockedGroup}");
 
+                    bool roleBoundsOk = RiftboundCoopPlayer.SanitizeSocialRole(-1) == 0
+                                     && RiftboundCoopPlayer.SanitizeSocialRole(2) == 2
+                                     && RiftboundCoopPlayer.SanitizeSocialRole(99) == 3
+                                     && RiftboundCoopPlayer.GetSocialRoleTag(1) == "[T]"
+                                     && RiftboundCoopPlayer.GetSocialRoleName(3) == "DPS";
+                    float groundedOff = RiftboundCoopPlayer.ComputeRemoteMountGroundOffset(false, true, 10.12f, 10.0f);
+                    float airborneOff = RiftboundCoopPlayer.ComputeRemoteMountGroundOffset(true, true, 10.12f, 10.0f);
+                    float clampedOff = RiftboundCoopPlayer.ComputeRemoteMountGroundOffset(false, true, 5.0f, 10.0f);
+                    bool groundOffsetOk = Mathf.Approximately(groundedOff, 0.14f)
+                                       && Mathf.Approximately(airborneOff, 0f)
+                                       && Mathf.Approximately(clampedOff, -0.35f);
+                    Record("MP03-SocialRoleAndMountGrounding", roleBoundsOk && groundOffsetOk,
+                        $"roleBounds={roleBoundsOk} grounded={groundedOff:F2} airborne={airborneOff:F2} clamped={clampedOff:F2}");
+
                     UnityEngine.Object.Destroy(dummyGo);
                     if (cc) cc.enabled = false;
                     pc.transform.position = startPos;
