@@ -6,6 +6,8 @@
 - NATIVE_AUDIT_SUMMARY.json: portable measured summary and local raw-report identities; native diagnostics are not gameplay.
 - GROUNDING_REPAIR_PROPOSAL.md and PRESENTATION_COORDINATION.md: grounding/mount repair and API/file-release requests; not applied code fixes.
 - Proof/: selected actual editor renders. Sole-normalized images are temporary candidates, not a production grounding fix.
+- CV_RUNTIME_VALIDATION.json and new PlayerGroundedWorld/AbeGroundedWorld proof images: actual continuation results. The running-world observation uses isolated progress, an idle synthetic keyboard, a test-only title gate and a normal scene reload; it is not UI/input/gameplay acceptance.
+- ANTIGRAVITY_MP_API_RECEIVED.md / OWNERSHIP_RELEASE_RECEIPT.json: actual owner release snapshot and implemented callback contract; older pending notes describe the first checkpoint.
 
 ## Reproduce in the isolated checkout
 
@@ -18,6 +20,9 @@ Run each method sequentially with `-batchmode -projectPath <this checkout> -exec
 | Riftbound.Editor.PresentationAssetAudit.Run | -nographics -presentationApproved | .code-check/presentation/asset-audit.json;27 prefab/clip/rig samples and12 approved Undead consumer checks |
 | Riftbound.Editor.PresentationGroundingAudit.Run | -nographics | .code-check/presentation/grounding-audit.json; selected saved actors/support candidates; no Play Mode |
 | Riftbound.Editor.PresentationPosePreview.Run | -presentationApproved; omit -nographics | .code-check/presentation/approved-previews/;12 actual controller poses, including Paladin |
+| Riftbound.Editor.MountVisualChecks.Run | -nographics |16disposable native mount cadence/state/binding checks |
+| Riftbound.Editor.GroundedVisualChecks.Run | -nographics |19native empty-scene PlayMode contact/root/gate/support checks |
+| Riftbound.Editor.PresentationWorldProbe.Run | omit -nographics | Isolated running world, synthetic idle keyboard/title gate, scene reload, measured support and optional captures; NOT input or online acceptance |
 
 The pose tool without -presentationApproved produces baseline/candidate benchmark images. Running it after applying the patch does not recreate the old controller baseline. Original pre-application captures remain separate in this delivery's local previews folder and selected Proof images.
 

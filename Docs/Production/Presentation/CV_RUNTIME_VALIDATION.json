@@ -1,0 +1,54 @@
+{
+  "evidence": "Native scoped mount/grounding checks and running-world observation; NOT normal input, UI, routes, saddle contact or online acceptance",
+  "unityVersion": "6000.6.2f1",
+  "mountChecks": 16,
+  "groundingChecks": 19,
+  "worldComponents": 95,
+  "worldMeasuredContacts": 91,
+  "within6cmScreen": 91,
+  "estimatedGapRangeMetres": [
+    -0.0036573708057403564,
+    0.04115385562181473
+  ],
+  "worldFramesObserved": 277,
+  "worldSceneReloadVerified": true,
+  "worldFixtureUsedTitleBypassAndSyntheticIdleKeyboard": true,
+  "supportUnavailable": [
+    "Ember Hatchling",
+    "Ember Hatchling",
+    "Outrider Lyra",
+    "Vermithrax the Ember Sovereign"
+  ],
+  "normalInputVerified": false,
+  "onlineVerified": false,
+  "standaloneBuilt": false,
+  "observerCallerIntegration": "Antigravity must call exact BindObserver hook; network roots without explicit context intentionally skip correction",
+  "rawReports": [
+    {
+      "localPath": ".code-check/presentation/mount-visual-checks.txt",
+      "sha256": "57c497bd1ac754ffca14940da14ac04245539449208d11d7f64ebe4587446240"
+    },
+    {
+      "localPath": ".code-check/presentation/grounded-visual-checks.txt",
+      "sha256": "c356115ccf956e72d7372abe6e08668b48b19e71af8cdf5c0b418931221725e7"
+    },
+    {
+      "localPath": ".code-check/presentation/world-probe/receipt.json",
+      "sha256": "d223faa0af60012344782a9e98c2500e8443854390c972ef7642301e7c500069"
+    }
+  ],
+  "changedVisualSourceHashes": [
+    {
+      "path": "Assets/RPG/Scripts/MountVisual.cs",
+      "sha256": "a486c60dd84175937aadb760ea330e3495c28ca3913b7a20da16f788288f62e6"
+    },
+    {
+      "path": "Assets/RPG/Scripts/GroundedVisual.cs",
+      "sha256": "e1a56001d1fe8bbe0c21659017856de4dcb14ca14cb852ab73ecd7f30942f355"
+    },
+    {
+      "path": "Assets/RPG/Scripts/CharacterVisualFactory.cs",
+      "sha256": "7961be12b40dde87546dbd5a79a3f42bfbccf559c1cd5ce173f8e87c6276ca7d"
+    }
+  ]
+}

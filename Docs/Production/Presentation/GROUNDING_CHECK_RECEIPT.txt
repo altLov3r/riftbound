@@ -1,0 +1,21 @@
+Native empty-scene presentation/physics fixtures; NOT gameplay, rendered or online acceptance.
+PASS [floor_contact] baked-foot-region sole=0.0250 support=0.0000 expected gap=.025Â±.025m
+PASS [actor_root_unchanged] (0.00000, 0.15000, 0.00000)
+PASS [visual_wrapper_unchanged] (0.00000, 0.00000, 0.00000)
+PASS [same_binding_no_drift] before=(0.00000, -0.11450, 0.00000) after=(0.00000, -0.11450, 0.00000)
+PASS [airborne_keeps_visual_baseline] (0.00000, -0.11450, 0.00000)
+PASS [airborne_root_not_snapped] (0.00000, 1.15000, 0.00000)
+PASS [mounted_seat_owned_by_caller] (0.12000, 0.42000, -0.08000)
+PASS [dead_pose_owned_by_caller] (-0.10000, 0.50000, 0.04000)
+PASS [grounding_resumes] baked-foot-region sole=0.0300 support=0.0000 expected gap=.025Â±.025m
+PASS [legacy_clearance_does_not_preserve_hover] legacy soleHeight=.08 observed sole=0.0300
+PASS [self_and_other_actor_excluded] baked-foot-region sole=0.0300 support=0.0000 expected gap=.025Â±.025m
+PASS [deck_not_lower_floor] baked-foot-region sole=2.0250 support=2.0000 expected gap=.025Â±.025m
+PASS [deck_actor_root_unchanged] (0.00000, 2.15000, 0.00000)
+PASS [new_visual_rebind] baked-foot-region sole=2.0250 support=2.0000 expected gap=.025Â±.025m
+PASS [stationary_without_motor_or_stats] baked-foot-region sole=0.0250 support=0.0000 expected gap=.025Â±.025m
+PASS [missing_support_fails_safe] (0.00000, 0.32752, 0.00000)
+PASS [saturated_support_fails_safe] (0.00000, 0.32752, 0.00000)
+PASS [animator_on_actor_root_never_moves_authority] (0.00000, 0.47752, 0.00000)
+PASS [stationary_service_motor_without_move] motor.isGrounded=False root=(0.00000, 0.15000, 0.00000) sole=0.0250 expected=.025Â±.025m; no Move called
+TOTAL PASS=19 ERRORS=0 RESULT=PASS

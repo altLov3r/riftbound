@@ -1,5 +1,19 @@
 # Presentation API / ownership exchange
 
+## Current exchange —continued18 November2026
+
+Actual owner release was subsequently found in Multiplayer/antigravity-polish/Docs/Production/MP_PRESENTATION_API_CONTRACT.md and its new run journal. The three source blobs matched the table below before modification. Snapshot and SHA256 provenance are retained in ANTIGRAVITY_MP_API_RECEIVED.md / OWNERSHIP_RELEASE_RECEIPT.json; this was an explicit local owner record, uncommitted at inspection, not inferred from silence or a user acknowledgement.
+
+Codex implements the exact requested nonbreaking API: `BindObserver(Animator model, Func<bool> isMounted, Func<bool> isAlive, Func<bool> isAirborne)`. Existing BindAnimator/Animate fields/signatures remain. `GroundedVisual.EnsureFor(GameObject actor, Animator model)` returns or creates the presentation component on an actor root and rejects Animator-on-authority-root bindings. Scene-load/startup and factory callers cover saved actors and factory-created companions without saving scenes or recreating actors.
+
+**AG next caller change:** after building a remote model, call EnsureFor on the network actor root, then BindObserver with that peer's IsMounted/Health/LocomotionFlags callbacks. Rebind on model replacement. A NetworkObject without explicit observer context intentionally remains uncorrected; never borrow the local player's state. AG retains this caller file. No remote binding call is implemented on Codex's baseline network branch.
+
+Restore the authored remote visual wrapper on dismount, without zeroing the nested bound Animator's correction or moving the network root. GroundedVisual caches its authored Animator local baseline and a sole point in its parent space, so nested-wrapper motion and repeated binding do not accumulate corrections. Mounted/dead/airborne poses remain caller-owned. Missing or saturated support does not snap a model to terrain.
+
+Current status: three files RELEASED TO CODEX by actual owner; requested API IMPLEMENTED/compiled; local native fixtures PASS; remote caller integration, actual online/riding/traversal checks NOT RUN. No additional prefab/controller/FBX/scene changes are part of this continuation. The original exchange below is historical context from checkpoint0fdc333.
+
+## Original request (historical)
+
 18 November2026. Codex request, not an Antigravity signature. Base033e15408795c25204959028d706f35a5c1d7f05. Branch visuals/codex-presentation-20261118. See OWN_CODEX_PRESENTATION_RUN.md and the common presentation plan.
 
 ## Requested file release
@@ -34,7 +48,7 @@ AG supplies finite accepted action ID, timing/duration, sequence/cancellation, a
 
 Current six player controllers reverse forward clips for WalkBack/RunBack. Undead Jump/Ride/Block alias run/idle despite existing Skeleton family clips. These are exact asset-review candidates, not approved controller edits. Native sampling follows. Keep animation requests separate from damage/reward events.
 
-## Current status
+## Original status at checkpoint0fdc333 (superseded)
 
 - File release: PENDING actual owner record.
 - Presentation API: PROPOSED, existing signatures retained.

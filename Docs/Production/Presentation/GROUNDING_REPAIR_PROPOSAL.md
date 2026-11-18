@@ -1,6 +1,6 @@
-# CV04 — measured grounding repair proposal
+# CV04 — measured grounding repair and evidence
 
-18 November2026. NOT APPLIED. Do not infer runtime grounding completion from temporary normalized renders.
+18 November2026. Initial proposal prepared at0fdc333, then implemented after actual Antigravity file release. Temporary normalized renders remain candidates, not proof of production behavior. The current implementation and native running-world results are in OWN_CODEX_PRESENTATION_HANDOFF.md and CV_RUNTIME_VALIDATION.json; remote caller/gameplay/traversal acceptance remains separate.
 
 ## Evidence
 
@@ -19,7 +19,7 @@ Standalone Human_Warrior estimated Idle sole is0.317m above prefab root; Undead_
 
 Rendered disposable Human/Orc normalized candidates place only the visual mesh near a zero-height reference plane. They demonstrate a possible pivot correction without moving collision roots. They do not validate terrain support, gait, slope/bridge handling, jumping, remote state or a production fix.
 
-## Proposed focused implementation after file release
+## Reviewed implementation requirements
 
 1. Retain GroundedVisual serialized fields/GUID/public BindAnimator signature. Capture an immutable unmounted visual baseline after model binding and valid Idle evaluation. Never apply correction to the actor/motor/NetworkTransform root; fail safely if the Animator lives on that root.
 2. Derive a per-model geometric sole estimate once on bind, with validated foot/toe bindings. Cache it; do not follow the instantaneous lowest animated foot every frame. Preserve authored gait offsets. Missing rig/geometry is a classified fallback, not a guessed global offset.
@@ -30,7 +30,7 @@ Rendered disposable Human/Orc normalized candidates place only the visual mesh n
 
 ## Caller and route gates
 
-- GroundedVisual.cs, CharacterVisualFactory.cs and MountVisual.cs are still awaiting actual Antigravity file release. Exact source blobs and proposed API are in PRESENTATION_COORDINATION.md. No edits to these files in this delivery.
+- The initial file-release gate is now satisfied by the owner record in Multiplayer/antigravity-polish; provenance/API are in PRESENTATION_COORDINATION.md. Three released source files changed in this continuation; actor collision roots and all scene/terrain assets remain unchanged.
 - AG owns PlayerController/PlayerMounts/EnemyController and remote callers. It must connect agreed grounding/mount state and maintain server-safe movement. Codex supplies exact method/field requirements instead of editing these callers.
 - Validate Emberwatch→Highspire→Westbank→Reaver and Emberwatch→Greenhollow on foot and mounted, including bridge deck vs underlying terrain, stairs, seams, steep approaches, enclosed floors and camera clearance. These routes were NOT RUN in this packet.
 - Preserve protected terrain/813trees/15prototypes and all authored scene/actor references. No scene/prefab/FBX regeneration or terrain lowering is proposed.
@@ -40,3 +40,11 @@ Rendered disposable Human/Orc normalized candidates place only the visual mesh n
 Native front-foot sampling gives approximate run contact strides6.064m/s horse/gryphon and5.979m/s zebra, consistent with their serialized run fields. Walk contact medians are approximately1.157/1.141m/s versus existing serialized upper-quartile estimates1.411/1.391m/s; the estimators differ. Do not auto-overwrite constants based on a different statistic. Current Animate ignores both fields for literal2.6/7.2 and clamps cadence tightly; using fields alone may still slide at walk speed3m/s. Evaluate model cadence and contact together before changing bounds or movement speeds. Retain current gameplay speeds/unlocks unless specifically agreed with AG.
 
 Missing Animator/controller/state guards and rebind-safe state caching are focused code candidates. Preserve Animate(speed,airborne,walking). The flying gryphon ID currently uses horse art; no wing or flight clip exists in this inspected family. Remote model instantiation and state synchronization belong to AG; Codex's asset correction cannot replace the capsule caller by itself.
+
+## Current implementation limits
+
+- BindObserver implements explicit mounted/alive/airborne callbacks. No-context network roots fail safely. Saved active actors bind at sceneLoaded and once after existing Start methods; factory-created companions/models bind on creation. No polling world generator or actor recreation.
+- Cached Idle foot-region mesh geometry replaces joint-height calibration. Correction is relative to immutable Animator baseline/parent, bounded to0.8m, smoothly applied to the visual only. Existing gait offsets remain. Legacy joint-clearance values are capped at0.03m for actual mesh soles, preserving serialized values/GUIDs.
+- 32-hit nonallocating support buffer rejects saturation, actor/self/trigger surfaces and surfaces outside the normal/height window. Static service/patrol Idle capsules can bind without Move only while their root is vertically stable; players/normal enemy motors retain grounded-state gating. Jump/Ride/Death and observer gates take priority.
+- Native reload probe with an explicitly synthetic idle keyboard and test-only title gate observed95attached components,91measurable contacts, all91within6cm screen. Actual range approximately−0.0037m to+0.0412m; this includes estimator/Idle-pose variation, not a zero-clipping guarantee. Four support-unavailable actors were left untouched: two Ember Hatchlings, Outrider Lyra, Vermithrax the Ember Sovereign. Intentional flight vs placement for those actors is NOT classified here.
+- Real normal-input movement, per-mount saddle fit, remote callback hookup, host/guest visuals and both routes remain NOT RUN. No new standing/flight pose is invented for missing rig/support data.

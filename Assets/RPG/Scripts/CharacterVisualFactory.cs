@@ -200,6 +200,8 @@ namespace Riftbound
                 foreach (var t in instance.GetComponentsInChildren<Transform>(true)) t.gameObject.layer = 2; // Ignore Raycast
             }
 
+            if (Application.isPlaying && !isPreview && parent)
+                GroundedVisual.EnsureFor(parent.gameObject, instance.GetComponentInChildren<Animator>());
             return instance;
         }
 
@@ -338,9 +340,7 @@ namespace Riftbound
 
                 player.animator = anim;
 
-                // Sync GroundedVisual if attached
-                var gv = player.GetComponent<GroundedVisual>();
-                if (gv) gv.BindAnimator(anim);
+                GroundedVisual.EnsureFor(player.gameObject, anim);
             }
 
             // 4. Update CharacterController to racial proportions

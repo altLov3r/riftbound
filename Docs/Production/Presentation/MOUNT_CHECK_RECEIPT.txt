@@ -1,0 +1,18 @@
+Native disposable mount animation checks; NOT gameplay, rendered hoof contact or online verification.
+PASS Walking uses prefab walkStride at3m/s, above old1.25 cadence cap
+PASS Running uses prefab runStride at8m/s
+PASS Walking cadence has finite0.65 lower bound
+PASS Walking cadence has2.25 upper bound
+PASS Invalid stride uses neutral finite cadence
+PASS Idle stays at authored playback speed
+PASS Airborne Jump stays at authored playback speed
+PASS Nonfinite movement input safely selects Idle
+PASS Repeated walking does not restart normalized phase or transition
+PASS Replacing Animator invalidates state cache even when desired state is unchanged
+PASS Replacing controller with override invalidates state cache
+PASS Missing Run falls back to existing Idle at neutral speed
+PASS Missing Jump falls back safely without a missing-state transition
+PASS Controller with no supported state is safe and neutral
+PASS Missing controller returns without exception
+PASS Missing Animator returns without exception
+TOTAL PASS=16 FAIL=0

@@ -1,50 +1,58 @@
 # Codex presentation handoff —18 November2026
 
-## Source and scope
+## Current delivery
 
-- Branch: **visuals/codex-presentation-20261118**.
-- Checkout: C:/Users/skama/Documents/wow=rpg-diplomna/Production/codex-presentation-20261118.
-- Actual base: **033e15408795c25204959028d706f35a5c1d7f05**, published combat/antigravity-refinement-20261117. Plan copied exactly fromf7ef4ee, not old story runtime. Existing integration/main/finished branches/builds and Antigravity checkout untouched.
-- Approximate execution04:52–05:23 Europe/Sofia. No eight-hour timer. Scene RELEASED/no scene lock or save.
+- Branch: **visuals/codex-presentation-20261118**; checkout Production/codex-presentation-20261118.
+- Reviewed runtime base **033e15408795c25204959028d706f35a5c1d7f05**; continues published checkpoint0fdc333, preserving its approved nine Undead controller changes. No main merge or edits to Antigravity's checkout.
+- Actual owner release found in **Multiplayer/antigravity-polish/Docs/Production/MP_PRESENTATION_API_CONTRACT.md**, with matching three base source blobs. Snapshot/hash/uncommitted-at-observation provenance in Presentation/OWNERSHIP_RELEASE_RECEIPT.json. Earlier pending-release notes describe checkpoint0fdc333 and are superseded.
 
-**Delivered: audited assets/grounding evidence, three compiled read-only editor tools, and the user's specifically approved nine-state Undead animation correction. This is a partial visual workstream, not a fully grounded/replicated gameplay build.**
+**Delivered: mount cadence/state safety, per-model visual grounding and observer API, compiled native checks and running-world contact evidence. Remote caller integration and normal-input/online acceptance remain separate.**
 
-## Applied change
+## Changes
 
-Only existing Player Undead Warrior/Mage/Rogue controllers changed: WalkBack now selects existing Walking_Backwards with positive1 speed; Jump selects existing Jump_Idle speed1; Ride selects existing Sit_Chair_Idle speed1. Paladin intentionally shares Warrior's controller. Exactly3controllers/9state records/15fields. All state fileIDs, controller GUIDs, transitions, other fields and metadata are preserved. No source FBX/importer, prefab, scene or terrain edits.
-
-User approval: selected **Approve these nine state changes** after exact proposal and candidate renders. See [review and patch identity](Presentation/UNDEAD_CONTROLLER_REVIEW.md), JSON receipt and minimal zero-context patch. Block, RunBack and Humanoid backward animations are NOT corrected in this slice. A seated pose alone is not proof of saddle fit.
+- **MountVisual.cs:** uses existing serialized walk/run stride fields instead of literal divisors, bounded0.65–2.25cadence, authored-speed Idle/Jump, invalid-input/controller/state safety and rebind-aware transition cache. Gameplay speed, unlocks, mount IDs, prefabs and saddles unchanged.
+- **GroundedVisual.cs:** caches Idle mesh-foot-region geometry once per model binding. Smooth bounded correction affects only the descendant Animator, relative to its immutable authored baseline/parent. Same binding does not accumulate offsets. Legacy toe-clearance values are capped at3cm for actual soles, without rewriting serialized fields.
+- Physical support rejects self/other actors/triggers, steep/high candidates and a saturated32-hit query. Missing support leaves the visual untouched. Explicit airborne/mounted/dead states retain caller pose ownership; default players/enemies retain motor grounding. Static service/patrol Idle capsules without Move are supported only with vertically stable roots and valid nearby support.
+- Actors bind on **each scene load**, with one bounded follow-up after existing Start methods; factory-created companions/models bind on creation. No world regeneration, actor recreation or scene save. **CharacterVisualFactory.cs** connects these visual helpers without changing motor dimensions, stats or movement policy.
+- Added three editor-only methods: MountVisualChecks.Run, GroundedVisualChecks.Run and PresentationWorldProbe.Run. Existing diagnostics/assertions were not weakened.
 
 ## Actual verification
 
-| Check | Actual result |
+| Check | Result |
 | --- | --- |
-| Unity6000.6.2f1 C# compilation | PASS for3new editor diagnostic scripts; post-approval methods executed normally, no compiler errors |
-| Native prefab/rig/clip/pose audit |27models inspected,0execution errors;24characters+3mounts |
-| Approved loaded-controller checks |12/12 across Undead Warrior/Paladin/Mage/Rogue: expected real clip, looping, speed+1, sampled pose data |
-| Pre-application static rendering |31images produced on a real graphics device,0execution errors; selected normalization/pose comparisons inspected |
-| Post-approval actual controller rendering |12images produced,0execution errors; selected Warrior backward-walk, Rogue seated and Paladin airborne poses inspected |
-| Saved-scene grounding audit |90selected actors inspected,0execution errors;87review candidates/1within screen/1missing support/1noAnimator. NOT90grounding passes |
-| Patch/source preservation |Candidate controller hashes match; reverse zero-context patch check PASS; state/controller identities preserved |
-| Original source/terrain |3reserved visual scripts, original scene and10tracked protected terrain assets match033e154 raw/LFS identities; receipt included |
+| Unity6000.6.2f1 C# compilation | PASS for released visual source and new editor diagnostics |
+| Native mount checks | **16PASS/0FAIL**, configured cadence, Idle/Jump, missing states/controllers/Animator and binding behavior |
+| Native grounding PlayMode fixtures | **19PASS/0ERROR**, contact, root/wrapper invariants, rebinding, caller gates, deck vs lower floor, self/other actors, missing/saturated support, root-Animator guard and static NPC capsule |
+| Running-world probe after scene reload | **95attached components**,277advancing frames;91measurable contacts, all91within6cm screening band |
+| Measured gap range | Approximately−0.0037m..+0.0412m; geometric/Idle-pose estimates, not a zero-clipping guarantee |
+| Actual world renders inspected | Player and Abe; retained in Presentation/Proof/PlayerGroundedWorld.png and AbeGroundedWorld.png |
+| Previous approved controller slice | Nine state changes retained; no additional controller/FBX/prefab edits |
 
-Geometry estimates suggest both visual pivot offsets and saved-root clearance contribute to levitation. Read [GROUNDING_REPAIR_PROPOSAL.md](Presentation/GROUNDING_REPAIR_PROPOSAL.md), not a global Y decrement. Native sole/contact estimates and cadence numbers are diagnostic heuristics, not final per-rig constants. Runtime-only actors/companions/peers were not instantiated into the saved scene.
+The world probe uses isolated progress, an explicitly synthetic idle keyboard, a test-only title gate and actual scene reload. It never calls EnterWorld/SaveRoster, drives the desktop or claims normal input/gameplay acceptance. Four actors have no accepted support nearby and are untouched: two Ember Hatchlings, Outrider Lyra, Vermithrax the Ember Sovereign. Intentional flight vs placement for those actors is NOT classified here.
 
-Raw local receipts/captures: .code-check/presentation/. Portable summaries/proof images are in [Presentation/](Presentation/README.md). Proof/HumanIdleSoleCandidateNotApplied.png is a temporary visual-normalization candidate, explicitly NOT a production grounding fix. UndeadRideAfter.png is rendered from the actually modified controller. Tools do not save/reimport assets; startup/import normalization side effects were diagnosed and narrowly restored in this initially clean isolated checkout.
+Native receipts and source/report hashes: [CV_RUNTIME_VALIDATION.json](Presentation/CV_RUNTIME_VALIDATION.json), MOUNT_CHECK_RECEIPT.txt and GROUNDING_CHECK_RECEIPT.txt. The initial failed grounding fixture tracked the outer wrapper instead of the nested owned Animator; corrected targets and added wrapper preservation without relaxing tolerances. Startup probe failures were investigated using actual paused/frame state, then an explicit test fixture gate; no unchanged retry loop.
 
-## Ownership gate / exact next action
+## Required Antigravity integration
 
-No actual Antigravity release was found for **GroundedVisual.cs, MountVisual.cs or CharacterVisualFactory.cs** in its latest journal/handoff. They remain byte-identical to base. The user acknowledged asking AG; that is not a release. See [PRESENTATION_COORDINATION.md](Presentation/PRESENTATION_COORDINATION.md) for exact source hashes and caller/API requests.
+The released exact API is implemented. After creating/replacing the remote visual, AG must bind its own peer context:
 
-Antigravity must record RELEASED TO CODEX or RESERVED with source commit for these three files. It retains Network/**, PlayerController/partials including PlayerMounts, EnemyController, combat, rewards and party/HUD callers. Agree explicit observer alive/grounded/mounted state and retain existing BindAnimator/Animate signatures. Then Codex resumes bounded sole/support/rebind and mount-stride/state-safety work; AG connects its own remote callers and replaces the capsule placeholder. Do not edit each other's checkout or infer release from silence.
+```csharp
+var grounding = GroundedVisual.EnsureFor(gameObject, remoteAnimator);
+grounding?.BindObserver(remoteAnimator,
+    () => IsMounted.Value,
+    () => Health.Value > 0,
+    () => (LocomotionFlags.Value & 1) != 0);
+```
 
-The approved controllers can be integrated after normal branch review while that exchange continues. New runtime work must start from the latest agreed successor, preserving AG's033e154 authority fixes. No main merge performed/authorized here.
+Network roots **intentionally skip correction without these explicit callbacks**. This call is not added to Codex's old baseline networking; Network/**, PlayerController/PlayerMounts/EnemyController and party/HUD remain AG-owned. Do not use the local player's singleton. Rebind on actual model replacement and restore the authored outer visual wrapper on dismount without overwriting the nested Animator correction or moving the server root. Details: [PRESENTATION_COORDINATION.md](Presentation/PRESENTATION_COORDINATION.md).
 
-## NOT RUN / test instructions
+This pinned visual implementation is released for reviewed integration. Coordinate further edits to these files before concurrent implementation; do not reset dirty AG work. Preserve its newer authority/party changes and existing branches/builds. **SCENE RELEASED**; no scene lock/write taken.
 
-- No actual normal-input animation playback, jump/land transition acceptance, mount seating on every combination or rendered host/guest test. Reproduce in the new combined candidate; static pose capture is insufficient.
-- No foot/mounted corridor traversal, bridge/stair/slope/seam/camera acceptance, NPC/enemy/companion grounding fix or network-state agreement yet.
-- No new standalone built; existing Combat01/Combined02 remain original. Broad145quest/41gameplay/32spawn/19combat and Relay suites were not rerun because no gameplay authority/progression code changed; historical results must not be transferred to this slice.
-- After reviewed integration: select each Undead class, walk backward, jump/land, mount/dismount; compare both players' views and verify seats, cancellation/death/respawn. Then execute the full presentation plan's affected regression/route/online gates on the exact combined source/build.
+## NOT RUN / next test
 
-No blind retries or weakened gameplay assertions. One preservation assertion caught and diagnosed material float roundoff; it was restored before delivery. Reserved code remains gated; no token-consuming ownership wait is running.
+- Normal physical-input locomotion/combat/jump/landing, per-mount seat/hoof contact, optional companion call/dismiss, all-race gait feel, both route corridors and camera clearance.
+- Integrated observer callbacks, rendered host/guest/latejoin, disconnect/death/mount transitions and actual two-PC testing.
+- Standalone build; old Combat01/Combined02 remain original. Unchanged quest/gameplay/spawn/combat/Relay suites were not repeated or transferred as new passes.
+- Additional Humanoid backward clips, Undead RunBack/Block and missing flight art remain separate reviewed tasks. No unsupported clip/model invented.
+
+Next: integrate the pinned visual branch with AG's multiplayer changes in a separate reviewed candidate, connect BindObserver, compile and run affected normal-input/route/host-client checks. This owned code slice is delivered; no background ownership wait, world expansion or repeated green tests are running.

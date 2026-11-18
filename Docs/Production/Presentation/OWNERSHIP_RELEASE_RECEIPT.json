@@ -1,0 +1,15 @@
+{
+  "sourcePath": "C:\\Users\\skama\\Documents\\wow=rpg-diplomna\\Multiplayer\\antigravity-polish\\Docs\\Production\\MP_PRESENTATION_API_CONTRACT.md",
+  "sourceBranch": "multiplayer/antigravity-polish-20261118",
+  "sourceBase": "033e15408795c25204959028d706f35a5c1d7f05",
+  "sourceRecordWasUncommittedWhenRead": true,
+  "observedLocalDate": "2026-11-18 Europe/Sofia",
+  "sha256": "346c34bb41a9bdeb0112a028f7a0b365f9b6b41b92afdf7c487764028fdeefa4",
+  "releasedPaths": [
+    "Assets/RPG/Scripts/GroundedVisual.cs",
+    "Assets/RPG/Scripts/MountVisual.cs",
+    "Assets/RPG/Scripts/CharacterVisualFactory.cs"
+  ],
+  "decision": "Actual owner record read; three base hashes matched before modifications",
+  "agCheckoutEditedByCodex": false
+}
