@@ -144,6 +144,12 @@ namespace Riftbound.Editor
             BuildStandaloneTo("Builds/RiftboundPresentation02", "MultiplayerPresentation02");
         }
 
+        [MenuItem("Riftbound/Build Release Gate 1 Runtime 01")]
+        public static void BuildReleaseGate1Runtime01()
+        {
+            BuildStandaloneTo("Builds/RiftboundReleaseGate1Runtime01", "ReleaseGate1Runtime01");
+        }
+
         static void BuildStandaloneTo(string buildDir, string label)
         {
             Directory.CreateDirectory(buildDir);

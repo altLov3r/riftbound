@@ -1122,8 +1122,9 @@ namespace Riftbound.Network
                     while (Time.realtimeSinceStartup - wDecline < 4f && (clientAvatar == null || clientAvatar.ReadyStatus.Value != 2))
                         yield return new WaitForSeconds(0.15f);
                     bool rcDeclineOk = clientAvatar != null && clientAvatar.ReadyStatus.Value == 2;
-                    lateJoinPass = ljStats != null && ljStats.Health < ljStats.maxHealth && hostPreDamaged && evtActive && rcDeclineOk;
-                    combatInfo += $", lateJoin={(lateJoinPass ? "PASS" : "FAIL")}({(ljStats ? $"{ljStats.Health:F0}/{ljStats.maxHealth:F0}" : "none")},evt={evtActive},rcDecline={rcDeclineOk})";
+                    bool obsGvOk = HasValidObserverGrounding(clientAvatar);
+                    lateJoinPass = ljStats != null && ljStats.Health < ljStats.maxHealth && hostPreDamaged && evtActive && rcDeclineOk && obsGvOk;
+                    combatInfo += $", lateJoin={(lateJoinPass ? "PASS" : "FAIL")}({(ljStats ? $"{ljStats.Health:F0}/{ljStats.maxHealth:F0}" : "none")},evt={evtActive},rcDecline={rcDeclineOk},obsGv={obsGvOk})";
                 }
                 else
                 {
@@ -1131,8 +1132,10 @@ namespace Riftbound.Network
                     if (RiftboundCoopPlayer.LocalOwner != null)
                         RiftboundCoopPlayer.LocalOwner.RespondReadyCheck(false);
                     yield return new WaitForSeconds(0.6f);
-                    lateJoinPass = ljStats != null && ljStats.Health < ljStats.maxHealth && evtActive && rcOpen;
-                    combatInfo += $", lateJoin={(lateJoinPass ? "PASS" : "FAIL")}({(ljStats ? $"{ljStats.Health:F0}/{ljStats.maxHealth:F0}" : "none")},evt={evtActive},rcSnap={rcOpen})";
+                    var hostPeer = GetFirstRemotePlayer();
+                    bool obsGvOk = HasValidObserverGrounding(hostPeer);
+                    lateJoinPass = ljStats != null && ljStats.Health < ljStats.maxHealth && evtActive && rcOpen && obsGvOk;
+                    combatInfo += $", lateJoin={(lateJoinPass ? "PASS" : "FAIL")}({(ljStats ? $"{ljStats.Health:F0}/{ljStats.maxHealth:F0}" : "none")},evt={evtActive},rcSnap={rcOpen},obsGv={obsGvOk})";
                 }
             }
 
@@ -1374,6 +1377,7 @@ namespace Riftbound.Network
                         yield return new WaitForSeconds(0.2f);
                     bool sawMounted = clientAvatar != null && clientAvatar.IsMounted.Value;
                     bool sawQuest = clientAvatar != null && clientAvatar.QuestAccepted.Value;
+                    bool sawObsGv = HasValidObserverGrounding(clientAvatar);
 
                     float waitDisc = Time.realtimeSinceStartup;
                     while (Time.realtimeSinceStartup - waitDisc < 12f && RiftboundCoopPlayer.AllPlayers.Count > 1)
@@ -1384,15 +1388,18 @@ namespace Riftbound.Network
                     float waitRejoin = Time.realtimeSinceStartup;
                     while (Time.realtimeSinceStartup - waitRejoin < 18f && RiftboundCoopPlayer.AllPlayers.Count < 2)
                         yield return new WaitForSeconds(0.2f);
+                    yield return new WaitForSeconds(0.4f);
+                    var rejoinedAvatar = GetFirstRemotePlayer();
                     bool rejoined = RiftboundCoopPlayer.AllPlayers.Count >= 2;
+                    bool rejoinObsGv = HasValidObserverGrounding(rejoinedAvatar);
 
                     float waitDisc2 = Time.realtimeSinceStartup;
                     while (Time.realtimeSinceStartup - waitDisc2 < 12f && RiftboundCoopPlayer.AllPlayers.Count > 1)
                         yield return new WaitForSeconds(0.2f);
                     int finalPlayers = RiftboundCoopPlayer.AllPlayers.Count;
 
-                    clientLeavePass = sawMounted && sawQuest && afterPlayers == 1 && rejoined && finalPlayers == 1 && nm != null && nm.IsListening;
-                    combatInfo += $", hostDisconnectRecovery={(clientLeavePass ? "PASS" : "FAIL")}(mounted={sawMounted},quest={sawQuest},playersAfter={afterPlayers},rejoined={rejoined},finalPlayers={finalPlayers})";
+                    clientLeavePass = sawMounted && sawQuest && sawObsGv && afterPlayers == 1 && rejoined && rejoinObsGv && finalPlayers == 1 && nm != null && nm.IsListening;
+                    combatInfo += $", hostDisconnectRecovery={(clientLeavePass ? "PASS" : "FAIL")}(mounted={sawMounted},quest={sawQuest},obs={sawObsGv},playersAfter={afterPlayers},rejoined={rejoined},rejoinObs={rejoinObsGv},finalPlayers={finalPlayers})";
                 }
                 else
                 {
@@ -1734,7 +1741,7 @@ namespace Riftbound.Network
                         while (Time.realtimeSinceStartup - waitLm2 < 10f && (clientAvatar == null || !clientAvatar.IsMounted.Value))
                             yield return new WaitForSeconds(0.2f);
                         bool zebraSeenOnHost = clientAvatar != null && clientAvatar.IsMounted.Value && clientAvatar.MountId.Value.ToString() == "zebra";
-                        bool realMountMeshOk = clientAvatar != null && clientAvatar.RemoteMountComponent != null && !clientAvatar.HasRemoteCapsuleFallback && clientAvatar.RemoteMountComponent.animator != null;
+                        bool realMountMeshOk = clientAvatar != null && clientAvatar.RemoteMountComponent != null && !clientAvatar.HasRemoteCapsuleFallback && clientAvatar.RemoteMountComponent.animator != null && HasValidObserverGrounding(clientAvatar);
 
                         int gBeforeTemper = clientAvatar != null ? clientAvatar.Gold.Value : 0;
                         float waitTemperH = Time.realtimeSinceStartup;
@@ -1750,7 +1757,7 @@ namespace Riftbound.Network
                         while (Time.realtimeSinceStartup - waitDownH < 6f && clientAvatar != null && clientAvatar.Health.Value > 0)
                             yield return new WaitForSeconds(0.15f);
                         yield return new WaitForSeconds(0.2f);
-                        bool mountClearedOnDeath = clientAvatar != null && !clientAvatar.IsMounted.Value && clientAvatar.RemoteMountComponent == null;
+                        bool mountClearedOnDeath = clientAvatar != null && !clientAvatar.IsMounted.Value && clientAvatar.RemoteMountComponent == null && IsWrapperAtRest(clientAvatar);
                         yield return new WaitForSeconds(1.6f); // Let dead client fail invalid RPCs
                         RiftboundCoopPlayer.LocalOwner.RequestReviveAlly(remoteCid); // Must fail > 5m
                         yield return new WaitForSeconds(0.6f);
@@ -1782,8 +1789,9 @@ namespace Riftbound.Network
                             yield return new WaitForSeconds(0.8f);
                         }
 
-                        authorityPass = hostChestOk && zebraSeenOnHost && realMountMeshOk && mountClearedOnDeath && farRevBlocked && nearRevOk;
-                        combatInfo += $", hostAuth={(authorityPass ? "PASS" : "FAIL")}(chest={hostChestOk},zebra={zebraSeenOnHost},realMnt={realMountMeshOk},mntClr={mountClearedOnDeath},farRevRej={farRevBlocked},nearRev={nearRevOk})";
+                        bool obsRevOk = HasValidObserverGrounding(clientAvatar) && clientAvatar.IsRemoteObserverAlive && !clientAvatar.IsRemoteObserverMounted && IsWrapperAtRest(clientAvatar);
+                        authorityPass = hostChestOk && zebraSeenOnHost && realMountMeshOk && mountClearedOnDeath && farRevBlocked && nearRevOk && obsRevOk;
+                        combatInfo += $", hostAuth={(authorityPass ? "PASS" : "FAIL")}(chest={hostChestOk},zebra={zebraSeenOnHost},realMnt={realMountMeshOk},mntClr={mountClearedOnDeath},farRevRej={farRevBlocked},nearRev={nearRevOk},obsGv={obsRevOk})";
                     }
                     else
                     {
@@ -1948,9 +1956,11 @@ namespace Riftbound.Network
                             potCdRej = lp.Potions == potsBeforeUse - 1 && me.Health.Value == hpAfterPot;
                         }
 
+                        var hostPeer = GetFirstRemotePlayer();
+                        bool peerObsGvOk = HasValidObserverGrounding(hostPeer) && IsWrapperAtRest(hostPeer);
                         bool leaderSpoofRej = !me.IsLeader.Value && me.ReadyStatus.Value == 0;
-                        authorityPass = posClampOk && outRangeRej && unknownAtkRej && cooldownRej && goldAfterChest > 0 && aliveRespRej && restFullRej && dupLmRej && zebraBlockedEarly && zebraUnlockedOk && temperOk && deadRejOk && revBackOk && restDmgOk && potOk && potCdRej && leaderSpoofRej;
-                        combatInfo += $", clientAuth={(authorityPass ? "PASS" : "FAIL")}(clamp={posClampOk},rngRej={outRangeRej},unkAtkRej={unknownAtkRej},cdRej={cooldownRej},aliveRespRej={aliveRespRej},restRej={restFullRej},dupLmRej={dupLmRej},zEarly={zebraBlockedEarly},zOk={zebraUnlockedOk},temper={temperOk},deadRej={deadRejOk},rev={revBackOk},restOk={restDmgOk}[g={restG0}->{me.Gold.Value},h={restH0}->{me.Health.Value}/{me.MaxHealth.Value}],potOk={potOk},potCdRej={potCdRej},ldrSpoofRej={leaderSpoofRej})";
+                        authorityPass = posClampOk && outRangeRej && unknownAtkRej && cooldownRej && goldAfterChest > 0 && aliveRespRej && restFullRej && dupLmRej && zebraBlockedEarly && zebraUnlockedOk && temperOk && deadRejOk && revBackOk && restDmgOk && potOk && potCdRej && leaderSpoofRej && peerObsGvOk;
+                        combatInfo += $", clientAuth={(authorityPass ? "PASS" : "FAIL")}(clamp={posClampOk},rngRej={outRangeRej},unkAtkRej={unknownAtkRej},cdRej={cooldownRej},aliveRespRej={aliveRespRej},restRej={restFullRej},dupLmRej={dupLmRej},zEarly={zebraBlockedEarly},zOk={zebraUnlockedOk},temper={temperOk},deadRej={deadRejOk},rev={revBackOk},restOk={restDmgOk}[g={restG0}->{me.Gold.Value},h={restH0}->{me.Health.Value}/{me.MaxHealth.Value}],potOk={potOk},potCdRej={potCdRej},ldrSpoofRej={leaderSpoofRej},obsGv={peerObsGvOk})";
                     }
                 }
                 else
@@ -1984,6 +1994,7 @@ namespace Riftbound.Network
                 }
                 yield return new WaitForSeconds(0.6f);
                 bool horseReal = peer != null && peer.IsMounted.Value && peer.RemoteMountComponent != null && !peer.HasRemoteCapsuleFallback && peer.MountId.Value.ToString() == "horse";
+                bool obsBefore = HasValidObserverGrounding(peer);
                 if (!string.IsNullOrEmpty(capDir))
                 {
                     ScreenCapture.CaptureScreenshot(System.IO.Path.Combine(capDir, (isHost ? "host" : "guest") + "_horse_roster.png"));
@@ -2022,11 +2033,12 @@ namespace Riftbound.Network
                     yield return new WaitForSeconds(0.15f);
                 yield return new WaitForSeconds(0.3f);
                 bool dismountClear = peer != null && !peer.IsMounted.Value && peer.RemoteMountComponent == null;
+                bool obsAfter = HasValidObserverGrounding(peer) && IsWrapperAtRest(peer);
 
                 me.TriggerActionAnim("Dodge", 0.32f);
                 yield return new WaitForSeconds(0.45f);
-                visualPass = horseReal && gryphonReal && dismountClear;
-                combatInfo += $", visualSmoke={(visualPass ? "PASS" : "FAIL")}(horseReal={horseReal},gryphonReal={gryphonReal},dismountClear={dismountClear})";
+                visualPass = horseReal && gryphonReal && dismountClear && obsBefore && obsAfter;
+                combatInfo += $", visualSmoke={(visualPass ? "PASS" : "FAIL")}(horseReal={horseReal},gryphonReal={gryphonReal},dismountClear={dismountClear},obsBefore={obsBefore},obsAfter={obsAfter})";
             }
 
             bool pass = players >= minPlayers && RiftboundCoopPlayer.LocalOwner != null && activeCams == 1 && activeListeners == 1 && sep >= 1.0f && combatPass && lateJoinPass && progPass && clientLeavePass && fullAcceptPass && authorityPass && visualPass;
@@ -2037,6 +2049,19 @@ namespace Riftbound.Network
             yield return new WaitForSeconds(0.5f);
             Application.Quit(pass ? 0 : 1);
         }
+
+        static bool HasValidObserverGrounding(RiftboundCoopPlayer p) =>
+            p != null
+            && !p.IsOwner
+            && p.RemoteVisualRoot != null
+            && p.RemoteAnimator != null
+            && p.IsObserverContextBound
+            && p.GetComponents<GroundedVisual>().Length == 1;
+
+        static bool IsWrapperAtRest(RiftboundCoopPlayer p) =>
+            p != null
+            && p.RemoteVisualRoot != null
+            && p.RemoteVisualRoot.transform.localPosition.sqrMagnitude < 0.0001f;
 
         /// <summary>Picks an un-gated LootChest deterministically across Host and Client.</summary>
         static LootChest FindDeterministicTestChest(int minGold, bool pickHighest)
