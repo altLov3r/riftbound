@@ -1,8 +1,0 @@
-SUPPLIES APPLIED UTC=2026-11-16T08:04:16.8019907Z
-Emberwatch packed supply crate: position=(-13.000, -0.114, -5.000), spread=0.000, activeRenderers=1, colliders=1
-Emberwatch outbound supply crate: position=(-11.600, -0.114, -4.850), spread=0.000, activeRenderers=1, colliders=1
-Emberwatch provision barrel: position=(-12.800, -0.170, -6.400), spread=0.000, activeRenderers=1, colliders=1
-Willow Rest resting bench: position=(-287.000, 6.036, 46.000), spread=0.043, activeRenderers=1, colliders=1
-Willow Rest provision barrel: position=(-285.200, 5.982, 45.800), spread=0.000, activeRenderers=1, colliders=1
-PASS after-save/reload: root count, exact transforms, source prefab links, grounding and clearance.
-Only new inert prop instances added. No source prefab/material, building, NPC, ID, terrain, paint or runtime logic changed.

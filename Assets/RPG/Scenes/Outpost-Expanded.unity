@@ -166560,7 +166560,7 @@ GameObject:
   m_Component:
   - component: {fileID: 609671006}
   m_Layer: 0
-  m_Name: Codex Overnight route refinements
+  m_Name: Route refinements
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -493434,7 +493434,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1768412084}
   m_Layer: 0
-  m_Name: Codex reference-route supplies
+  m_Name: Route supplies
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

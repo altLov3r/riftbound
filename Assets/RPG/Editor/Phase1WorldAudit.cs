@@ -202,7 +202,7 @@ namespace Riftbound.Editor
         public static void AuditTerrainSnapshot()
         {
             if (!Application.isBatchMode) throw new InvalidOperationException("Terrain snapshot audit is batch-only.");
-            const string folder = "Assets/CodexWorldAuditSnapshot/";
+            const string folder = "Assets/WorldAuditSnapshot/";
             var objects = new List<GameObject>(); var terrains = new List<Terrain>();
             var sb = new StringBuilder("TERRAIN SNAPSHOT AUDIT: source hashes/assignments in world-audit-scene-references.json and snapshot manifest.\n");
             sb.AppendLine("No source scene loaded/saved; no scene colliders or rendered-tree verification. Heights/grades only.");

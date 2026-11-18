@@ -1,4 +1,4 @@
-// Staged outside Assets while Antigravity owns the live project/build.
+// Preparation tools do not apply changes to the live scene.
 // Compile/run only in the isolated validation project's Editor folder until scene handoff.
 using System;
 using System.IO;
@@ -10,7 +10,7 @@ namespace Riftbound.Editor
 {
     public static class ReaverRepairPreparation
     {
-        const string SnapshotFolder = "Assets/CodexWorldAuditSnapshot/";
+        const string SnapshotFolder = "Assets/WorldAuditSnapshot/";
 
         public static void VerifySnapshot()
         {

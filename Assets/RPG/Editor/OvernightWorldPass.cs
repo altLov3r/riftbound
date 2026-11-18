@@ -17,8 +17,8 @@ namespace Riftbound.Editor
 
         static void OpenWorld()
         {
-            if (!Application.isBatchMode || !File.Exists("Docs/Overnight/OWN_CODEX_RUN.md"))
-                throw new InvalidOperationException("Use the isolated Codex batch checkout.");
+            if (!Application.isBatchMode || !File.Exists(".coordination/world-edit-context.md"))
+                throw new InvalidOperationException("Use an isolated batch checkout with local edit authorization.");
             Directory.CreateDirectory(Evidence);
             EditorSceneManager.OpenScene(WorldRegions.ScenePath);
             Physics.SyncTransforms();
@@ -208,8 +208,8 @@ namespace Riftbound.Editor
                 report.AppendLine("No scene saved. NOT RUN: individual rendered tree-base/collider review, full normal-input route/mounted-camera acceptance, live NavMesh and rendered performance comparison.");
                 File.WriteAllText(Evidence + "final-world-checks.txt", report.ToString());
 
-                const string output = "Builds/OvernightCodexWorld/Riftbound.exe";
-                if (Directory.Exists("Builds/OvernightCodexWorld"))
+                const string output = "Builds/WorldValidation/Riftbound.exe";
+                if (Directory.Exists("Builds/WorldValidation"))
                     throw new InvalidOperationException("Build output already exists; inspect rather than overwrite.");
                 var result = BuildPipeline.BuildPlayer(new BuildPlayerOptions
                 {

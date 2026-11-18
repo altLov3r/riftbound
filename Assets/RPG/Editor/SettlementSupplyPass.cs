@@ -16,7 +16,7 @@ namespace Riftbound.Editor
     public static class SettlementSupplyPass
     {
         const string Folder=".code-check/world-production/supplies/";
-        const string RootName="Codex reference-route supplies";
+        const string RootName="Route supplies";
         const string Props="Assets/RPG/Art/FantasyProps/FBX/";
         [Serializable] internal sealed class Placement
         {

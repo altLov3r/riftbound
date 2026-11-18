@@ -41,7 +41,7 @@ namespace Riftbound.Editor
         {
             try
             {
-                if (!Application.isBatchMode || !File.Exists("Docs/Overnight/OWN_CODEX_RUN.md")) throw new Exception("Isolated Codex batch only.");
+                if (!Application.isBatchMode || !File.Exists(".coordination/world-edit-context.md")) throw new Exception("Isolated batch with local edit authorization only.");
                 EditorSceneManager.OpenScene(WorldRegions.ScenePath); Physics.SyncTransforms();
                 var report = new StringBuilder($"WORLD TRAVERSAL GEOMETRY UTC={DateTime.UtcNow:O}\n");
                 report.AppendLine("Real scene physics + CharacterController.Move; not actual input/animation/network/NavMesh acceptance. Mount includes current predictive box sweep.");
@@ -68,7 +68,7 @@ namespace Riftbound.Editor
         {
             try
             {
-                if (!Application.isBatchMode || !File.Exists("Docs/Overnight/OWN_CODEX_RUN.md")) throw new Exception("Isolated Codex batch only.");
+                if (!Application.isBatchMode || !File.Exists(".coordination/world-edit-context.md")) throw new Exception("Isolated batch with local edit authorization only.");
                 EditorSceneManager.OpenScene(WorldRegions.ScenePath);
                 var terrain = WorldRegions.TerrainAt(new Vector3(-255, 6, 50));
                 var collider = terrain.GetComponent<TerrainCollider>();

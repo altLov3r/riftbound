@@ -722,7 +722,7 @@ namespace Riftbound.Network
             }
 
             var localOwner = RiftboundCoopPlayer.LocalOwner;
-            GUI.Label(new Rect(mx + 16f, rowY, mw - 32f, 18f), "ACTIVE ROSTER (Human Peers Only — AI Companions Opt-In Below)", rosterSubStyle);
+            GUI.Label(new Rect(mx + 16f, rowY, mw - 32f, 18f), "PARTY MEMBERS", rosterSubStyle);
             rowY += 22f;
 
             foreach (var p in sortedPeers)
@@ -758,7 +758,7 @@ namespace Riftbound.Network
                 localOwner?.RequestMapPing(localOwner.transform.position);
             if (GUI.Button(new Rect(mx + 162f, btnY, 146f, 28f), "Ready Check [F7]"))
                 localOwner?.RequestReadyCheck();
-            if (GUI.Button(new Rect(mx + 316f, btnY, 138f, 28f), "AI Crew [G]"))
+            if (GUI.Button(new Rect(mx + 316f, btnY, 138f, 28f), "Companions [G]"))
             {
                 CloseGroupMenu();
                 PartySystem.Instance?.ToggleCompanionMenu();

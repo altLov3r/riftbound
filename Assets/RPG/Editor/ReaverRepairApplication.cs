@@ -27,7 +27,7 @@ namespace Riftbound.Editor
             try
             {
                 if (!Application.isBatchMode) throw new InvalidOperationException("Coordinated batch operation only.");
-                if (!File.ReadAllText("Docs/ONLINE_MULTIPLAYER_STATUS.md").Contains("**SCENE RELEASED**"))
+                if (!File.ReadAllText(".coordination/scene-status.md").Contains("**SCENE RELEASED**"))
                     throw new InvalidOperationException("Explicit scene release is required.");
                 if (File.Exists(Target) || File.Exists(Target + ".meta")) throw new InvalidOperationException("Destination exists; refusing replacement.");
                 string sourceHash = Hash(Source), gradedHash = Hash(Graded), sceneHash = Hash(WorldRegions.ScenePath);
@@ -159,7 +159,7 @@ namespace Riftbound.Editor
             TerrainData preview = null;
             try
             {
-                if (!Application.isBatchMode || !File.ReadAllText("Docs/ONLINE_MULTIPLAYER_STATUS.md").Contains("**SCENE RELEASED**"))
+                if (!Application.isBatchMode || !File.ReadAllText(".coordination/scene-status.md").Contains("**SCENE RELEASED**"))
                     throw new InvalidOperationException("Coordinated batch scene release required.");
                 if (File.Exists(safeTarget) || File.Exists(safeTarget + ".meta")) throw new InvalidOperationException("Final destination exists.");
                 string originalHash = Hash(Source), gradedHash = Hash(Graded);

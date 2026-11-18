@@ -177,7 +177,7 @@ namespace Riftbound
             State = QueueState.ProposalReady;
             ProposalCountdown = ProposalDuration;
 
-            // Reset proposal flags; AI companions accept automatically within 1.5s
+            // Reset proposal flags; companions accept automatically within 1.5s
             for (int i = 0; i < proposalReady.Length; i++) proposalReady[i] = false;
             proposalReady[0] = true; // Tank accepted
             proposalReady[1] = true; // Healer accepted
@@ -216,7 +216,7 @@ namespace Riftbound
                 if (cc) cc.enabled = true;
             }
 
-            // Spawn or assemble AI companions in party
+            // Spawn or assemble companions in party
             if (PartySystem.Instance)
             {
                 PartySystem.Instance.SeedInitialParty(true);

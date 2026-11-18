@@ -1,5 +1,0 @@
-SUPPLY NATIVE PREVIEW UTC=2026-11-16T08:12:54.1265091Z final=True
-1280x720; simulation paused, UI hidden, same camera/settings. Editor capture-frame timings only, not standalone GPU FPS. Warm20 rendered frames, sample90 per view.
-Emberwatch-yard-final medianMs=9.004 p95Ms=10.130 batches=0 triangles=1584250 activeSceneRenderers=4817
-Emberwatch-departure-final medianMs=11.309 p95Ms=12.613 batches=0 triangles=5599249 activeSceneRenderers=4807
-Willow-Rest-final medianMs=9.778 p95Ms=10.625 batches=0 triangles=1080597 activeSceneRenderers=4807

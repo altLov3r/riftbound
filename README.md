@@ -1,59 +1,48 @@
 # Riftbound
 
-A small 3D fantasy RPG built in Unity for a diploma project and competition.
+A 3D fantasy RPG built with Unity for a diploma project and competition. Explore connected settlements, complete quests, choose a race and class, and play solo or in an online party of up to four players.
 
-## Open and play
+## Run the project
 
-1. Install Git and Git LFS, then run `git lfs install` once.
-2. Clone this repository and run `git lfs pull` inside it.
-3. Add the cloned folder in Unity Hub and open it with **Unity 6000.6.2f1**.
-4. Let Unity import assets and install the packages from `Packages/`.
-5. Open `Assets/RPG/Scenes/Outpost-Expanded.unity`, press Play, choose **Play** on the title screen, select a character and choose **Enter World**.
+1. Install Git LFS and run `git lfs install`.
+2. Clone the repository, then run `git lfs pull`.
+3. Open the project in Unity Hub using **Unity6000.6.2f1**.
+4. Open `Assets/RPG/Scenes/Outpost-Expanded.unity` and press Play.
+5. Select a character and enter the world. Use the Game tab for keyboard and mouse input.
 
-Use the Game tab for playing. `Riftbound > Direct Play in Editor` bypasses character selection for quick testing.
-The opening screen is a local single-player menu. Gameplay uses painted class-ability icons, contextual hints and a compact active-quest tracker; secondary panels remain under MENU. See `Docs/PRESENTATION_UPDATE.md`.
-While playing, `Riftbound > Validate Play Mode startup` checks the player, camera, HUD and keyboard connections.
+## Play
 
-## Controls
+| Action | Control |
+| --- | --- |
+| Move / camera / jump | WASD / mouse / Space |
+| Slow walk | C |
+| Interact / select target | E / Tab |
+| Core abilities |1â€“4 |
+| Summon or dismiss mount / select mount | Z / V |
+| Inventory / quest journal / map | I / J / M |
+| Group menu / companions | O / G |
+| Map ping / ready check | F6 / F7 |
+| Close panel / settings | Escape |
 
-- WASD: move; mouse buttons: camera; mouse wheel: zoom; Space: jump.
-- C: toggle slow walking; E: interact; Tab: select a target.
-- Z: summon/dismiss mount; V: cycle unlocked mounts.
-- I: inventory; J: quests; M: map; Escape: settings/pause.
+Characters start solo; companions are optional. Online parties use a private invite code, shared only with the people joining. Online progress is currently session-only and does not replace offline character saves. Host migration is not supported.
 
-You start solo. Use **MENU > Companions** to call or dismiss allies; `/crew` opens the same panel. Chat and the damage meter start hidden. The expanded world covers 768 × 768 metres with separate settlements, connecting roads, a river crossing and mountain switchbacks. See `Docs/WORLD_ZONES.md` for the layout.
+The current world includes Emberwatch, Highspire, Westbank, Greenhollow and the Reaver camp. Four classes and six races have character variants; animation and mount presentation are still being refined.
 
-In the quest journal, **Track Main Quest** creates a live minimap waypoint. It follows the next raider or supply crate and returns to Abe when the objective is ready. Placing a manual waypoint stops automatic tracking.
+## Documentation
 
-Enemies award XP on defeat. Press **E** near their remains to collect gold, bone shards and equipment. Unclaimed loot survives save/reload with its remaining two-minute gameplay timer; claimed rewards stay claimed.
+- [Gameplay](Docs/GAMEPLAY.md)
+- [World zones](Docs/WORLD_ZONES.md)
+- [Lore](Docs/Lore/RIFTBOUND_LORE_BIBLE.md)
+- [Online setup](Docs/ONLINE_SETUP.md)
+- [Development and builds](Docs/Development/README.md)
+- [Validation](Docs/VALIDATION.md)
+- [Roadmap](Docs/ROADMAP.md)
+- [Release plan](Docs/RELEASE_PLAN.md)
 
-More controls and project notes are in `CHARACTER_UPDATE.md`, `TASKS.md` and `HANDOFF.md`.
+## Contributing
 
-For the optional **Charting the Frontier** quest, speak with **Cartographer Elara at Greenhollow Post**. Survey Westbank Overlook, Bloodrock Vista and Wyrmcrest Lookout, then return for gold, XP and Traveler's Charm. The quest tracks your next destination and counts earlier discoveries. See `Docs/FRONTIER_UPDATE.md` for testing and build details.
-
-Elara then offers **Silence the River Reavers**: defeat Captain Selvek at the western river camp and return for Riverwarden's Signet. A graded trail connects the camp to the Westbank road. See `Docs/REAVER_UPDATE.md` for the latest build and test route.
-
-## Work with a teammate
-
-- Each person clones into a separate local folder. Never share `Library/` or `Temp/`.
-- Pull before working. Use a separate branch per task and merge through pull requests.
-- Commit assets together with their `.meta` files; move or rename assets inside Unity.
-- Agree who edits a scene or prefab. Avoid simultaneous edits to the same scene.
-- Commit `Assets/`, `Packages/` and `ProjectSettings/`. Builds, caches, saves and Unity VC metadata stay local.
-- For script changes, use small commits. Keep models and textures in Git LFS.
-
-Unity VC metadata is retained locally as a fallback; new work is tracked with Git. This repository begins with the current project snapshot, not imported Unity VC history.
-
-## Windows build
-
-Exit Play Mode and choose **Riftbound > Build Windows demo**. The executable is written to `Builds/Windows/Riftbound.exe` and is intentionally ignored by Git.
+Use a separate checkout and branch per task. Keep models and textures in Git LFS, commit Unity `.meta` files with their assets, and coordinate scene/prefab ownership before editing. Builds, caches, saves and local workspace records are excluded from Git.
 
 ## Assets
 
-Keep the repository private while the source/license records for all imported character and prop assets are completed. Existing attribution and license files are preserved under `Assets/RPG/`; see `Assets/RPG/CHARACTER_ASSETS.md`.
-
-## Quest regression check
-
-Use an isolated Unity project copy containing `Assets/`, `Packages/` and `ProjectSettings/`. Start Unity in batch mode with `-executeMethod Riftbound.Editor.QuestRouteSmokeTest.Run` and without `-quit`; the check exits when finished. It creates a fresh test save under `.code-check/` and writes `QuestRouteSmokeResult.txt`.
-
-The check covers startup, movement, solo/companion controls, four terrain tiles, relocated spawns/taxis, Abe's three quests, enemy eligibility, loot collection, legacy save compatibility and live quest navigation. Defeats are simulated through the combat damage API; visual quality and combat balance still need manual testing.
+Attribution and source records remain under `Assets/RPG/`, including [character asset records](Assets/RPG/CHARACTER_ASSETS.md). Some imported assets still need source/license review before public redistribution. Existing license and attribution files must stay with their assets.

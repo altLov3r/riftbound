@@ -1,3 +1,0 @@
-PRODUCTION BUILD PROTECTION UTC=2026-11-16T08:15:21.9356301Z
-PASS: 813 trees, 8 layer references, every paint texel, detail prototype/density, terrain hole and outside-footprint height preserved.
-PASS Terrain/Collider, 15 prototypes, grade=27.92

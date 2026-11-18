@@ -114,31 +114,31 @@ namespace Riftbound.Editor
             if (Application.isBatchMode) EditorApplication.Exit(0);
         }
 
-        [MenuItem("Riftbound/Build Production Gemini Gameplay Standalone")]
-        public static void BuildProductionGeminiGameplay()
+        [MenuItem("Riftbound/Build Production Gameplay Standalone")]
+        public static void BuildProductionGameplay()
         {
-            BuildStandaloneTo("Builds/ProductionGeminiGameplay", "Production");
+            BuildStandaloneTo("Builds/ProductionGameplay", "Production");
         }
 
-        [MenuItem("Riftbound/Multiplayer/Build Overnight Antigravity Online")]
-        public static void BuildOvernightAntigravityOnline()
+        [MenuItem("Riftbound/Multiplayer/Build Online Validation")]
+        public static void BuildOnlineValidation()
         {
-            BuildStandaloneTo("Builds/OvernightAntigravityOnline", "Overnight");
+            BuildStandaloneTo("Builds/OnlineValidation", "Overnight");
         }
 
-        [MenuItem("Riftbound/Build Combat Antigravity Refinement 01")]
+        [MenuItem("Riftbound/Build Combat Refinement 01")]
         public static void BuildCombatRefinement01()
         {
             BuildStandaloneTo("Builds/RiftboundCombat01", "CombatRefinement01");
         }
 
-        [MenuItem("Riftbound/Build Multiplayer Antigravity Presentation 01")]
+        [MenuItem("Riftbound/Build Multiplayer Presentation 01")]
         public static void BuildMultiplayerPolish01()
         {
             BuildStandaloneTo("Builds/RiftboundPresentation01", "MultiplayerPresentation01");
         }
 
-        [MenuItem("Riftbound/Build Multiplayer Antigravity Presentation 02")]
+        [MenuItem("Riftbound/Build Multiplayer Presentation 02")]
         public static void BuildMultiplayerPolish02()
         {
             BuildStandaloneTo("Builds/RiftboundPresentation02", "MultiplayerPresentation02");

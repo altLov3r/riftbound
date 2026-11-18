@@ -1,6 +1,6 @@
 # Riftbound — the March of Nine Hearths
 
-Creative canon v1,16–17 November 2026. Written for the existing Riftbound map, characters and compact cooperative RPG. This is authored story/content, not a claim that dialogue, schedules or new quests are installed. NPC implementation contracts live in NPC_STORY_CONTRACTS.md; combat delivery lives in ../Design/COMBAT_REFINEMENT_PLAN.md and ../Integration/POST_INTEGRATION_PLAN.md.
+Creative canon v1,16–17 November 2026. Written for the existing Riftbound map, characters and compact cooperative RPG. This is authored story/content, not a claim that dialogue, schedules or new quests are installed. NPC implementation contracts live in NPC_STORY_CONTRACTS.md; combat design lives in ../Design/COMBAT_REFINEMENT_PLAN.md.
 
 ## 1. The promise at the centre
 
@@ -164,8 +164,8 @@ These are authored content concepts, not spawned loot or approved placement edit
 9. Art direction follows material causes: archive seals, repaired timber, honest measures, weathered witnesses and practical work. Do not cover the map in glowing Rift particles or identical crates.
 10. Player-visible text cannot promise content, durable online persistence, map regions or choices that are not present. Lore depth should increase coherence, not multiply unfinished systems.
 
-## 11. First deliverable and ownership
+## 11. Reference slice and implementation boundaries
 
-**Codex owns authored canon, NPC voice/state content, regional clue/placement contracts and read-only content validation. Antigravity owns runtime dialogue/state adapters, combat/AI/network behavior and regression.** Actual scene/prefab/terrain changes need their specific reviewed scope and a single owner. FactionQuestSystem.cs mixes definitions and runtime and remains entirely Antigravity-owned; Codex supplies external content contracts instead of parallel edits to that file.
+Narrative design covers canon, NPC voice and state-aware content, regional clues and content validation. Runtime development covers dialogue/state adapters, combat, enemy behavior, networking and regression checks. Scene, prefab and terrain changes require a reviewed scope and one editor at a time. FactionQuestSystem.cs combines definitions and runtime behavior; supply narrative changes through the shared content contract rather than editing quest logic concurrently.
 
 First reference slice: Abe → Rowan/Mira → Elara's existing survey → Selvek's existing bounty. Preserve the initial tutorial and all quest eligibility/reward behavior. Implement a small state-aware dialogue catalog for those five identities, then one readable raider/guard/hexer encounter using existing assets. Do not start new regions/classes or rewrite all NPC systems before this slice works offline and in co-op.

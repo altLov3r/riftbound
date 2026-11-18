@@ -55,3 +55,29 @@
 # Adobe's vendor source assembly is named Library; it is not Unity's generated cache.
 !/Assets/Adobe/Substance3DForUnity/Connector/Library/
 !/Assets/Adobe/Substance3DForUnity/Connector/Library/**
+
+# Local workspace notes
+/.coordination/
+/HANDOFF.md
+/TASKS.md
+/ASSET_REQUESTS.md
+/CHARACTER_UPDATE.md
+/PROTOTYPE.md
+
+# Publish maintained documentation; keep working records local.
+/Docs/*
+!/Docs/Design/
+!/Docs/Lore/
+!/Docs/Development/
+!/Docs/Integration/
+!/Docs/WORLD_ZONES.md
+!/Docs/ONLINE_SETUP.md
+!/Docs/VALIDATION.md
+!/Docs/GAMEPLAY.md
+!/Docs/ROADMAP.md
+!/Docs/RELEASE_PLAN.md
+/Docs/Design/*
+!/Docs/Design/COMBAT_REFINEMENT_PLAN.md
+/Docs/Integration/*
+!/Docs/Integration/Verify-CombinedRelay.ps1
+!/Docs/Integration/README.md

@@ -1,7 +1,0 @@
-UTC=2026-11-16T16:05:44.2535176Z
-Path=Builds/RiftboundCombined02/Riftbound.exe
-Result=Succeeded
-Errors=0
-Warnings=815
-Duration=00:00:30.7651002
-Bytes=542645635

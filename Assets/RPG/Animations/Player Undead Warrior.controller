@@ -98,7 +98,7 @@ AnimatorState:
   m_MirrorParameterActive: 0
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
-  m_Motion: {fileID: -3100369314251171874, guid: 7d25d53b3a94a2d40947a5e01b34c24d, type: 3}
+  m_Motion: {fileID: 7779023693546330386, guid: 7d25d53b3a94a2d40947a5e01b34c24d, type: 3}
   m_Tag: 
   m_SpeedParameter: 
   m_MirrorParameter: 
@@ -187,7 +187,7 @@ AnimatorState:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: WalkBack
-  m_Speed: -1
+  m_Speed: 1
   m_CycleOffset: 0
   m_Transitions: []
   m_StateMachineBehaviours: []
@@ -199,7 +199,7 @@ AnimatorState:
   m_MirrorParameterActive: 0
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
-  m_Motion: {fileID: 7060811993321468294, guid: 7d25d53b3a94a2d40947a5e01b34c24d, type: 3}
+  m_Motion: {fileID: -6411013857362534180, guid: 7d25d53b3a94a2d40947a5e01b34c24d, type: 3}
   m_Tag: 
   m_SpeedParameter: 
   m_MirrorParameter: 
@@ -213,7 +213,7 @@ AnimatorState:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: Jump
-  m_Speed: 0.75
+  m_Speed: 1
   m_CycleOffset: 0
   m_Transitions: []
   m_StateMachineBehaviours: []
@@ -225,7 +225,7 @@ AnimatorState:
   m_MirrorParameterActive: 0
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
-  m_Motion: {fileID: 3543698089625107784, guid: 7d25d53b3a94a2d40947a5e01b34c24d, type: 3}
+  m_Motion: {fileID: 5069180758234724613, guid: 7d25d53b3a94a2d40947a5e01b34c24d, type: 3}
   m_Tag: 
   m_SpeedParameter: 
   m_MirrorParameter: 

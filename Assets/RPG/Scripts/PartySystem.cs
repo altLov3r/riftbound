@@ -368,7 +368,7 @@ namespace Riftbound
             for (int i = 0; i < members.Count; i++)
             {
                 members[i].readyStatus = ReadyStatus.Pending;
-                // AI companions decide to ready up after 1.2s to 3.0s
+                // Companions decide to ready up after 1.2s to 3.0s
                 members[i].readyDecisionTime = now + UnityEngine.Random.Range(1.2f, 3.2f);
             }
 

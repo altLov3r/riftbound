@@ -31,7 +31,7 @@ namespace Riftbound.Editor
 
         static void Open()
         {
-            if (!Application.isBatchMode || !File.Exists("Docs/Overnight/OWN_CODEX_RUN.md")) throw new Exception("Isolated Codex batch only.");
+            if (!Application.isBatchMode || !File.Exists(".coordination/world-edit-context.md")) throw new Exception("Isolated batch with local edit authorization only.");
             Directory.CreateDirectory(Evidence); EditorSceneManager.OpenScene(WorldRegions.ScenePath); Physics.SyncTransforms();
         }
 
@@ -129,7 +129,7 @@ namespace Riftbound.Editor
             try
             {
                 Open();
-                if (GameObject.Find("Codex Overnight route refinements")) throw new Exception("Route refinements already exist; inspect instead of reapplying.");
+                if (GameObject.Find("Route refinements")) throw new Exception("Route refinements already exist; inspect instead of reapplying.");
                 var north = FindNorthGatePath();
                 var riverJunction = Ground(new Vector3(-225, 0, 0));
                 if (!ClearLine(north[north.Count - 1], riverJunction)) throw new Exception("North gate to river road is obstructed; inspect before connecting.");
@@ -142,7 +142,7 @@ namespace Riftbound.Editor
                 if (fences.Length != 2 || fences.Any(t => Vector2.Distance(new Vector2(t.position.x, t.position.z), new Vector2(-19, 0)) > 8))
                     throw new Exception("Unexpected fence layout; no bulk changes permitted.");
                 Directory.CreateDirectory(Folder); AssetDatabase.Refresh();
-                var root = new GameObject("Codex Overnight route refinements").transform;
+                var root = new GameObject("Route refinements").transform;
                 foreach (var fence in fences)
                 {
                     report.AppendLine($"Intentional west-exit opening: retained inactive fence segment at {fence.position}");

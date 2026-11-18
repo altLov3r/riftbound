@@ -1,39 +1,28 @@
-# GitHub migration and playable build — 2026-10-31
+# Validation
 
-For the newer QuestUpdate build and 57 quest/loot/navigation checks, see `Docs/QUEST_ROUTE_PASS.md`. This document preserves the migration pass results.
+Use an isolated checkout and unique evidence paths. Compile after source/package changes. Never replace a failed assertion with a weaker expectation to obtain a pass.
 
-## Repository
+## Unity entrypoints
 
-- Private repository: https://github.com/altLov3r/riftbound
-- Initial project snapshot: `66dbd55`.
-- Models, textures, audio and native plugins use Git LFS. LFS integrity check passed, and the initial upload completed.
-- Unity VC package removed; visible `.meta` files and text serialization retained. Original `.plastic` metadata remains local.
-- Generated performance-test metadata, caches, diagnostic output and builds are ignored. Ignoring these files does not delete their local copies.
+Run batch methods with `-batchmode -projectPath <checkout> -executeMethod <method> -logFile <ignored evidence file>`. PlayMode methods manage their own exit; omit `-quit`. Run one Unity process per checkout.
 
-## Windows build
+| Method | Scope |
+| --- | --- |
+| Riftbound.Editor.CombatRefinementChecks.VerifyParity | Combat authority/parity, selected narrative and multiplayer/group behavior |
+| Riftbound.Editor.Gp01Diagnostics.RunPlayModeVerify | Gameplay diagnostics with isolated progress |
+| Riftbound.Editor.QuestRouteSmokeTest.Run | Quest/state/reward/navigation regression |
+| Riftbound.Editor.CombinedSpawnVerification.Run | Native terrain/collider spawn checks; requires local read-only context |
+| Riftbound.Editor.MountVisualChecks.Run |16focused native cadence/state/binding checks |
+| Riftbound.Editor.GroundedVisualChecks.Run |19native contact/root/rebinding/support fixtures |
+| Riftbound.Editor.PresentationAssetAudit.Run | Prefab/rig/clip and sampled-pose inventory |
+| Riftbound.Editor.PresentationWorldProbe.Run | Running-world contact observation with explicit synthetic idle/title fixture and scene reload |
 
-- Output: `Builds/GitHubPreview/Riftbound.exe`, including the accompanying player data folder.
-- Result: **Succeeded — 0 errors, 680 warnings**; build size reported by Unity: 313,819,135 bytes.
-- Warnings include AI inference shader variants and deprecated APIs in the imported Adobe plugin. They are not treated as resolved.
-- Built from an isolated copy of the current project using Unity 6000.6.2f1 and `Riftbound.Editor.PrototypeBuild.BuildWindows`.
-- The player, frontend, camera, scene and graphics settings matched the source snapshot. The copied executable's SHA-256 matched the built executable.
-- Existing `Builds/Windows` output was preserved.
+GPU rendering methods require a real graphics device; omit `-nographics`. Native physics, sampled poses, rendered captures, scripted movement, headless online sessions and manual two-PC play are distinct evidence categories.
 
-## Startup and movement smoke check
+## Manual acceptance
 
-The isolated editor passed 17 assertions with a temporary test character and a separate save path:
+Test each relevant class/race in offline and host/guest roles. Cover run/walk/backward/strafe/jump, attacks/casts/guard/dodge, death/respawn, mount/dismount and optional companions. Inspect feet, rider hips, actual mount mesh/materials and full action transitions.
 
-- Character menu, player, health, animator, camera and HUD initialize successfully.
-- Character handoff applies the test Human Warrior after reloading the scene.
-- Entering the world closes the menu, unpauses the camera and restores time scale to 1.
-- The selected character has a renderer; camera and HUD still reference the live player.
-- Synthetic W input moved the character 10.30 metres.
-- No RPG runtime exceptions were captured during this path.
+Test late join, leaving/rejoining, four-player capacity, ready yes/no/timeout, invalid requests and host departure. Verify no duplicate rewards and no offline-save mutation. Traverse both reference corridors, including bridge deck vs underlying terrain, stairs, slopes, seams and camera clearance.
 
-The runner explicitly resumed the isolated editor when it paused. Earlier attempts stopped at frame 1 and were inconclusive. The passing run advanced beyond 1,000 frames. The temporary command-polling debug harness was replaced in the actual project with the manual `Riftbound > Validate Play Mode startup` command.
-
-This was a headless control-flow check. It does not establish animation quality, rendering quality, combat balance, mount behaviour or a complete quest playthrough.
-
-## Next game pass
-
-Play the main route in the new executable: select a character, accept Abe's quest, fight enemies, claim the reward, summon a mount, save and reload. Prioritize blocking defects in that route. Review unused AI inference assets and the build warnings before adding further systems.
+Record exact source/build hashes and actual results. Prior branch passes do not establish acceptance of a newly combined build. Current integration still needs remote grounding API hookup and a newly verified combined standalone; manual two-PC acceptance is not claimed here.

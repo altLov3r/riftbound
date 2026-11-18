@@ -16,7 +16,7 @@ namespace Riftbound.Editor
 
         internal static void Open()
         {
-            if (!Application.isBatchMode || !File.Exists("Docs/Production/OWN_CODEX_WORLD_RUN.md"))
+            if (!Application.isBatchMode || !File.Exists(".coordination/world-validation-context.md"))
                 throw new InvalidOperationException("Isolated world-production batch only.");
             Directory.CreateDirectory(Evidence);
             EditorSceneManager.OpenScene(WorldRegions.ScenePath);
@@ -107,12 +107,12 @@ namespace Riftbound.Editor
 
         public static void BuildVerifiedWorld()
         {
-            BuildToFolder("Builds/CodexWorldProduction01","build");
+            BuildToFolder("Builds/WorldProduction01","build");
         }
 
         public static void BuildSettlementWorld()
         {
-            BuildToFolder("Builds/CodexWorldProduction02","build-02");
+            BuildToFolder("Builds/WorldProduction02","build-02");
         }
 
         public static void BuildCombinedWorld()
