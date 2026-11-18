@@ -34,5 +34,14 @@
 | Promoted `Resources/Narrative/first-five.v1.json` Load | **NOT RUN** | Awaits Codex promotion onto branch after `NARRATIVE_SCHEMA_ACCEPTANCE.md` |
 
 ## File Releases & Next Integration Steps for Codex
-- **Released to Codex (zero Antigravity edits; exact SHA1 blobs recorded):** `Assets/RPG/Scripts/MountVisual.cs` (`5e1f9566...`), `Assets/RPG/Scripts/GroundedVisual.cs` (`600f6bc8...`), `Assets/RPG/Scripts/CharacterVisualFactory.cs` (`64b6f6e2...`) (see [MP_PRESENTATION_API_CONTRACT.md](file:///c:/Users/skama/Documents/wow=rpg-diplomna/Multiplayer/antigravity-polish/Docs/Production/MP_PRESENTATION_API_CONTRACT.md)).
-- Codex `visuals/codex-presentation-20261118` can proceed on `CV01–CV04` (`Human_Mage` `"Ride"` orientation, `MountVisual` stride divisors, `Mount gryphon.prefab` distinction, and `GroundedVisual.SetObserverState` observer hooking) while keeping `Player Undead *.controller` (`0fdc333`) ready for final branch integration.
+
+Antigravity **explicitly releases** the following Codex visual presentation files on branch `multiplayer/antigravity-polish-20261118` (kept byte-identical to `033e15408795c25204959028d706f35a5c1d7f05` and `d420fe2e2510f608585df4ed31bf5456fa7684ae`) and guarantees zero concurrent or subsequent edits to them:
+
+| File | Release Status | Verified Git Blob SHA1 |
+| :--- | :--- | :--- |
+| `Assets/RPG/Scripts/GroundedVisual.cs` | **RELEASED TO CODEX** | `600f6bc8c00f08e399bd14695d8de421b2659f10` |
+| `Assets/RPG/Scripts/MountVisual.cs` | **RELEASED TO CODEX** | `5e1f956630ce5b8e70d010f14389e455eae33f33` |
+| `Assets/RPG/Scripts/CharacterVisualFactory.cs` | **RELEASED TO CODEX** | `64b6f6e2af60ecd17c0324d984c6daeab89e053f` |
+
+- Contract details & agreed `GroundedVisual.SetObserverState(bool alive, bool airborne, bool mounted)` opt-in observer hook are recorded in [MP_PRESENTATION_API_CONTRACT.md](file:///c:/Users/skama/Documents/wow=rpg-diplomna/Multiplayer/antigravity-polish/Docs/Production/MP_PRESENTATION_API_CONTRACT.md).
+- Codex `visuals/codex-presentation-20261118` can edit those three released files freely for `CV01–CV04` (`Human_Mage` `"Ride"` orientation, `MountVisual` stride divisors, `Mount gryphon.prefab` distinction, and `GroundedVisual.SetObserverState` observer hooking) while keeping `Player Undead *.controller` (`0fdc333`) ready for final branch integration.
