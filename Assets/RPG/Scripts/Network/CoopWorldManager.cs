@@ -1098,6 +1098,9 @@ namespace Riftbound.Network
                         clientTookDamage = lp && lp.Stats && lp.Stats.Health < lp.Stats.maxHealth;
                     }
 
+                    if (isHost)
+                        yield return new WaitForSeconds(1.0f);
+
                     combatPass = enemyStats.Health < initialHp && clientTookDamage;
                     combatInfo = $", enemy={targetEnemy.NetworkKey} hp={enemyStats.Health:F0}/{initialHp:F0}, clientDamaged={clientTookDamage}";
                 }
@@ -1703,8 +1706,8 @@ namespace Riftbound.Network
                         yield return new WaitForSeconds(1.2f);
 
                         if (clientAvatar != null)
-                            clientAvatar.AuthorizeHostTeleport(targetEnemy.transform.position + new Vector3(14f, 0f, 0f));
-                        yield return new WaitForSeconds(2.0f);
+                            clientAvatar.AuthorizeHostTeleport(targetEnemy.transform.position + new Vector3(15.5f, 0f, 0f));
+                        yield return new WaitForSeconds(3.2f);
 
                         if (clientAvatar != null)
                             clientAvatar.AuthorizeHostTeleport(targetEnemy.transform.position + new Vector3(2.2f, 0f, 0f));
@@ -1804,12 +1807,24 @@ namespace Riftbound.Network
                         bool posClampOk = Vector3.Distance(lp.transform.position, prePos) < 25f;
 
                         float wtFar = Time.realtimeSinceStartup;
-                        while (Time.realtimeSinceStartup - wtFar < 8f && Vector3.Distance(lp.transform.position, targetEnemy.transform.position) < 10f)
+                        while (Time.realtimeSinceStartup - wtFar < 8f && Vector3.Distance(lp.transform.position, targetEnemy.transform.position) < 12f)
                             yield return new WaitForSeconds(0.15f);
                         float hpBeforeFar = eStats.Health;
                         me.RequestAbilityAttack(eStats, "melee");
                         yield return new WaitForSeconds(0.6f);
                         bool outRangeRej = Mathf.Approximately(eStats.Health, hpBeforeFar);
+
+                        // Verify immediate enemy-state replication on an accepted guest hit while enemy is idle (>14m pursuit range, zero 0.1s chasing ticks)
+                        bool enemyIdleHitOk = true;
+                        if (rightAb == "fireball")
+                        {
+                            float hpBeforeIdleHit = eStats.Health;
+                            me.RequestAbilityAttack(eStats, "fireball");
+                            float wtIdleHit = Time.realtimeSinceStartup;
+                            while (Time.realtimeSinceStartup - wtIdleHit < 1.2f && Mathf.Approximately(eStats.Health, hpBeforeIdleHit))
+                                yield return new WaitForSeconds(0.05f);
+                            enemyIdleHitOk = hpBeforeIdleHit - eStats.Health >= 30f && eStats.Health > 0f;
+                        }
 
                         float wtNear = Time.realtimeSinceStartup;
                         while (Time.realtimeSinceStartup - wtNear < 8f && Vector3.Distance(lp.transform.position, targetEnemy.transform.position) > 5f)
@@ -1963,8 +1978,8 @@ namespace Riftbound.Network
                         bool peerObsGvOk = HasValidObserverGrounding(hostPeer) && IsWrapperAtRest(hostPeer);
                         bool leaderSpoofRej = !me.IsLeader.Value && me.ReadyStatus.Value == 0;
                         bool enemySpoofRej = rpcSpoofThrew && targetEnemy.LastRemoteActionSeq == enemySeqBeforeSpoof && targetEnemy.ActiveRemoteActionKind == enemyKindBeforeSpoof && !targetEnemy.IsWarningActive;
-                        authorityPass = posClampOk && outRangeRej && unknownAtkRej && cooldownRej && goldAfterChest > 0 && aliveRespRej && restFullRej && dupLmRej && zebraBlockedEarly && zebraUnlockedOk && temperOk && deadRejOk && revBackOk && restDmgOk && potOk && potCdRej && leaderSpoofRej && peerObsGvOk && enemySpoofRej;
-                        combatInfo += $", clientAuth={(authorityPass ? "PASS" : "FAIL")}(clamp={posClampOk},rngRej={outRangeRej},unkAtkRej={unknownAtkRej},cdRej={cooldownRej},aliveRespRej={aliveRespRej},restRej={restFullRej},dupLmRej={dupLmRej},zEarly={zebraBlockedEarly},zOk={zebraUnlockedOk},temper={temperOk},deadRej={deadRejOk},rev={revBackOk},restOk={restDmgOk}[g={restG0}->{me.Gold.Value},h={restH0}->{me.Health.Value}/{me.MaxHealth.Value}],potOk={potOk},potCdRej={potCdRej},ldrSpoofRej={leaderSpoofRej},obsGv={peerObsGvOk},enemySpoofRej={enemySpoofRej})";
+                        authorityPass = posClampOk && outRangeRej && enemyIdleHitOk && unknownAtkRej && cooldownRej && goldAfterChest > 0 && aliveRespRej && restFullRej && dupLmRej && zebraBlockedEarly && zebraUnlockedOk && temperOk && deadRejOk && revBackOk && restDmgOk && potOk && potCdRej && leaderSpoofRej && peerObsGvOk && enemySpoofRej;
+                        combatInfo += $", clientAuth={(authorityPass ? "PASS" : "FAIL")}(clamp={posClampOk},rngRej={outRangeRej},idleHit={enemyIdleHitOk},unkAtkRej={unknownAtkRej},cdRej={cooldownRej},aliveRespRej={aliveRespRej},restRej={restFullRej},dupLmRej={dupLmRej},zEarly={zebraBlockedEarly},zOk={zebraUnlockedOk},temper={temperOk},deadRej={deadRejOk},rev={revBackOk},restOk={restDmgOk}[g={restG0}->{me.Gold.Value},h={restH0}->{me.Health.Value}/{me.MaxHealth.Value}],potOk={potOk},potCdRej={potCdRej},ldrSpoofRej={leaderSpoofRej},obsGv={peerObsGvOk},enemySpoofRej={enemySpoofRej})";
                     }
                 }
                 else

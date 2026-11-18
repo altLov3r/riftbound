@@ -178,7 +178,7 @@ namespace Riftbound
             && Unity.Netcode.NetworkManager.Singleton.IsListening
             && !Unity.Netcode.NetworkManager.Singleton.IsServer);
 
-        void BroadcastNetAction(byte actionKind, float duration, Vector3 origin, string spellName = "", string icon = "")
+        void BroadcastNetAction(byte actionKind, float duration, Vector3 origin, string spellName = "", string icon = "", float castDuration = -1f)
         {
             if (
 #if UNITY_EDITOR
@@ -189,35 +189,46 @@ namespace Riftbound
                 || !Unity.Netcode.NetworkManager.Singleton.IsServer)
                 return;
             if (Network.RiftboundCoopPlayer.LocalOwner)
-                Network.RiftboundCoopPlayer.LocalOwner.BroadcastEnemyAction(this, actionKind, duration, origin, spellName, icon, ++serverActionSeq);
+                Network.RiftboundCoopPlayer.LocalOwner.BroadcastEnemyAction(this, actionKind, duration, origin, spellName, icon, ++serverActionSeq, castDuration);
         }
 
-        public bool TryGetActiveActionSnapshot(out byte kind, out float remaining, out Vector3 origin, out string spellName, out string icon, out uint seq)
+        public bool TryGetActiveActionSnapshot(out byte kind, out float remaining, out float castRemaining, out Vector3 origin, out string spellName, out string icon, out uint seq)
         {
             if (stats && stats.Alive)
             {
                 if (heavyUntil > Time.time)
                 {
-                    kind = ActionHeavyWindup;
-                    remaining = Mathf.Clamp(heavyUntil - Time.time, 0.1f, 3.0f);
-                    origin = heavyCenter;
-                    spellName = string.IsNullOrEmpty(activeSpellName) ? (heavyAttacker ? "Crushing Blow" : "Heavy Slam") : activeSpellName;
-                    icon = string.IsNullOrEmpty(activeSpellIcon) ? "🔨" : activeSpellIcon;
-                    seq = serverActionSeq == 0 ? 1u : serverActionSeq;
-                    return true;
+                    float rem = Mathf.Clamp(heavyUntil - Time.time, 0f, 3.0f);
+                    if (rem > 0.01f)
+                    {
+                        kind = ActionHeavyWindup;
+                        remaining = rem;
+                        castRemaining = rem;
+                        origin = heavyCenter;
+                        spellName = string.IsNullOrEmpty(activeSpellName) ? (heavyAttacker ? "Crushing Blow" : "Heavy Slam") : activeSpellName;
+                        icon = string.IsNullOrEmpty(activeSpellIcon) ? "🔨" : activeSpellIcon;
+                        seq = serverActionSeq == 0 ? 1u : serverActionSeq;
+                        return true;
+                    }
                 }
                 if (pendingDamage && ranged && Time.time < damageAt)
                 {
-                    kind = ActionAttack;
-                    remaining = Mathf.Clamp(attackEnds - Time.time, 0.15f, 3.0f);
-                    origin = transform.position;
-                    spellName = activeSpellName;
-                    icon = activeSpellIcon;
-                    seq = serverActionSeq == 0 ? 1u : serverActionSeq;
-                    return true;
+                    float holdRem = Mathf.Clamp(attackEnds - Time.time, 0f, 3.0f);
+                    float castRem = Mathf.Clamp(damageAt - Time.time, 0f, 3.0f);
+                    if (holdRem > 0.01f || castRem > 0.01f)
+                    {
+                        kind = ActionAttack;
+                        remaining = holdRem;
+                        castRemaining = castRem;
+                        origin = transform.position;
+                        spellName = activeSpellName;
+                        icon = activeSpellIcon;
+                        seq = serverActionSeq == 0 ? 1u : serverActionSeq;
+                        return true;
+                    }
                 }
             }
-            kind = 0; remaining = 0f; origin = Vector3.zero; spellName = ""; icon = ""; seq = 0;
+            kind = 0; remaining = 0f; castRemaining = 0f; origin = Vector3.zero; spellName = ""; icon = ""; seq = 0;
             return false;
         }
 
@@ -261,7 +272,7 @@ namespace Riftbound
             }
         }
 
-        public void ApplyReplicatedAction(uint seq, byte kind, float duration, Vector3 origin, string spellName, string icon)
+        public void ApplyReplicatedAction(uint seq, byte kind, float duration, Vector3 origin, string spellName, string icon, float castDuration = -1f)
         {
             if (!stats) Initialize();
             if (seq != 0 && seq <= lastRemoteActionSeq) return;
@@ -303,8 +314,9 @@ namespace Riftbound
                     break;
                 case ActionHeavyWindup:
                 {
-                    float windupDur = Mathf.Clamp(boundedDur > 0.05f ? boundedDur : 1.8f, 0.2f, 3.0f);
-                    ActivateHeavyWarning(origin, windupDur, spellName, icon);
+                    float windupDur = Mathf.Clamp(boundedDur > 0f ? boundedDur : 1.8f, 0.02f, 3.0f);
+                    float resolvedCast = castDuration >= 0f ? Mathf.Clamp(castDuration, 0f, 3.0f) : windupDur;
+                    ActivateHeavyWarning(origin, resolvedCast, spellName, icon);
                     remoteActiveAction = ActionHeavyWindup;
                     remoteActionUntil = Time.time + windupDur;
                     if (animator) animator.speed = 1f;
@@ -315,25 +327,26 @@ namespace Riftbound
                     CastBarSystem.CancelTargetCast(stats);
                     SpellFX.CreateHeavySlam(origin, 4f);
                     remoteActiveAction = ActionCleave;
-                    remoteActionUntil = Time.time + Mathf.Clamp(boundedDur > 0.05f ? boundedDur : cleaveDuration, 0.2f, 2.5f);
+                    remoteActionUntil = Time.time + Mathf.Clamp(boundedDur > 0.02f ? boundedDur : cleaveDuration, 0.02f, 2.5f);
                     Play("Cleave", true, "Attack");
                     if (animator) animator.speed = 1f;
                     break;
                 case ActionAttack:
                 {
-                    float atkDur = Mathf.Clamp(boundedDur > 0.05f ? boundedDur : attackDuration, 0.15f, 3.0f);
+                    float atkDur = Mathf.Clamp(boundedDur > 0f ? boundedDur : attackDuration, 0.02f, 3.0f);
+                    float resolvedCast = castDuration >= 0f ? Mathf.Clamp(castDuration, 0f, 3.0f) : Mathf.Clamp(atkDur * 0.85f, 0f, atkDur);
                     remoteActiveAction = ActionAttack;
                     remoteActionUntil = Time.time + atkDur;
                     Play("Attack", true, "Idle");
                     if (animator) animator.speed = 1f;
-                    if (!string.IsNullOrEmpty(spellName))
-                        CastBarSystem.StartTargetCast(stats, spellName, string.IsNullOrEmpty(icon) ? "✦" : icon, Mathf.Clamp(atkDur * 0.85f, 0.15f, atkDur), null, true);
+                    if (resolvedCast > 0.02f && !string.IsNullOrEmpty(spellName))
+                        CastBarSystem.StartTargetCast(stats, spellName, string.IsNullOrEmpty(icon) ? "✦" : icon, resolvedCast, null, true);
                     break;
                 }
             }
         }
 
-        void ActivateHeavyWarning(Vector3 center, float duration, string spell, string icon)
+        void ActivateHeavyWarning(Vector3 center, float castDuration, string spell, string icon)
         {
             if (!warning)
             {
@@ -352,9 +365,12 @@ namespace Riftbound
             }
             Play("Idle", true, "Default"); if (animator) animator.speed = 1;
             GameSound.Play(SoundCue.Rune, transform.position);
-            string resolvedSpell = string.IsNullOrEmpty(spell) ? (heavyAttacker ? "Crushing Blow" : (ranged ? "Shadow Bolt" : "Savage Strike")) : spell;
-            string resolvedIcon = string.IsNullOrEmpty(icon) ? (heavyAttacker ? "🔨" : (ranged ? "💀" : "⚔")) : icon;
-            CastBarSystem.StartTargetCast(stats, resolvedSpell, resolvedIcon, duration, null, true);
+            if (castDuration > 0.02f)
+            {
+                string resolvedSpell = string.IsNullOrEmpty(spell) ? (heavyAttacker ? "Crushing Blow" : (ranged ? "Shadow Bolt" : "Savage Strike")) : spell;
+                string resolvedIcon = string.IsNullOrEmpty(icon) ? (heavyAttacker ? "🔨" : (ranged ? "💀" : "⚔")) : icon;
+                CastBarSystem.StartTargetCast(stats, resolvedSpell, resolvedIcon, castDuration, null, true);
+            }
         }
 
         void HeavyAttack()
@@ -621,7 +637,7 @@ namespace Riftbound
                         CastBarSystem.StartTargetCast(stats, spellName, icon, attackDuration * 0.85f, null, true);
                     }
                     activeSpellName = spellName; activeSpellIcon = icon;
-                    BroadcastNetAction(ActionAttack, attackDuration, transform.position, spellName, icon);
+                    BroadcastNetAction(ActionAttack, attackDuration, transform.position, spellName, icon, ranged ? attackDuration * 0.85f : 0f);
                     if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner)
                         Network.RiftboundCoopPlayer.LocalOwner.BroadcastEnemyState(this);
                 }

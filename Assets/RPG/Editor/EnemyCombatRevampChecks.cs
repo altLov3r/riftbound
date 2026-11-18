@@ -241,26 +241,58 @@ namespace Riftbound.Editor
                     Check("death_overrides_action_and_clears_warning", !eStats.Alive && !ec.IsWarningActive && ec.ActiveRemoteActionKind == 0,
                         $"alive={eStats.Alive} warn={ec.IsWarningActive} kind={ec.ActiveRemoteActionKind}");
 
-                    // Rig fallback test on controllers lacking Death/Cleave (Brute.controller / Wolf.controller)
+                    // Rig fallback test on controllers lacking Death/Cleave (Brute.controller / Wolf.controller) — requires real Animator & controllers
                     wolfCtrl = AssetDatabase.LoadAssetAtPath<RuntimeAnimatorController>("Assets/RPG/Animations/NPCs/Wolf.controller");
                     bruteCtrl = AssetDatabase.LoadAssetAtPath<RuntimeAnimatorController>("Assets/RPG/Animations/Brute.controller");
-                    if (ec.animator)
+                    RuntimeAnimatorController origCtrl = ec.animator ? ec.animator.runtimeAnimatorController : null;
+                    bool animReady = ec.animator != null && origCtrl != null && bruteCtrl != null && wolfCtrl != null;
+                    string deathFallbackBrute = "missing";
+                    string wolfFallbackIdle = "missing";
+                    if (animReady)
                     {
-                        if (bruteCtrl) ec.animator.runtimeAnimatorController = bruteCtrl;
-                        string deathFallbackBrute = ec.ResolveAnimState("Death", "Hit");
-                        string wolfFallbackIdle = "missing";
-                        if (wolfCtrl)
-                        {
-                            ec.animator.runtimeAnimatorController = wolfCtrl;
-                            wolfFallbackIdle = ec.ResolveAnimState("Cleave", "Attack");
-                        }
-                        bool fallbacksOk = bruteCtrl != null && wolfCtrl != null && deathFallbackBrute == "Hit" && wolfFallbackIdle == "Default";
-                        Check("rig_fallback_missing_states_safe", fallbacksOk, $"bruteDeath={deathFallbackBrute} wolfCleave={wolfFallbackIdle}");
+                        ec.animator.runtimeAnimatorController = bruteCtrl;
+                        deathFallbackBrute = ec.ResolveAnimState("Death", "Hit");
+                        ec.animator.runtimeAnimatorController = wolfCtrl;
+                        wolfFallbackIdle = ec.ResolveAnimState("Cleave", "Attack");
+                        ec.animator.runtimeAnimatorController = origCtrl;
                     }
-                    else
-                    {
-                        Check("rig_fallback_missing_states_safe", true, "no animator fallback");
-                    }
+                    Check("rig_fallback_missing_states_safe",
+                        animReady && deathFallbackBrute == "Hit" && wolfFallbackIdle == "Default",
+                        $"animReady={animReady} bruteDeath={deathFallbackBrute} wolfCleave={wolfFallbackIdle}");
+
+                    // Revive remote enemy before ranged late-join snapshot test
+                    ec.ApplyReplicatedState(300f, 300f, true, enemyGo.transform.position, 0f);
+                    CastBarSystem.CancelTargetCast(eStats);
+                    ec.ranged = true;
+                    ec.attackDuration = 1.2f;
+                    typeof(EnemyController).GetField("pendingDamage", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(ec, true);
+                    typeof(EnemyController).GetField("attackEnds", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(ec, Time.time + 0.30f);
+                    typeof(EnemyController).GetField("damageAt", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(ec, Time.time + 0.12f);
+                    typeof(EnemyController).GetField("activeSpellName", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(ec, "Shadow Bolt");
+                    typeof(EnemyController).GetField("activeSpellIcon", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(ec, "💀");
+                    bool gotSnap = ec.TryGetActiveActionSnapshot(out byte snapKind, out float snapRem, out float snapCastRem, out Vector3 snapOrig, out string snapSpell, out string snapIcon, out uint snapSeq);
+                    typeof(EnemyController).GetField("pendingDamage", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(ec, false);
+                    ec.ApplyReplicatedState(300f, 300f, true, enemyGo.transform.position, 0f);
+                    ec.ApplyReplicatedAction(7u, snapKind, snapRem, snapOrig, snapSpell, snapIcon, snapCastRem);
+                    var lateCast = CastBarSystem.GetTargetCast(eStats);
+                    bool exactRangedCastOk = gotSnap
+                                          && Mathf.Abs(snapRem - 0.30f) < 0.02f
+                                          && Mathf.Abs(snapCastRem - 0.12f) < 0.02f
+                                          && lateCast != null
+                                          && Mathf.Abs(lateCast.castDuration - 0.12f) < 0.02f
+                                          && Mathf.Abs(ec.RemainingRemoteAction - 0.30f) < 0.02f;
+                    Check("ranged_late_join_cast_remaining_matches_damage_deadline", exactRangedCastOk,
+                        $"got={gotSnap} holdRem={snapRem:F3} castRem={snapCastRem:F3} barDur={(lateCast != null ? lateCast.castDuration : -1f):F3}");
+
+                    // Expired / zero castRemaining must NEVER recreate a target cast bar
+                    CastBarSystem.CancelTargetCast(eStats);
+                    ec.ApplyReplicatedAction(8u, EnemyController.ActionAttack, 0.20f, enemyGo.transform.position, "Shadow Bolt", "💀", 0f);
+                    bool noExpiredBarZero = !CastBarSystem.IsTargetCasting(eStats) && CastBarSystem.GetTargetCast(eStats) == null;
+                    ec.ApplyReplicatedAction(9u, EnemyController.ActionAttack, 0.20f, enemyGo.transform.position, "Shadow Bolt", "💀", 0.01f);
+                    bool noExpiredBarTiny = !CastBarSystem.IsTargetCasting(eStats) && CastBarSystem.GetTargetCast(eStats) == null;
+                    Check("expired_cast_remaining_never_recreates_cast_bar", noExpiredBarZero && noExpiredBarTiny,
+                        $"noBarZero={noExpiredBarZero} noBarTiny={noExpiredBarTiny}");
+                    ec.ranged = false;
 
                     // Switch to authoritative server mode: verify Heavy LOS block, Leash Cancel, Missing Target Cancel, & Single Melee Hit
                     ec.SetNetClientSimulationForTest(false);
@@ -338,6 +370,17 @@ namespace Riftbound.Editor
                                     && !Riftbound.Network.RiftboundCoopPlayer.IsAuthorizedEnemySenderForIds(1UL, 1UL, 0UL);
                     Check("server_sender_and_owner_validation_rejects_spoof", authRulesOk,
                         $"authRulesOk={authRulesOk}");
+
+                    bool canonicalSafeOffline = Riftbound.Network.RiftboundCoopPlayer.ResolveCanonicalHostChannel(null) == null
+                                              && !Riftbound.Network.RiftboundCoopPlayer.IsAuthorizedEnemySenderForIds(2UL, 0UL, 0UL);
+                    Check("canonical_host_channel_null_offline_and_rejects_guest_owner", canonicalSafeOffline,
+                        $"canonicalSafeOffline={canonicalSafeOffline}");
+
+                    ec.SetNetClientSimulationForTest(true);
+                    ec.ApplyReplicatedState(0f, eStats.maxHealth, false, enemyGo.transform.position, enemyGo.transform.eulerAngles.y);
+                    Check("client_replicated_death_marks_enemy_dead_immediately", Mathf.Approximately(eStats.Health, 0f) && !eStats.Alive,
+                        $"hp={eStats.Health:F1} alive={eStats.Alive}");
+                    ec.SetNetClientSimulationForTest(false);
                     Finish(false);
                 }
             }
