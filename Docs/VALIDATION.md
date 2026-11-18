@@ -22,7 +22,7 @@ Run batch methods with `-batchmode -projectPath <checkout> -executeMethod <metho
 
 GPU rendering methods require a real graphics device; omit `-nographics`. Native physics, sampled poses, rendered captures, scripted movement, headless online sessions and manual two-PC play are distinct evidence categories.
 
-The support preview does not save the scene. Its successful motor steps establish a candidate for review, not permission to apply it or proof of encounter/traversal acceptance. `ClosestPoint` containment is reported only for supported primitive/convex shapes; a terrain or non-convex mesh result is not classified as containment.
+The support preview does not save the scene. `RunCandidate`/`RunBoth` are preparation methods for the original enabled-capsule baseline and deliberately reject the already-repaired scene; use `Run` to inspect the saved repair. Successful preview motor steps establish a candidate for review, not permission to apply it or proof of encounter/traversal acceptance. `ClosestPoint` containment is reported only for supported primitive/convex shapes; a terrain or non-convex mesh result is not classified as containment.
 
 ## Manual acceptance
 
