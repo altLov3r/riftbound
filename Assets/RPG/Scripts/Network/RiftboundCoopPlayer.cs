@@ -41,6 +41,11 @@ namespace Riftbound.Network
         public NetworkVariable<bool> IsMounted = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
         public NetworkVariable<FixedString32Bytes> MountId = new NetworkVariable<FixedString32Bytes>(new FixedString32Bytes("horse"), NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
         public NetworkVariable<float> MoveSpeed = new NetworkVariable<float>(0f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+        public NetworkVariable<byte> LocomotionFlags = new NetworkVariable<byte>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server); // bit0=airborne, bit1=walking, bit2=blocking
+        public NetworkVariable<byte> ResourcePct = new NetworkVariable<byte>(100, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+        public NetworkVariable<bool> IsLeader = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+        public NetworkVariable<bool> IsInCombat = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+        public NetworkVariable<uint> ReadyCheckId = new NetworkVariable<uint>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
         public NetworkVariable<int> SpawnSlot = new NetworkVariable<int>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
         public NetworkVariable<int> QuestIndex = new NetworkVariable<int>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
@@ -51,6 +56,12 @@ namespace Riftbound.Network
         PlayerController localPlayer;
         GameObject remoteVisualRoot;
         GameObject remoteMountVisual;
+        MountVisual remoteMountComp;
+        Transform remoteRiderHips;
+        Renderer remoteWeaponRenderer;
+        bool remoteWeaponWasEnabled;
+        string builtMountId = "";
+        Vector3 remoteBaseVisualPos = Vector3.zero;
         Animator remoteAnimator;
         string currentRemoteAnim = "";
         string builtRace = "";
@@ -60,6 +71,21 @@ namespace Riftbound.Network
         bool hostTeleportAuthorized;
         Vector3 authorizedTeleportTarget;
         float actionAnimUntil;
+        uint localActionSeq;
+        uint lastClientActionSeq;
+        uint lastBroadcastSeq;
+        float lastClientActionTime = -10f;
+        uint lastObservedActionSeq;
+        uint serverReadyCheckSeq;
+        static uint activeGlobalReadyCheckSeq;
+        static float activeGlobalReadyCheckExpires;
+        float lastServerReadyCheckTime = -10f;
+        static readonly Dictionary<string, MountDefinition> cachedMounts = new Dictionary<string, MountDefinition>(System.StringComparer.OrdinalIgnoreCase);
+
+        public MountVisual RemoteMountComponent => remoteMountComp;
+        public bool HasRemoteCapsuleFallback => remoteMountVisual != null && remoteMountComp == null;
+        public float RemoteSmoothedSpeed => remoteSmoothedSpeed;
+        public string CurrentRemoteAnim => currentRemoteAnim;
         Vector3 lastLocalPos;
         bool hasLastLocalPos;
         Vector3 lastRemoteWorldPos;
@@ -94,6 +120,7 @@ namespace Riftbound.Network
             if (IsServer)
             {
                 SpawnSlot.Value = OwnerClientId == NetworkManager.ServerClientId ? 0 : AllPlayers.Count - 1;
+                IsLeader.Value = OwnerClientId == NetworkManager.ServerClientId;
                 MaxHealth.Value = 100;
                 Health.Value = 100;
                 Level.Value = 1;
@@ -117,20 +144,29 @@ namespace Riftbound.Network
                 Race.OnValueChanged += OnIdentityChanged;
                 ClassName.OnValueChanged += OnIdentityChanged;
                 IsMounted.OnValueChanged += OnMountChanged;
+                MountId.OnValueChanged += OnMountIdChanged;
+                Health.OnValueChanged += OnRemoteHealthChanged;
                 RebuildRemoteVisual();
             }
         }
 
         public override void OnNetworkDespawn()
         {
+            if (IsServer && IsLeader.Value && OwnerClientId != NetworkManager.ServerClientId)
+            {
+                var hostPeer = FindByClientId(NetworkManager.ServerClientId);
+                if (hostPeer && hostPeer != this) hostPeer.IsLeader.Value = true;
+            }
             AllPlayers.Remove(this);
             if (LocalOwner == this) LocalOwner = null;
             Gold.OnValueChanged -= OnAuthoritativeGoldChanged;
             Race.OnValueChanged -= OnIdentityChanged;
             ClassName.OnValueChanged -= OnIdentityChanged;
             IsMounted.OnValueChanged -= OnMountChanged;
+            MountId.OnValueChanged -= OnMountIdChanged;
+            Health.OnValueChanged -= OnRemoteHealthChanged;
+            ClearRemoteMountVisual();
             if (remoteVisualRoot) Destroy(remoteVisualRoot);
-            if (remoteMountVisual) Destroy(remoteMountVisual);
         }
 
         void OnAuthoritativeGoldChanged(int prev, int next)
@@ -146,6 +182,26 @@ namespace Riftbound.Network
         void OnMountChanged(bool prev, bool next)
         {
             if (!IsOwner) UpdateRemoteMountVisual();
+        }
+
+        void OnMountIdChanged(FixedString32Bytes prev, FixedString32Bytes next)
+        {
+            if (!IsOwner) UpdateRemoteMountVisual();
+        }
+
+        void OnRemoteHealthChanged(int prev, int next)
+        {
+            if (IsOwner) return;
+            if (next <= 0)
+            {
+                actionAnimUntil = 0f;
+                ClearRemoteMountVisual();
+            }
+            else if (prev <= 0 && next > 0)
+            {
+                currentRemoteAnim = "";
+                UpdateRemoteMountVisual();
+            }
         }
 
         void BindToLocalPlayer()
@@ -191,6 +247,37 @@ namespace Riftbound.Network
             return candidate;
         }
 
+        public static MountDefinition ResolveMountDefinition(string mountId)
+        {
+            string key = string.IsNullOrEmpty(mountId) ? "horse" : mountId.Trim().ToLowerInvariant();
+            if (cachedMounts.TryGetValue(key, out var cached) && cached) return cached;
+
+            var lp = LocalOwner ? LocalOwner.localPlayer : null;
+            if (!lp) lp = FindFirstObjectByType<PlayerController>();
+            if (lp && lp.mounts != null)
+            {
+                foreach (var m in lp.mounts)
+                {
+                    if (m && !string.IsNullOrEmpty(m.mountId))
+                        cachedMounts[m.mountId.Trim().ToLowerInvariant()] = m;
+                }
+            }
+
+            var resMounts = Resources.LoadAll<MountDefinition>("Mounts");
+            if (resMounts != null)
+            {
+                foreach (var m in resMounts)
+                {
+                    if (m && !string.IsNullOrEmpty(m.mountId) && !cachedMounts.ContainsKey(m.mountId.Trim().ToLowerInvariant()))
+                        cachedMounts[m.mountId.Trim().ToLowerInvariant()] = m;
+                }
+            }
+
+            if (cachedMounts.TryGetValue(key, out var resolved) && resolved) return resolved;
+            if (cachedMounts.TryGetValue("horse", out var horse) && horse) return horse;
+            return null;
+        }
+
         void RebuildRemoteVisual()
         {
             string r = Race.Value.ToString();
@@ -199,6 +286,7 @@ namespace Riftbound.Network
             if (string.IsNullOrWhiteSpace(c)) c = "Warrior";
             if (remoteVisualRoot && builtRace == r && builtClass == c) return;
 
+            ClearRemoteMountVisual();
             if (remoteVisualRoot) Destroy(remoteVisualRoot);
             builtRace = r;
             builtClass = c;
@@ -207,49 +295,128 @@ namespace Riftbound.Network
             {
                 remoteVisualRoot.name = $"CoopVisual_{r}_{c}";
                 remoteVisualRoot.transform.localPosition = Vector3.zero;
+                remoteBaseVisualPos = remoteVisualRoot.transform.localPosition;
                 remoteBaseVisualRot = remoteVisualRoot.transform.localRotation;
                 remoteVisualYawOffset = 0f;
                 foreach (var cam in remoteVisualRoot.GetComponentsInChildren<Camera>(true)) Destroy(cam);
                 foreach (var al in remoteVisualRoot.GetComponentsInChildren<AudioListener>(true)) Destroy(al);
                 remoteAnimator = remoteVisualRoot.GetComponentInChildren<Animator>();
+                currentRemoteAnim = "";
             }
             UpdateRemoteMountVisual();
         }
 
+        static Transform FindRiderHips(Animator anim)
+        {
+            if (!anim) return null;
+            if (anim.isHuman)
+            {
+                var hips = anim.GetBoneTransform(HumanBodyBones.Hips);
+                if (hips) return hips;
+            }
+            foreach (var bone in anim.GetComponentsInChildren<Transform>(true))
+            {
+                string bName = bone.name.ToLowerInvariant();
+                if (bone.name.EndsWith(":Hips") || bName == "hips" || bName.Contains("hips") || bName.Contains("pelvis"))
+                    return bone;
+            }
+            return null;
+        }
+
+        void ClearRemoteMountVisual()
+        {
+            if (remoteMountVisual)
+            {
+                Destroy(remoteMountVisual);
+                remoteMountVisual = null;
+            }
+            remoteMountComp = null;
+            builtMountId = "";
+            if (remoteWeaponRenderer)
+            {
+                remoteWeaponRenderer.enabled = remoteWeaponWasEnabled;
+                remoteWeaponRenderer = null;
+            }
+            remoteRiderHips = null;
+            if (remoteVisualRoot) remoteVisualRoot.transform.localPosition = remoteBaseVisualPos;
+        }
+
         void UpdateRemoteMountVisual()
         {
-            if (IsMounted.Value)
+            if (IsMounted.Value && Health.Value > 0)
             {
-                if (!remoteMountVisual)
+                string targetId = MountId.Value.ToString();
+                if (string.IsNullOrWhiteSpace(targetId)) targetId = "horse";
+                targetId = targetId.Trim().ToLowerInvariant();
+
+                if (remoteMountVisual && remoteMountComp && builtMountId == targetId)
                 {
-                    remoteMountVisual = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-                    remoteMountVisual.name = "RemoteMountSteed";
-                    var col = remoteMountVisual.GetComponent<Collider>();
-                    if (col) Destroy(col);
-                    remoteMountVisual.transform.SetParent(transform, false);
-                    remoteMountVisual.transform.localPosition = new Vector3(0f, 0.55f, 0f);
-                    remoteMountVisual.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
-                    remoteMountVisual.transform.localScale = new Vector3(0.65f, 0.95f, 0.65f);
-                    var rend = remoteMountVisual.GetComponent<Renderer>();
-                    if (rend)
+                    PositionRemoteRider();
+                    return;
+                }
+
+                ClearRemoteMountVisual();
+                var def = ResolveMountDefinition(targetId);
+                if (def && def.prefab)
+                {
+                    var inst = Instantiate(def.prefab, transform);
+                    inst.name = $"CoopMount_{targetId}";
+                    inst.transform.SetLocalPositionAndRotation(Vector3.zero, Quaternion.identity);
+                    foreach (var col in inst.GetComponentsInChildren<Collider>(true)) Destroy(col);
+                    remoteMountComp = inst;
+                    remoteMountVisual = inst.gameObject;
+                    builtMountId = targetId;
+                }
+
+                if (remoteAnimator)
+                {
+                    remoteRiderHips = FindRiderHips(remoteAnimator);
+                    foreach (var r in remoteAnimator.GetComponentsInChildren<Renderer>(true))
                     {
-                        string mid = MountId.Value.ToString().ToLowerInvariant();
-                        Color c = mid.Contains("zebra") ? Color.white : (mid.Contains("griffon") || mid.Contains("wyvern") ? new Color(0.85f, 0.7f, 0.3f) : new Color(0.45f, 0.28f, 0.16f));
-                        rend.material.color = c;
+                        if (r.name.ToLowerInvariant().Contains("axe"))
+                        {
+                            remoteWeaponRenderer = r;
+                            remoteWeaponWasEnabled = r.enabled;
+                            r.enabled = false;
+                            break;
+                        }
+                    }
+                    if (remoteAnimator.HasState(0, Animator.StringToHash("Ride")))
+                    {
+                        remoteAnimator.CrossFadeInFixedTime("Ride", 0.08f, 0, 0f);
+                        currentRemoteAnim = "Ride";
                     }
                 }
-                if (remoteVisualRoot) remoteVisualRoot.transform.localPosition = new Vector3(0f, 0.72f, 0f);
+                PositionRemoteRider();
             }
             else
             {
-                if (remoteMountVisual) { Destroy(remoteMountVisual); remoteMountVisual = null; }
-                if (remoteVisualRoot) remoteVisualRoot.transform.localPosition = Vector3.zero;
+                ClearRemoteMountVisual();
+                if (remoteAnimator && currentRemoteAnim == "Ride" && Health.Value > 0)
+                    currentRemoteAnim = "";
             }
+        }
+
+        void PositionRemoteRider()
+        {
+            if (!IsMounted.Value || Health.Value <= 0 || !remoteVisualRoot || !remoteMountComp || !remoteMountComp.saddle || !remoteRiderHips)
+                return;
+            Vector3 hipWorldOffset = remoteRiderHips.position - remoteVisualRoot.transform.position;
+            remoteVisualRoot.transform.position = remoteMountComp.saddle.position - hipWorldOffset;
+        }
+
+        void LateUpdate()
+        {
+            if (!IsSpawned || IsOwner) return;
+            PositionRemoteRider();
         }
 
         void Update()
         {
             if (!IsSpawned) return;
+
+            if (IsServer && Health.Value <= 0 && IsMounted.Value)
+                IsMounted.Value = false;
 
             if (IsOwner)
             {
@@ -265,7 +432,12 @@ namespace Riftbound.Network
                     float spd = hasLastLocalPos ? Vector3.Distance(curPos, lastLocalPos) / Mathf.Max(0.01f, dt) : 0f;
                     lastLocalPos = curPos;
                     hasLastLocalPos = true;
-                    SubmitMoveStateServerRpc(curPos, localPlayer.transform.eulerAngles.y, spd);
+                    var motor = localPlayer.GetComponent<CharacterController>();
+                    bool airborne = motor && !motor.isGrounded;
+                    byte flags = (byte)((airborne ? 1 : 0) | (localPlayer.Walking ? 2 : 0) | (localPlayer.Blocking ? 4 : 0));
+                    byte resPct = (byte)Mathf.RoundToInt(Mathf.Clamp01(localPlayer.ClassResource / Mathf.Max(1f, localPlayer.MaxClassResource)) * 100f);
+                    bool inCombat = localPlayer.InCombat();
+                    SubmitMoveStateServerRpc(curPos, localPlayer.transform.eulerAngles.y, spd, flags, resPct, inCombat);
                 }
             }
             else
@@ -291,11 +463,15 @@ namespace Riftbound.Network
             float effectiveSpeed = netSpd > 0.2f ? netSpd : (remoteZeroSpeedTimer < 0.12f ? remoteSmoothedSpeed : 0f);
             remoteSmoothedSpeed = Mathf.Lerp(remoteSmoothedSpeed, effectiveSpeed, 1f - Mathf.Exp(-14f * Time.deltaTime));
 
-            // Smoothly orient visual child toward strafe direction while moving unmounted
+            byte flags = LocomotionFlags.Value;
+            bool airborne = (flags & 1) != 0;
+            bool walking = (flags & 2) != 0;
+            bool blocking = (flags & 4) != 0;
+
             float targetYaw = 0f;
             Vector3 localVel = transform.InverseTransformDirection(worldVel);
             bool movingBack = localVel.z < -0.25f && remoteSmoothedSpeed > 0.25f;
-            if (Health.Value > 0 && !IsMounted.Value && Time.time >= actionAnimUntil && worldVel.sqrMagnitude > 0.09f)
+            if (Health.Value > 0 && !IsMounted.Value && !blocking && Time.time >= actionAnimUntil && worldVel.sqrMagnitude > 0.09f)
             {
                 float signedAngle = Vector3.SignedAngle(transform.forward, worldVel.normalized, Vector3.up);
                 if (Mathf.Abs(signedAngle) <= 105f) targetYaw = Mathf.Clamp(signedAngle, -52f, 52f);
@@ -305,18 +481,37 @@ namespace Riftbound.Network
             if (remoteVisualRoot)
                 remoteVisualRoot.transform.localRotation = remoteBaseVisualRot * Quaternion.Euler(0f, remoteVisualYawOffset, 0f);
 
-            if (Time.time < actionAnimUntil)
+            // Strict priority order: Dead > Mounted > Blocking > Sequenced One-Shot Action > Airborne > Locomotion
+            string desired;
+            if (Health.Value <= 0)
+            {
+                actionAnimUntil = 0f;
+                ClearRemoteMountVisual();
+                desired = remoteAnimator.HasState(0, Animator.StringToHash("Death")) ? "Death" : "Hit";
+            }
+            else if (IsMounted.Value)
+            {
+                actionAnimUntil = 0f;
+                if (!remoteMountVisual) UpdateRemoteMountVisual();
+                if (remoteMountComp && remoteMountComp.animator)
+                    remoteMountComp.Animate(remoteSmoothedSpeed, airborne, walking);
+                desired = "Ride";
+            }
+            else if (blocking)
+            {
+                actionAnimUntil = 0f;
+                desired = remoteAnimator.HasState(0, Animator.StringToHash("Block")) ? "Block" : "Idle";
+            }
+            else if (Time.time < actionAnimUntil)
             {
                 remoteAnimator.speed = 1f;
                 return;
             }
-
-            string desired;
-            if (Health.Value <= 0)
-                desired = remoteAnimator.HasState(0, Animator.StringToHash("Death")) ? "Death" : "Hit";
-            else if (IsMounted.Value)
-                desired = "Ride";
-            else if (remoteSmoothedSpeed > 3.6f)
+            else if (airborne && remoteAnimator.HasState(0, Animator.StringToHash("Jump")))
+            {
+                desired = "Jump";
+            }
+            else if (remoteSmoothedSpeed > 3.6f && !walking)
                 desired = movingBack && remoteAnimator.HasState(0, Animator.StringToHash("RunBack")) ? "RunBack" : "Run";
             else if (remoteSmoothedSpeed > 0.25f)
                 desired = movingBack && remoteAnimator.HasState(0, Animator.StringToHash("WalkBack")) ? "WalkBack" : "Walk";
@@ -334,7 +529,7 @@ namespace Riftbound.Network
             if (desired == currentRemoteAnim) return;
             if (remoteAnimator.HasState(0, Animator.StringToHash(desired)))
             {
-                remoteAnimator.CrossFadeInFixedTime(desired, 0.14f, 0, 0f);
+                remoteAnimator.CrossFadeInFixedTime(desired, desired == "Death" || desired == "Ride" ? 0.08f : 0.14f, 0, 0f);
                 currentRemoteAnim = desired;
             }
         }
@@ -356,12 +551,16 @@ namespace Riftbound.Network
         // ── O-01 Authoritative Movement ─────────────────────────────────────────────────
 
         [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Owner)]
-        void SubmitMoveStateServerRpc(Vector3 pos, float yaw, float speed)
+        void SubmitMoveStateServerRpc(Vector3 pos, float yaw, float speed, byte flags, byte resourcePct, bool inCombat)
         {
             float dt = Mathf.Clamp(Time.time - lastServerMoveTime, 0.02f, 0.5f);
             lastServerMoveTime = Time.time;
 
-            if (Health.Value <= 0) return;
+            if (Health.Value <= 0)
+            {
+                if (IsMounted.Value) IsMounted.Value = false;
+                return;
+            }
 
             float maxSpeed = IsMounted.Value ? 15.5f : 9.5f;
             float maxStep = maxSpeed * dt + 1.5f;
@@ -392,6 +591,9 @@ namespace Riftbound.Network
             }
 
             MoveSpeed.Value = Mathf.Clamp(speed, 0f, maxSpeed);
+            LocomotionFlags.Value = (byte)(flags & 0x07);
+            ResourcePct.Value = (byte)Mathf.Min(100, (int)resourcePct);
+            IsInCombat.Value = inCombat;
         }
 
         public void AuthorizeHostTeleport(Vector3 destination)
@@ -418,7 +620,7 @@ namespace Riftbound.Network
         public void SendSpoofedPositionForTest(Vector3 targetPos)
         {
             if (!CoopSessionConfig.IsMultiplayer || !IsSpawned || !IsOwner) return;
-            SubmitMoveStateServerRpc(targetPos, transform.eulerAngles.y, 10f);
+            SubmitMoveStateServerRpc(targetPos, transform.eulerAngles.y, 10f, 0, 100, false);
         }
 
         public void RequestSetMount(bool mounted, string mountId)
@@ -432,38 +634,103 @@ namespace Riftbound.Network
             (serverDiscoveredLandmarks.Contains("greenhollow-post") ? 1 : 0) +
             (serverDiscoveredLandmarks.Contains("ancient-grove") ? 1 : 0);
 
+        public static bool IsSupportedMountId(string normalized) =>
+            normalized == "horse" || normalized == "zebra" || normalized == "gryphon";
+
         [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Owner)]
         void RequestSetMountServerRpc(bool mounted, string mountId)
         {
+            string normalized = string.IsNullOrEmpty(mountId) ? "horse" : mountId.Trim().ToLowerInvariant();
+            if (!mounted)
+            {
+                IsMounted.Value = false;
+                if (IsSupportedMountId(normalized)) MountId.Value = new FixedString32Bytes(normalized);
+                return;
+            }
             if (Health.Value <= 0) { IsMounted.Value = false; return; }
-            string normalized = string.IsNullOrEmpty(mountId) ? "horse" : mountId.ToLowerInvariant();
-            if (mounted && normalized == "zebra" && ServerGreenhollowCount() < 3) return;
-            IsMounted.Value = mounted;
+            if (!IsSupportedMountId(normalized)) return;
+            if (normalized == "zebra" && ServerGreenhollowCount() < 3) return;
             MountId.Value = new FixedString32Bytes(normalized);
+            IsMounted.Value = true;
         }
 
-        public void TriggerActionAnim(string animName)
+        public static bool IsSupportedActionAnim(string actionId) =>
+            actionId == "Attack" || actionId == "Cleave" || actionId == "Cast" ||
+            actionId == "Block" || actionId == "Dodge" || actionId == "Hit" || actionId == "Cancel";
+
+        public void TriggerActionAnim(string animName, float duration = 0.55f)
         {
-            if (!CoopSessionConfig.IsMultiplayer || !IsSpawned) return;
-            if (IsServer) BroadcastActionAnimClientRpc(animName);
-            else RequestActionAnimServerRpc(animName);
+            if (!CoopSessionConfig.IsMultiplayer || !IsSpawned || !IsOwner) return;
+            if (!IsSupportedActionAnim(animName)) return;
+            uint seq = ++localActionSeq;
+            float clampedDur = animName == "Cancel" ? 0f : Mathf.Clamp(duration, 0.12f, 2.2f);
+            if (IsServer) ApplyAndBroadcastActionAnim(animName, clampedDur, seq);
+            else RequestActionAnimServerRpc(animName, clampedDur, seq);
         }
 
         [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Owner)]
-        void RequestActionAnimServerRpc(string animName)
+        void RequestActionAnimServerRpc(string animName, float duration, uint seq) =>
+            ApplyAndBroadcastActionAnim(animName, duration, seq);
+
+        void ApplyAndBroadcastActionAnim(string animName, float duration, uint seq)
         {
-            BroadcastActionAnimClientRpc(animName);
+            if (!IsServer || !IsSupportedActionAnim(animName)) return;
+            if (seq <= lastClientActionSeq) return;
+            if (animName != "Cancel" && (Health.Value <= 0 || IsMounted.Value)) return;
+            lastClientActionSeq = seq;
+            lastClientActionTime = Time.time;
+            float clampedDur = animName == "Cancel" ? 0f : Mathf.Clamp(duration, 0.12f, 2.2f);
+            BroadcastActionAnimClientRpc(animName, clampedDur, ++lastBroadcastSeq);
+        }
+
+        void BroadcastServerFallbackActionAnim(string animName, float duration)
+        {
+            if (!IsServer || !IsSupportedActionAnim(animName)) return;
+            if (Time.time < lastClientActionTime + 0.35f) return;
+            if (Health.Value <= 0 || IsMounted.Value) return;
+            BroadcastActionAnimClientRpc(animName, Mathf.Clamp(duration, 0.12f, 2.2f), ++lastBroadcastSeq);
         }
 
         [Rpc(SendTo.Everyone)]
-        void BroadcastActionAnimClientRpc(string animName)
+        void BroadcastActionAnimClientRpc(string animName, float duration, uint seq)
         {
-            if (IsOwner || !remoteAnimator || string.IsNullOrEmpty(animName)) return;
-            if (remoteAnimator.HasState(0, Animator.StringToHash(animName)))
+            if (IsOwner || !IsSupportedActionAnim(animName)) return;
+            if (seq <= lastObservedActionSeq) return;
+            lastObservedActionSeq = seq;
+
+            if (animName == "Cancel")
             {
-                remoteAnimator.CrossFadeInFixedTime(animName, 0.08f, 0, 0f);
-                actionAnimUntil = Time.time + 0.55f;
-                currentRemoteAnim = animName;
+                actionAnimUntil = 0f;
+                return;
+            }
+            if (Health.Value <= 0 || IsMounted.Value) return;
+
+            if (animName == "Dodge")
+            {
+                SpellFX.CreateArcaneBurst(transform.position);
+                if (remoteAnimator)
+                {
+                    string dodgeAnim = remoteAnimator.HasState(0, Animator.StringToHash("Jump")) ? "Jump" : "Run";
+                    if (remoteAnimator.HasState(0, Animator.StringToHash(dodgeAnim)))
+                    {
+                        remoteAnimator.CrossFadeInFixedTime(dodgeAnim, 0.06f, 0, 0f);
+                        actionAnimUntil = Time.time + Mathf.Clamp(duration, 0.2f, 0.45f);
+                        currentRemoteAnim = dodgeAnim;
+                    }
+                }
+                return;
+            }
+
+            if (!remoteAnimator) return;
+            string resolved = animName;
+            if (animName == "Cast" && !remoteAnimator.HasState(0, Animator.StringToHash("Cast")))
+                resolved = remoteAnimator.HasState(0, Animator.StringToHash("Cleave")) ? "Cleave" : "Attack";
+
+            if (remoteAnimator.HasState(0, Animator.StringToHash(resolved)))
+            {
+                remoteAnimator.CrossFadeInFixedTime(resolved, 0.08f, 0, 0f);
+                actionAnimUntil = Time.time + Mathf.Clamp(duration, 0.12f, 2.2f);
+                currentRemoteAnim = resolved;
             }
         }
 
@@ -549,7 +816,7 @@ namespace Riftbound.Network
                 if (!CastBarSystem.IsTargetCasting(stats)) return;
                 bool interrupted = CastBarSystem.InterruptTarget(stats, "Interrupt");
                 if (interrupted) serverAbilityCooldowns[cdKey] = Time.time + cd;
-                BroadcastActionAnimClientRpc("Attack");
+                BroadcastServerFallbackActionAnim("Attack", 0.35f);
                 return;
             }
 
@@ -575,7 +842,7 @@ namespace Riftbound.Network
 
             if (actualApplied > 0f)
                 ConfirmAbilityHitClientRpc(enemy.NetworkKey, Mathf.RoundToInt(actualApplied), RpcTarget.Single(OwnerClientId, RpcTargetUse.Temp));
-            BroadcastActionAnimClientRpc(key == "fireball" || key == "frostnova" || key == "consecration" ? "Cast" : "Attack");
+            BroadcastServerFallbackActionAnim(key == "fireball" || key == "frostnova" || key == "consecration" ? "Cast" : "Attack", 0.50f);
             BroadcastEnemyState(enemy);
         }
 
@@ -690,6 +957,8 @@ namespace Riftbound.Network
             if (avatar.IsServerBlocking) mitigated *= 0.5f;
             int dmgInt = Mathf.Max(1, Mathf.RoundToInt(mitigated));
             avatar.Health.Value = Mathf.Max(0, avatar.Health.Value - dmgInt);
+            if (avatar.Health.Value <= 0 && avatar.IsMounted.Value)
+                avatar.IsMounted.Value = false;
             avatar.ReceiveEnemyHitClientRpc(dmgInt, enemyKey, false, avatar.RpcTarget.Single(targetClientId, RpcTargetUse.Temp));
         }
 
@@ -1146,7 +1415,9 @@ namespace Riftbound.Network
             }
             if (CoopWorldManager.Instance != null && CoopWorldManager.Instance.TryGetActiveReadyCheck(out string rcInitiator))
             {
-                SendReadyCheckSnapshotClientRpc(rcInitiator, rpcParams);
+                var joiningPeer = FindByClientId(clientId);
+                if (joiningPeer) joiningPeer.ReadyCheckId.Value = activeGlobalReadyCheckSeq;
+                SendReadyCheckSnapshotClientRpc(rcInitiator, activeGlobalReadyCheckSeq, rpcParams);
             }
             if (LivingWorldEvents.Instance != null)
             {
@@ -1155,8 +1426,10 @@ namespace Riftbound.Network
         }
 
         [Rpc(SendTo.SpecifiedInParams)]
-        void SendReadyCheckSnapshotClientRpc(string initiatorName, RpcParams rpcParams = default)
+        void SendReadyCheckSnapshotClientRpc(string initiatorName, uint checkId, RpcParams rpcParams = default)
         {
+            serverReadyCheckSeq = checkId;
+            if (LocalOwner) LocalOwner.serverReadyCheckSeq = checkId;
             if (CoopWorldManager.Instance) CoopWorldManager.Instance.OpenReadyCheck(initiatorName);
         }
 
@@ -1257,27 +1530,63 @@ namespace Riftbound.Network
         [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Owner)]
         void RequestReadyCheckServerRpc()
         {
-            foreach (var p in AllPlayers) if (p) p.ReadyStatus.Value = 0;
+            if (Time.time < lastServerReadyCheckTime + 1.2f) return;
+            lastServerReadyCheckTime = Time.time;
+            activeGlobalReadyCheckSeq++;
+            activeGlobalReadyCheckExpires = Time.time + 25f;
+            foreach (var p in AllPlayers)
+            {
+                if (!p) continue;
+                p.ReadyStatus.Value = 0;
+                p.ReadyCheckId.Value = activeGlobalReadyCheckSeq;
+            }
             ReadyStatus.Value = 1;
-            BroadcastReadyCheckClientRpc(PlayerName.Value.ToString());
+            BroadcastReadyCheckClientRpc(PlayerName.Value.ToString(), activeGlobalReadyCheckSeq);
         }
 
         [Rpc(SendTo.Everyone)]
-        void BroadcastReadyCheckClientRpc(string initiatorName)
+        void BroadcastReadyCheckClientRpc(string initiatorName, uint checkId)
         {
+            serverReadyCheckSeq = checkId;
+            if (LocalOwner) LocalOwner.serverReadyCheckSeq = checkId;
             if (CoopWorldManager.Instance) CoopWorldManager.Instance.OpenReadyCheck(initiatorName);
         }
 
         public void RespondReadyCheck(bool ready)
         {
             if (!CoopSessionConfig.IsMultiplayer || !IsSpawned) return;
-            RespondReadyCheckServerRpc(ready);
+            uint cid = ReadyCheckId.Value != 0 ? ReadyCheckId.Value : serverReadyCheckSeq;
+            RespondReadyCheckServerRpc(ready, cid);
+        }
+
+        public void RespondReadyCheckForTest(bool ready, uint checkId)
+        {
+            if (!CoopSessionConfig.IsMultiplayer || !IsSpawned) return;
+            RespondReadyCheckServerRpc(ready, checkId);
         }
 
         [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Owner)]
-        void RespondReadyCheckServerRpc(bool ready)
+        void RespondReadyCheckServerRpc(bool ready, uint checkId)
         {
+            if (activeGlobalReadyCheckSeq == 0 || checkId != activeGlobalReadyCheckSeq) return;
+            if (Time.time > activeGlobalReadyCheckExpires) return;
             ReadyStatus.Value = (byte)(ready ? 1 : 2);
+        }
+
+        public void RequestPromoteLeader(ulong targetClientId)
+        {
+            if (!CoopSessionConfig.IsMultiplayer || !IsSpawned) return;
+            RequestPromoteLeaderServerRpc(targetClientId);
+        }
+
+        [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Owner)]
+        void RequestPromoteLeaderServerRpc(ulong targetClientId)
+        {
+            if (!IsLeader.Value) return;
+            var target = FindByClientId(targetClientId);
+            if (!target || !target.IsSpawned) return;
+            foreach (var p in AllPlayers)
+                if (p && p.IsSpawned) p.IsLeader.Value = (p.OwnerClientId == targetClientId);
         }
 
         public void RequestReviveAlly(ulong targetClientId)

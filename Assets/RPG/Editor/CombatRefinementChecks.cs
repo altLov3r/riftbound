@@ -357,6 +357,37 @@ namespace Riftbound.Editor
                     pc.Stats.invulnerableUntil = 0f;
                     Record("CF09-DodgeInvulnerableWindow", Mathf.Approximately(pc.Stats.Health, hpPreDodge), $"hpAfterDodgeHit={pc.Stats.Health}/{hpPreDodge}");
 
+                    // 7. MP01-MP04 Multiplayer Presentation & Party Checks
+                    var defHorse = RiftboundCoopPlayer.ResolveMountDefinition("horse");
+                    var defZebra = RiftboundCoopPlayer.ResolveMountDefinition("zebra");
+                    var defGryphon = RiftboundCoopPlayer.ResolveMountDefinition("gryphon");
+                    bool realMountsOk = defHorse && defHorse.prefab && defHorse.prefab.saddle && defHorse.prefab.animator
+                                     && defZebra && defZebra.prefab && defZebra.prefab.saddle && defZebra.prefab.animator
+                                     && defGryphon && defGryphon.prefab;
+                    Record("MP01-MountRegistryRealPrefabs", realMountsOk,
+                        $"horse={defHorse?.prefab?.name ?? "null"} zebra={defZebra?.prefab?.name ?? "null"} gryphon={defGryphon?.prefab?.name ?? "null"}");
+
+                    bool allowlistOk = RiftboundCoopPlayer.IsSupportedMountId("horse")
+                                    && RiftboundCoopPlayer.IsSupportedMountId("zebra")
+                                    && RiftboundCoopPlayer.IsSupportedMountId("gryphon")
+                                    && !RiftboundCoopPlayer.IsSupportedMountId("capsule_hack")
+                                    && RiftboundCoopPlayer.IsSupportedActionAnim("Dodge")
+                                    && RiftboundCoopPlayer.IsSupportedActionAnim("Cancel")
+                                    && !RiftboundCoopPlayer.IsSupportedActionAnim("SpoofWave");
+                    Record("MP02-ActionAndMountAllowlist", allowlistOk, "Mount & Action allowlists accept valid IDs and reject spoofed IDs");
+
+                    int companionCountStart = PartySystem.Instance ? PartySystem.Instance.Members.Count : 0;
+                    var cwm = CoopWorldManager.Instance;
+                    bool modalBlockedGroup = false;
+                    if (cwm)
+                    {
+                        cwm.SetGroupMenuOpenForTest(true);
+                        modalBlockedGroup = pc.AnyBlockingWindowOpen();
+                        cwm.CloseGroupMenu();
+                    }
+                    Record("MP04-PartyOptInAndGroupMenuModal", companionCountStart == 0 && (cwm == null || modalBlockedGroup),
+                        $"initialCompanions={companionCountStart} cwmPresent={cwm != null} groupModalBlocks={modalBlockedGroup}");
+
                     UnityEngine.Object.Destroy(dummyGo);
                     if (cc) cc.enabled = false;
                     pc.transform.position = startPos;

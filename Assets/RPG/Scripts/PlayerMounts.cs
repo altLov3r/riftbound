@@ -155,6 +155,8 @@ namespace Riftbound
             if (animator.HasState(0, Animator.StringToHash("Ride"))) Play("Ride", true);
             moveVelocity = Vector3.zero;
             vertical = 0f;
+            if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner != null)
+                Network.RiftboundCoopPlayer.LocalOwner.RequestSetMount(true, taxiDef.mountId);
         }
         public void AnimateFlightTaxi()
         {

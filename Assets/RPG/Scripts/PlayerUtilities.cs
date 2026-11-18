@@ -25,7 +25,11 @@ namespace Riftbound
                 Blocking = true; GuardEnds = Time.time + 3; Stats.incomingDamageMultiplier = .5f;
                 moveVelocity = Vector3.zero; if (animator) animator.speed = 1; Play("Block", true);
                 if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner != null)
+                {
+                    Network.RiftboundCoopPlayer.LocalOwner.TriggerActionAnim("Cancel", 0f);
                     Network.RiftboundCoopPlayer.LocalOwner.SyncDefenseState(true, false);
+                    Network.RiftboundCoopPlayer.LocalOwner.TriggerActionAnim("Block", 0.25f);
+                }
             }
             if (keys.hKey.wasPressedThisFrame && !ReturningHome && !Blocking && !uiBlocked && Time.time >= busyUntil)
             {
@@ -60,7 +64,10 @@ namespace Riftbound
             if (Blocking) GuardReady = Time.time + 6;
             Blocking = false; if (Stats) Stats.incomingDamageMultiplier = 1;
             if (wasBlocking && Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner != null)
+            {
                 Network.RiftboundCoopPlayer.LocalOwner.SyncDefenseState(false, false);
+                Network.RiftboundCoopPlayer.LocalOwner.TriggerActionAnim("Cancel", 0f);
+            }
         }
         public void ToggleGuardPublic()
         {
@@ -70,7 +77,11 @@ namespace Riftbound
                 Blocking = true; GuardEnds = Time.time + 3; Stats.incomingDamageMultiplier = .5f;
                 moveVelocity = Vector3.zero; if (animator) animator.speed = 1; Play("Block", true);
                 if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner != null)
+                {
+                    Network.RiftboundCoopPlayer.LocalOwner.TriggerActionAnim("Cancel", 0f);
                     Network.RiftboundCoopPlayer.LocalOwner.SyncDefenseState(true, false);
+                    Network.RiftboundCoopPlayer.LocalOwner.TriggerActionAnim("Block", 0.25f);
+                }
             }
         }
         public void TriggerHearthstonePublic()

@@ -86,7 +86,8 @@ namespace Riftbound
             (EquipmentSetSystem.Instance && EquipmentSetSystem.Instance.IsWindowOpen) ||
             (GlyphSystem.Instance && GlyphSystem.Instance.IsWindowOpen) ||
             (GemSocketSystem.Instance && GemSocketSystem.Instance.IsWindowOpen) ||
-            (PetBattleSystem.Instance && (PetBattleSystem.Instance.IsJournalOpen || PetBattleSystem.Instance.IsBattleActive));
+            (PetBattleSystem.Instance && (PetBattleSystem.Instance.IsJournalOpen || PetBattleSystem.Instance.IsBattleActive)) ||
+            Network.CoopWorldManager.IsGroupMenuOpen;
         public float ClassResource { get; private set; } = 100f;
         public float MaxClassResource => CharacterClass == "Paladin" ? 5f : 100f;
         public string ClassResourceName => CharacterClass == "Warrior" ? "Rage" : CharacterClass == "Mage" ? "Mana" : CharacterClass == "Rogue" ? "Energy" : "Holy Power";
@@ -507,6 +508,7 @@ namespace Riftbound
             if (Stats && !Stats.Alive) return;
             if (Time.time < dodgeReadyTime) return;
             ClearCombatInputBuffer();
+            bool wasMidAction = Time.time < busyUntil;
             combatActionEpoch++;
             busyUntil = Mathf.Min(busyUntil, Time.time);
             dodgeReadyTime = Time.time + 3.5f;
@@ -514,7 +516,11 @@ namespace Riftbound
             dodgeDir = inputDir.sqrMagnitude > 0.05f ? inputDir.normalized : transform.forward;
             if (Stats) Stats.invulnerableUntil = Time.time + 0.38f;
             if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner != null)
+            {
+                if (wasMidAction) Network.RiftboundCoopPlayer.LocalOwner.TriggerActionAnim("Cancel", 0f);
                 Network.RiftboundCoopPlayer.LocalOwner.SyncDefenseState(Blocking, true);
+                Network.RiftboundCoopPlayer.LocalOwner.TriggerActionAnim("Dodge", 0.32f);
+            }
             SpellFX.CreateArcaneBurst(transform.position);
             CombatTextManager.Spawn(transform.position + Vector3.up * 1.8f, "DODGE!", new Color(0.55f, 0.95f, 1f), false);
         }
@@ -553,6 +559,8 @@ namespace Riftbound
                 if (success)
                 {
                     interruptReadyTime = Time.time + 12f;
+                    if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner != null)
+                        Network.RiftboundCoopPlayer.LocalOwner.TriggerActionAnim("Attack", 0.35f);
                     CombatTextManager.Spawn(Target.transform.position + Vector3.up * 1.5f, $"★ {InterruptSpellName.ToUpper()}! ★", Color.red, true);
                     SpellFX.CreateExpandingRing(Target.transform.position, 0.3f, 2.2f, 0.25f, new Color(0.4f, 0.85f, 1f, 0.9f), 0.14f);
                     OrbitCamera.Shake(0.12f, 0.12f);
@@ -678,7 +686,7 @@ namespace Riftbound
                 busyUntil = Time.time + 0.6f;
                 Play("Attack", true);
                 if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner != null)
-                    Network.RiftboundCoopPlayer.LocalOwner.TriggerActionAnim("Attack");
+                    Network.RiftboundCoopPlayer.LocalOwner.TriggerActionAnim("Cast", 0.60f);
                 AudioEffects.PlaySpellCast();
                 float dmg = 36 + (Level - 1) * 4 + WeaponBonus;
                 if (CharacterRace == "Brute") dmg *= 1.15f;
@@ -730,7 +738,7 @@ namespace Riftbound
                 if (animator && hasVisualBaseRotation) animator.transform.localRotation = visualBaseRotation;
                 Play("Cleave", true);
                 if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner != null)
-                    Network.RiftboundCoopPlayer.LocalOwner.TriggerActionAnim("Cleave");
+                    Network.RiftboundCoopPlayer.LocalOwner.TriggerActionAnim("Cast", 0.50f);
                 AudioEffects.PlaySpellCast();
                 SpellFX.CreateFrostNova(transform.position, 6.5f);
                 foreach (var enemy in FindObjectsByType<EnemyController>(FindObjectsSortMode.None))
@@ -763,7 +771,7 @@ namespace Riftbound
                 if (animator && hasVisualBaseRotation) animator.transform.localRotation = visualBaseRotation;
                 Play("Cleave", true);
                 if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner != null)
-                    Network.RiftboundCoopPlayer.LocalOwner.TriggerActionAnim("Cleave");
+                    Network.RiftboundCoopPlayer.LocalOwner.TriggerActionAnim("Cleave", 0.50f);
                 AudioEffects.PlaySpellCast();
                 Hit(Target, 52, "eviscerate");
                 Message = "Eviscerate! Critical finisher!";
@@ -778,7 +786,7 @@ namespace Riftbound
                 if (animator && hasVisualBaseRotation) animator.transform.localRotation = visualBaseRotation;
                 Play("Cleave", true);
                 if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner != null)
-                    Network.RiftboundCoopPlayer.LocalOwner.TriggerActionAnim("Cleave");
+                    Network.RiftboundCoopPlayer.LocalOwner.TriggerActionAnim("Cast", 0.50f);
                 AudioEffects.PlaySpellCast();
                 SpellFX.CreateConsecration(transform.position, 5.5f);
                 foreach (var enemy in FindObjectsByType<EnemyController>(FindObjectsSortMode.None))
@@ -879,8 +887,19 @@ namespace Riftbound
             string swingAnim = cleave ? "Cleave" : "Attack";
             Play(swingAnim, true);
             if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner != null)
-                Network.RiftboundCoopPlayer.LocalOwner.TriggerActionAnim(swingAnim);
-            yield return new WaitForSeconds(duration * .45f);
+                Network.RiftboundCoopPlayer.LocalOwner.TriggerActionAnim(swingAnim, duration * 0.78f);
+            float windupEnd = Time.time + duration * .45f;
+            while (Time.time < windupEnd)
+            {
+                if (!Stats || !Stats.Alive || Blocking || actionEpoch != combatActionEpoch || Time.time < dodgeEnds) yield break;
+                if (!cleave && victim && victim.Alive && (!orbit || !orbit.IsSteering))
+                {
+                    Vector3 aim = victim.transform.position - transform.position; aim.y = 0f;
+                    if (aim.sqrMagnitude > 0.01f && aim.sqrMagnitude < 16f)
+                        transform.rotation = Quaternion.RotateTowards(transform.rotation, Quaternion.LookRotation(aim), 240f * Time.deltaTime);
+                }
+                yield return null;
+            }
             if (!Stats.Alive || Blocking || actionEpoch != combatActionEpoch || Time.time < dodgeEnds) yield break;
             if (cleave)
             {
@@ -949,9 +968,11 @@ namespace Riftbound
         public void ApplyConfirmedHitPresentation(Combatant enemy, float confirmedDamage, bool isCrit)
         {
             if (!enemy) return;
-            AudioEffects.PlayBladeHit();
+            if (CharacterClass == "Mage") GameSound.Play(SoundCue.Rune, enemy.transform.position + Vector3.up * 1.1f);
+            else AudioEffects.PlayBladeHit();
             SpellFX.CreateHitSparks(enemy.transform.position + Vector3.up * 1.1f, isCrit);
             if (isCrit) OrbitCamera.Shake(0.13f, 0.14f);
+            else if (confirmedDamage >= 35f) OrbitCamera.Shake(0.08f, 0.08f);
             CombatTextManager.SpawnDamage(enemy.transform.position, confirmedDamage, isCrit);
             string critMsg = isCrit ? " [CRITICAL!]" : "";
             ChatSystem.LogCombat($"Your strike hits {enemy.displayName} for {Mathf.RoundToInt(confirmedDamage)} damage{critMsg}.");

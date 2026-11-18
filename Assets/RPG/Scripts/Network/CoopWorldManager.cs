@@ -18,15 +18,25 @@ namespace Riftbound.Network
         string statusText = "";
         bool shuttingDown;
 
-        // Deliverables #5: Party Frames, Map Ping, Ready Check
+        // Deliverables #5: Party Frames, Map Ping, Ready Check, Group Menu
         bool readyCheckOpen;
         string readyCheckInitiator = "";
         float readyCheckExpires;
+        float readySummaryUntil;
         string activePingSender = "";
         Vector3 activePingWorldPos;
         float activePingExpires;
         bool hostDisconnected;
         string hostDisconnectMessage = "";
+        bool groupMenuOpen;
+        bool revealJoinCode;
+        ulong selectedPeerClientId = ulong.MaxValue;
+        readonly List<RiftboundCoopPlayer> sortedPeers = new List<RiftboundCoopPlayer>();
+        GUIStyle rosterHeaderStyle, rosterSubStyle, rosterRightStyle;
+
+        public static bool IsGroupMenuOpen => Instance && Instance.groupMenuOpen;
+        public void SetGroupMenuOpenForTest(bool open) { groupMenuOpen = open; if (!open) revealJoinCode = false; }
+        public void CloseGroupMenu() { groupMenuOpen = false; revealJoinCode = false; }
 
         public bool HasActivePingForTest => Time.time < activePingExpires;
         public bool IsReadyCheckOpenForTest => readyCheckOpen && Time.time < readyCheckExpires;
@@ -55,7 +65,8 @@ namespace Riftbound.Network
         {
             readyCheckInitiator = initiator;
             readyCheckOpen = true;
-            readyCheckExpires = Time.time + 20f;
+            readyCheckExpires = Time.time + 25f;
+            readySummaryUntil = Time.time + 30f;
         }
 
         void Update()
@@ -66,7 +77,19 @@ namespace Riftbound.Network
             if (keys == null) return;
 
             var localPc = FindFirstObjectByType<PlayerController>();
-            bool uiBlocking = localPc != null && (localPc.ChatOpen || localPc.DialogueOpen || localPc.ShopOpen || localPc.InventoryOpen || localPc.MapOpen || localPc.JournalOpen || localPc.TalentsOpen || localPc.SpellbookOpen || localPc.AchievementOpen || localPc.ReputationOpen);
+            bool chatOrTextOpen = localPc != null && (localPc.ChatOpen || localPc.DialogueOpen || localPc.ShopOpen);
+            if (!chatOrTextOpen && keys.oKey.wasPressedThisFrame)
+            {
+                groupMenuOpen = !groupMenuOpen;
+                if (!groupMenuOpen) revealJoinCode = false;
+            }
+            if (groupMenuOpen && keys.escapeKey.wasPressedThisFrame)
+            {
+                CloseGroupMenu();
+                return;
+            }
+
+            bool uiBlocking = groupMenuOpen || (localPc != null && (localPc.ChatOpen || localPc.DialogueOpen || localPc.ShopOpen || localPc.InventoryOpen || localPc.MapOpen || localPc.JournalOpen || localPc.TalentsOpen || localPc.SpellbookOpen || localPc.AchievementOpen || localPc.ReputationOpen));
             if (uiBlocking || RiftboundCoopPlayer.LocalOwner.Health.Value <= 0) return;
 
             if (keys.f6Key.wasPressedThisFrame)
@@ -358,6 +381,9 @@ namespace Riftbound.Network
                 hostDisconnected = true;
                 hostDisconnectMessage = $"{reason}. Host exit ends the session (no host migration).";
                 readyCheckOpen = false;
+                groupMenuOpen = false;
+                revealJoinCode = false;
+                selectedPeerClientId = ulong.MaxValue;
                 activePingExpires = 0f;
                 Debug.LogWarning($"[CoopWorldManager] {statusText}");
             }
@@ -384,6 +410,9 @@ namespace Riftbound.Network
             }
 
             CoopSessionConfig.ResetToOffline();
+            groupMenuOpen = false;
+            revealJoinCode = false;
+            selectedPeerClientId = ulong.MaxValue;
             Time.timeScale = 1f;
             SceneManager.LoadScene(SceneManager.GetActiveScene().name);
         }
@@ -420,82 +449,217 @@ namespace Riftbound.Network
                 return;
             }
 
-            int count = RiftboundCoopPlayer.AllPlayers.Count;
-            float w = 265f;
-            float h = CoopSessionConfig.IsOnlineMode && !string.IsNullOrEmpty(OnlineSessionService.ActiveJoinCode) ? 132f : 124f;
-            float x = Screen.width - w - 16f;
-            float y = 16f;
+            if (rosterHeaderStyle == null)
+            {
+                rosterHeaderStyle = new GUIStyle(GUI.skin.label) { fontSize = 11, fontStyle = FontStyle.Bold };
+                rosterHeaderStyle.normal.textColor = new Color(0.95f, 0.94f, 0.88f);
+                rosterSubStyle = new GUIStyle(GUI.skin.label) { fontSize = 10 };
+                rosterSubStyle.normal.textColor = new Color(0.84f, 0.86f, 0.88f);
+                rosterRightStyle = new GUIStyle(GUI.skin.label) { fontSize = 10, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleRight };
+            }
 
+            float scale = Mathf.Min(Screen.width / 1280f, Screen.height / 720f);
+            var oldMatrix = GUI.matrix;
+            GUI.matrix = Matrix4x4.TRS(Vector3.zero, Quaternion.identity, Vector3.one * scale);
+            float uiW = Screen.width / scale;
+            float uiH = Screen.height / scale;
+
+            int count = CountSpawnedPeers();
+            // Compact group pill placed cleanly left of the Mail/minimap controls; join code stays tucked inside the Group Menu [O]
+            float pillW = 144f, pillH = 24f;
+            float pillX = Mathf.Max(480f, uiW - 436f), pillY = 20f;
             GUI.color = new Color(0.06f, 0.08f, 0.11f, 0.88f);
-            GUI.DrawTexture(new Rect(x, y, w, h), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(pillX, pillY, pillW, pillH), Texture2D.whiteTexture);
+            GUI.color = new Color(0.66f, 0.55f, 0.33f, 0.85f);
+            GUI.DrawTexture(new Rect(pillX, pillY, pillW, 1.5f), Texture2D.whiteTexture);
             GUI.color = Color.white;
-
-            GUI.Label(new Rect(x + 10f, y + 6f, w - 20f, 20f), $"{statusText} ({count}/{MaxPlayers})");
-            GUI.Label(new Rect(x + 10f, y + 24f, w - 20f, 18f), "Session-only progress (offline saves safe)");
-
-            float btnY = y + 46f;
-            if (CoopSessionConfig.IsOnlineMode && !string.IsNullOrEmpty(OnlineSessionService.ActiveJoinCode))
+            string pillText = groupMenuOpen ? $"Close Group [{count}/{MaxPlayers}]" : $"Group {count}/{MaxPlayers} [O]";
+            if (GUI.Button(new Rect(pillX + 2f, pillY + 2f, pillW - 4f, pillH - 4f), pillText, rosterHeaderStyle))
             {
-                GUI.Label(new Rect(x + 10f, btnY, 145f, 22f), $"Code: {OnlineSessionService.ActiveJoinCode}");
-                if (GUI.Button(new Rect(x + 155f, btnY, w - 165f, 22f), "Copy Code"))
-                {
-                    GUIUtility.systemCopyBuffer = OnlineSessionService.ActiveJoinCode;
-                }
-                btnY += 26f;
+                groupMenuOpen = !groupMenuOpen;
+                if (!groupMenuOpen) revealJoinCode = false;
             }
 
-            float halfW = (w - 26f) * 0.5f;
-            if (GUI.Button(new Rect(x + 10f, btnY, halfW, 22f), "Ping [F6]"))
-            {
-                RiftboundCoopPlayer.LocalOwner?.RequestMapPing(RiftboundCoopPlayer.LocalOwner.transform.position);
-            }
-            if (GUI.Button(new Rect(x + 16f + halfW, btnY, halfW, 22f), "Ready [F7]"))
-            {
-                RiftboundCoopPlayer.LocalOwner?.RequestReadyCheck();
-            }
-            btnY += 26f;
+            DrawPartyFramesAndCoopExtras(uiW, uiH);
+            if (groupMenuOpen) DrawGroupSessionMenu(uiW, uiH);
 
-            if (GUI.Button(new Rect(x + 10f, btnY, w - 20f, 24f), "Leave Session"))
-            {
-                DisconnectAndReturnToMenu();
-            }
-
-            DrawPartyFramesAndCoopExtras();
+            GUI.matrix = oldMatrix;
         }
 
-        void DrawPartyFramesAndCoopExtras()
+        int CountSpawnedPeers()
         {
-            if (RiftboundCoopPlayer.AllPlayers.Count > 1)
+            int n = 0;
+            foreach (var p in RiftboundCoopPlayer.AllPlayers)
+                if (p && p.IsSpawned) n++;
+            return n;
+        }
+
+        void RefreshSortedPeers()
+        {
+            sortedPeers.Clear();
+            foreach (var p in RiftboundCoopPlayer.AllPlayers)
+                if (p && p.IsSpawned) sortedPeers.Add(p);
+            sortedPeers.Sort((a, b) =>
             {
-                float py = 180f;
-                foreach (var p in RiftboundCoopPlayer.AllPlayers)
-                {
-                    if (!p || !p.IsSpawned || p.IsOwner) continue;
-                    GUI.color = new Color(0.05f, 0.07f, 0.1f, 0.84f);
-                    GUI.DrawTexture(new Rect(16f, py, 215f, 44f), Texture2D.whiteTexture);
-                    GUI.color = Color.white;
+                int slotCmp = a.SpawnSlot.Value.CompareTo(b.SpawnSlot.Value);
+                return slotCmp != 0 ? slotCmp : a.OwnerClientId.CompareTo(b.OwnerClientId);
+            });
+        }
 
-                    string readyMark = p.ReadyStatus.Value == 1 ? " [OK]" : (p.ReadyStatus.Value == 2 ? " [NO]" : "");
-                    string downMark = p.Health.Value <= 0 ? " [DOWN - E Revive]" : (p.IsMounted.Value ? " [Mount]" : "");
-                    GUI.Label(new Rect(24f, py + 4f, 200f, 18f), $"{p.PlayerName.Value} Lv{p.Level.Value} {p.ClassName.Value}{readyMark}{downMark}");
-
-                    float pct = p.MaxHealth.Value > 0 ? Mathf.Clamp01((float)p.Health.Value / p.MaxHealth.Value) : 1f;
-                    GUI.color = new Color(0.15f, 0.15f, 0.15f, 0.9f);
-                    GUI.DrawTexture(new Rect(24f, py + 26f, 198f, 8f), Texture2D.whiteTexture);
-                    GUI.color = p.Health.Value <= 0 ? new Color(0.55f, 0.2f, 0.2f) : new Color(0.25f, 0.85f, 0.35f);
-                    GUI.DrawTexture(new Rect(25f, py + 27f, 196f * pct, 6f), Texture2D.whiteTexture);
-                    GUI.color = Color.white;
-                    py += 50f;
-                }
+        static Color GetClassTint(string cls)
+        {
+            switch (cls)
+            {
+                case "Warrior": return new Color(0.78f, 0.61f, 0.43f);
+                case "Paladin": return new Color(0.96f, 0.55f, 0.73f);
+                case "Mage": return new Color(0.25f, 0.78f, 0.92f);
+                case "Rogue": return new Color(1.0f, 0.94f, 0.36f);
+                default: return new Color(0.85f, 0.85f, 0.85f);
             }
+        }
+
+        static Color GetResourceTint(string cls)
+        {
+            switch (cls)
+            {
+                case "Warrior": return new Color(0.85f, 0.18f, 0.12f);
+                case "Mage": return new Color(0.18f, 0.48f, 0.95f);
+                case "Rogue": return new Color(0.95f, 0.85f, 0.15f);
+                case "Paladin": return new Color(1.0f, 0.82f, 0.22f);
+                default: return new Color(0.5f, 0.5f, 0.55f);
+            }
+        }
+
+        static bool HasSupportedResource(string cls) =>
+            cls == "Warrior" || cls == "Mage" || cls == "Rogue" || cls == "Paladin";
+
+        void DrawPartyFramesAndCoopExtras(float uiW, float uiH)
+        {
+            RefreshSortedPeers();
+            bool showReadyBadge = readyCheckOpen || Time.time < readySummaryUntil;
+
+            // Stack cleanly below top-left self Player Frame (y=20..72) + Dodge pip (y~76..98) and below any opt-in NPC crew
+            int companionCount = PartySystem.Instance != null ? PartySystem.Instance.Members.Count : 0;
+            float startX = 24f;
+            float py = 104f + companionCount * 38f;
+            float cardW = 208f;
+            float cardH = 44f;
+
+            var localOwner = RiftboundCoopPlayer.LocalOwner;
+            bool selectedStillPresent = false;
+
+            foreach (var p in sortedPeers)
+            {
+                if (!p || !p.IsSpawned || p.IsOwner) continue;
+                if (p.OwnerClientId == selectedPeerClientId) selectedStillPresent = true;
+
+                string cls = p.ClassName.Value.ToString();
+                Color clsCol = GetClassTint(cls);
+                Rect cardRect = new Rect(startX, py, cardW, cardH);
+
+                GUI.color = new Color(0.05f, 0.07f, 0.10f, 0.86f);
+                GUI.DrawTexture(cardRect, Texture2D.whiteTexture);
+                GUI.color = clsCol;
+                GUI.DrawTexture(new Rect(startX, py, 3f, cardH), Texture2D.whiteTexture);
+                GUI.color = p.OwnerClientId == selectedPeerClientId ? new Color(0.88f, 0.72f, 0.25f, 0.95f) : new Color(0.32f, 0.28f, 0.20f, 0.75f);
+                GUI.DrawTexture(new Rect(startX + 3f, py, cardW - 3f, 1f), Texture2D.whiteTexture);
+                GUI.DrawTexture(new Rect(startX + 3f, py + cardH - 1f, cardW - 3f, 1f), Texture2D.whiteTexture);
+                GUI.color = Color.white;
+
+                string leaderTag = p.IsLeader.Value ? "★ " : "";
+                string combatTag = p.IsInCombat.Value ? " [CBT]" : "";
+                string mountTag = p.IsMounted.Value ? " [M]" : "";
+                string downTag = p.Health.Value <= 0 ? " [DOWN]" : "";
+                rosterHeaderStyle.normal.textColor = p.Health.Value <= 0 ? new Color(0.82f, 0.35f, 0.35f) : clsCol;
+                GUI.Label(new Rect(startX + 7f, py + 2f, cardW - 34f, 15f), $"{leaderTag}{p.PlayerName.Value} Lv{p.Level.Value}{combatTag}{mountTag}{downTag}", rosterHeaderStyle);
+                rosterHeaderStyle.normal.textColor = new Color(0.95f, 0.94f, 0.88f);
+
+                if (showReadyBadge)
+                {
+                    string rMark = p.ReadyStatus.Value == 1 ? "✔" : (p.ReadyStatus.Value == 2 ? "✖" : "?");
+                    rosterRightStyle.normal.textColor = p.ReadyStatus.Value == 1 ? new Color(0.3f, 0.92f, 0.38f) :
+                                                        p.ReadyStatus.Value == 2 ? new Color(0.92f, 0.28f, 0.28f) :
+                                                        new Color(1f, 0.78f, 0.25f);
+                    GUI.Label(new Rect(startX + cardW - 24f, py + 2f, 19f, 15f), rMark, rosterRightStyle);
+                }
+
+                // HP bar (13px)
+                float hpPct = p.MaxHealth.Value > 0 ? Mathf.Clamp01((float)p.Health.Value / p.MaxHealth.Value) : 1f;
+                float barX = startX + 7f, barW = cardW - 13f;
+                GUI.color = new Color(0.13f, 0.14f, 0.16f, 0.95f);
+                GUI.DrawTexture(new Rect(barX, py + 19f, barW, 13f), Texture2D.whiteTexture);
+                GUI.color = p.Health.Value <= 0 ? new Color(0.55f, 0.18f, 0.18f) : new Color(0.25f, 0.78f, 0.36f);
+                GUI.DrawTexture(new Rect(barX + 1f, py + 20f, (barW - 2f) * hpPct, 11f), Texture2D.whiteTexture);
+                GUI.color = Color.white;
+                GUI.Label(new Rect(barX + 4f, py + 17f, barW - 8f, 15f), p.Health.Value <= 0 ? "DOWN (0)" : $"{p.Health.Value}/{p.MaxHealth.Value}", rosterSubStyle);
+
+                // Supported resource bar (5px)
+                GUI.color = new Color(0.10f, 0.11f, 0.13f, 0.95f);
+                GUI.DrawTexture(new Rect(barX, py + 35f, barW, 5f), Texture2D.whiteTexture);
+                if (HasSupportedResource(cls))
+                {
+                    float resPct = Mathf.Clamp01(p.ResourcePct.Value / 100f);
+                    GUI.color = GetResourceTint(cls);
+                    GUI.DrawTexture(new Rect(barX, py + 35f, barW * resPct, 5f), Texture2D.whiteTexture);
+                }
+                GUI.color = Color.white;
+
+                if (!groupMenuOpen && Event.current.type == EventType.MouseDown && Event.current.button == 0 && cardRect.Contains(Event.current.mousePosition))
+                {
+                    selectedPeerClientId = selectedPeerClientId == p.OwnerClientId ? ulong.MaxValue : p.OwnerClientId;
+                    Event.current.Use();
+                }
+
+                // Compact peer context actions (only real implemented actions)
+                if (!groupMenuOpen && selectedPeerClientId == p.OwnerClientId && localOwner != null)
+                {
+                    float ctxX = startX + cardW + 6f;
+                    bool canRevive = p.Health.Value <= 0 && localOwner.Health.Value > 0 && Vector3.Distance(localOwner.transform.position, p.transform.position) <= 5.0f;
+                    bool canPromote = localOwner.IsLeader.Value && !p.IsLeader.Value;
+                    float ctxH = 54f + (canPromote ? 24f : 0f);
+                    GUI.color = new Color(0.05f, 0.07f, 0.10f, 0.94f);
+                    GUI.DrawTexture(new Rect(ctxX, py, 134f, ctxH), Texture2D.whiteTexture);
+                    GUI.color = Color.white;
+                    float cy = py + 4f;
+                    if (GUI.Button(new Rect(ctxX + 4f, cy, 126f, 21f), "Ping Location", rosterSubStyle))
+                    {
+                        localOwner.RequestMapPing(p.transform.position);
+                        selectedPeerClientId = ulong.MaxValue;
+                    }
+                    cy += 24f;
+                    GUI.enabled = canRevive;
+                    if (GUI.Button(new Rect(ctxX + 4f, cy, 126f, 21f), canRevive ? "Revive Ally" : "Revive (<5m)", rosterSubStyle))
+                    {
+                        localOwner.RequestReviveAlly(p.OwnerClientId);
+                        selectedPeerClientId = ulong.MaxValue;
+                    }
+                    GUI.enabled = true;
+                    if (canPromote)
+                    {
+                        cy += 24f;
+                        if (GUI.Button(new Rect(ctxX + 4f, cy, 126f, 21f), "Make Leader", rosterSubStyle))
+                        {
+                            localOwner.RequestPromoteLeader(p.OwnerClientId);
+                            selectedPeerClientId = ulong.MaxValue;
+                        }
+                    }
+                }
+
+                py += cardH + 4f;
+            }
+            if (!selectedStillPresent && selectedPeerClientId != ulong.MaxValue)
+                selectedPeerClientId = ulong.MaxValue;
 
             if (Time.time < activePingExpires && Camera.main)
             {
                 Vector3 sp = Camera.main.WorldToScreenPoint(activePingWorldPos + Vector3.up * 2.5f);
                 if (sp.z > 0.1f)
                 {
+                    float scale = Mathf.Min(Screen.width / 1280f, Screen.height / 720f);
+                    float gx = sp.x / scale;
+                    float gy = (Screen.height - sp.y) / scale;
                     GUI.color = new Color(1f, 0.82f, 0.2f, 0.95f);
-                    GUI.Label(new Rect(sp.x - 80f, Screen.height - sp.y - 20f, 160f, 24f), $"★ PING ({activePingSender})");
+                    GUI.Label(new Rect(gx - 80f, gy - 20f, 160f, 24f), $"★ PING ({activePingSender})");
                     GUI.color = Color.white;
                 }
             }
@@ -503,10 +667,12 @@ namespace Riftbound.Network
             if (readyCheckOpen)
             {
                 float rw = 300f;
-                float rx = (Screen.width - rw) * 0.5f;
-                float ry = 90f;
-                GUI.color = new Color(0.06f, 0.08f, 0.12f, 0.92f);
+                float rx = (uiW - rw) * 0.5f;
+                float ry = 88f;
+                GUI.color = new Color(0.06f, 0.08f, 0.12f, 0.94f);
                 GUI.DrawTexture(new Rect(rx, ry, rw, 84f), Texture2D.whiteTexture);
+                GUI.color = new Color(0.66f, 0.55f, 0.33f, 0.9f);
+                GUI.DrawTexture(new Rect(rx, ry, rw, 2f), Texture2D.whiteTexture);
                 GUI.color = Color.white;
                 GUI.Label(new Rect(rx + 14f, ry + 8f, rw - 28f, 22f), $"Ready Check from {readyCheckInitiator}");
                 if (GUI.Button(new Rect(rx + 14f, ry + 38f, 128f, 30f), "Ready"))
@@ -519,6 +685,80 @@ namespace Riftbound.Network
                     RiftboundCoopPlayer.LocalOwner?.RespondReadyCheck(false);
                     readyCheckOpen = false;
                 }
+            }
+        }
+
+        void DrawGroupSessionMenu(float uiW, float uiH)
+        {
+            float mw = 470f, mh = 365f;
+            float mx = (uiW - mw) * 0.5f, my = (uiH - mh) * 0.5f;
+
+            GUI.color = new Color(0.05f, 0.06f, 0.09f, 0.96f);
+            GUI.DrawTexture(new Rect(mx, my, mw, mh), Texture2D.whiteTexture);
+            GUI.color = new Color(0.66f, 0.55f, 0.33f, 0.92f);
+            GUI.DrawTexture(new Rect(mx, my, mw, 2f), Texture2D.whiteTexture);
+            GUI.color = Color.white;
+
+            int count = sortedPeers.Count;
+            GUI.Label(new Rect(mx + 16f, my + 12f, mw - 70f, 24f), $"GROUP & SESSION  ({count}/{MaxPlayers} Players)");
+            if (GUI.Button(new Rect(mx + mw - 38f, my + 10f, 24f, 24f), "X"))
+                CloseGroupMenu();
+
+            GUI.Label(new Rect(mx + 16f, my + 36f, mw - 32f, 20f), $"{statusText} · Session-only progress · Host exit ends session", rosterSubStyle);
+
+            float rowY = my + 64f;
+            if (CoopSessionConfig.IsOnlineMode && !string.IsNullOrEmpty(OnlineSessionService.ActiveJoinCode))
+            {
+                string displayedCode = revealJoinCode ? OnlineSessionService.ActiveJoinCode : "••••••";
+                GUI.Label(new Rect(mx + 16f, rowY + 2f, 185f, 22f), $"Private Invite Code: {displayedCode}", rosterSubStyle);
+                if (GUI.Button(new Rect(mx + 206f, rowY, 74f, 24f), revealJoinCode ? "Hide" : "Reveal"))
+                    revealJoinCode = !revealJoinCode;
+                if (GUI.Button(new Rect(mx + 286f, rowY, 166f, 24f), "Copy Invite Code"))
+                    GUIUtility.systemCopyBuffer = OnlineSessionService.ActiveJoinCode;
+                rowY += 34f;
+            }
+
+            var localOwner = RiftboundCoopPlayer.LocalOwner;
+            GUI.Label(new Rect(mx + 16f, rowY, mw - 32f, 18f), "ACTIVE ROSTER (Human Peers Only — AI Companions Opt-In Below)", rosterSubStyle);
+            rowY += 22f;
+
+            foreach (var p in sortedPeers)
+            {
+                if (!p || !p.IsSpawned) continue;
+                GUI.color = new Color(0.09f, 0.11f, 0.15f, 0.9f);
+                GUI.DrawTexture(new Rect(mx + 16f, rowY, mw - 32f, 38f), Texture2D.whiteTexture);
+                GUI.color = Color.white;
+
+                string leaderMark = p.IsLeader.Value ? "★ Leader · " : "";
+                string selfMark = p.IsOwner ? " (You)" : "";
+                string readyStr = p.ReadyStatus.Value == 1 ? "Ready" : (p.ReadyStatus.Value == 2 ? "Not Ready" : "Idle");
+                string stateStr = p.Health.Value <= 0 ? "DOWN" : (p.IsMounted.Value ? $"Mounted ({p.MountId.Value})" : (p.IsInCombat.Value ? "Combat" : readyStr));
+                GUI.Label(new Rect(mx + 24f, rowY + 2f, 260f, 18f), $"{leaderMark}{p.PlayerName.Value}{selfMark} · Lv{p.Level.Value} {p.ClassName.Value}");
+                GUI.Label(new Rect(mx + 24f, rowY + 19f, 260f, 17f), $"HP {p.Health.Value}/{p.MaxHealth.Value} · {stateStr}", rosterSubStyle);
+
+                if (!p.IsOwner && localOwner != null && localOwner.IsLeader.Value && !p.IsLeader.Value)
+                {
+                    if (GUI.Button(new Rect(mx + mw - 132f, rowY + 8f, 108f, 22f), "Make Leader"))
+                        localOwner.RequestPromoteLeader(p.OwnerClientId);
+                }
+                rowY += 42f;
+            }
+
+            float btnY = my + mh - 74f;
+            if (GUI.Button(new Rect(mx + 16f, btnY, 138f, 28f), "Map Ping [F6]"))
+                localOwner?.RequestMapPing(localOwner.transform.position);
+            if (GUI.Button(new Rect(mx + 162f, btnY, 146f, 28f), "Ready Check [F7]"))
+                localOwner?.RequestReadyCheck();
+            if (GUI.Button(new Rect(mx + 316f, btnY, 138f, 28f), "AI Crew [G]"))
+            {
+                CloseGroupMenu();
+                PartySystem.Instance?.ToggleCompanionMenu();
+            }
+
+            if (GUI.Button(new Rect(mx + 16f, my + mh - 38f, mw - 32f, 28f), "Leave Session & Return to Menu"))
+            {
+                CloseGroupMenu();
+                DisconnectAndReturnToMenu();
             }
         }
 
@@ -1476,6 +1716,7 @@ namespace Riftbound.Network
                         while (Time.realtimeSinceStartup - waitLm2 < 10f && (clientAvatar == null || !clientAvatar.IsMounted.Value))
                             yield return new WaitForSeconds(0.2f);
                         bool zebraSeenOnHost = clientAvatar != null && clientAvatar.IsMounted.Value && clientAvatar.MountId.Value.ToString() == "zebra";
+                        bool realMountMeshOk = clientAvatar != null && clientAvatar.RemoteMountComponent != null && !clientAvatar.HasRemoteCapsuleFallback && clientAvatar.RemoteMountComponent.animator != null;
 
                         int gBeforeTemper = clientAvatar != null ? clientAvatar.Gold.Value : 0;
                         float waitTemperH = Time.realtimeSinceStartup;
@@ -1490,7 +1731,9 @@ namespace Riftbound.Network
                         float waitDownH = Time.realtimeSinceStartup;
                         while (Time.realtimeSinceStartup - waitDownH < 6f && clientAvatar != null && clientAvatar.Health.Value > 0)
                             yield return new WaitForSeconds(0.15f);
-                        yield return new WaitForSeconds(1.8f); // Let dead client fail invalid RPCs
+                        yield return new WaitForSeconds(0.2f);
+                        bool mountClearedOnDeath = clientAvatar != null && !clientAvatar.IsMounted.Value && clientAvatar.RemoteMountComponent == null;
+                        yield return new WaitForSeconds(1.6f); // Let dead client fail invalid RPCs
                         RiftboundCoopPlayer.LocalOwner.RequestReviveAlly(remoteCid); // Must fail > 5m
                         yield return new WaitForSeconds(0.6f);
                         bool farRevBlocked = clientAvatar != null && clientAvatar.Health.Value <= 0;
@@ -1521,8 +1764,8 @@ namespace Riftbound.Network
                             yield return new WaitForSeconds(0.8f);
                         }
 
-                        authorityPass = hostChestOk && zebraSeenOnHost && farRevBlocked && nearRevOk;
-                        combatInfo += $", hostAuth={(authorityPass ? "PASS" : "FAIL")}(chest={hostChestOk},zebra={zebraSeenOnHost},farRevRej={farRevBlocked},nearRev={nearRevOk})";
+                        authorityPass = hostChestOk && zebraSeenOnHost && realMountMeshOk && mountClearedOnDeath && farRevBlocked && nearRevOk;
+                        combatInfo += $", hostAuth={(authorityPass ? "PASS" : "FAIL")}(chest={hostChestOk},zebra={zebraSeenOnHost},realMnt={realMountMeshOk},mntClr={mountClearedOnDeath},farRevRej={farRevBlocked},nearRev={nearRevOk})";
                     }
                     else
                     {
@@ -1681,12 +1924,15 @@ namespace Riftbound.Network
                             int hpAfterPot = me.Health.Value;
                             me.RequestUsePotion(); // Within 1.5s server cooldown -> must reject with zero local potion/HP desync
                             me.RequestAbilityHeal(60, "spoof_unknown_heal"); // Unknown heal ID must reject cleanly
+                            me.RequestPromoteLeader(me.OwnerClientId); // Non-leader promote must reject cleanly
+                            me.RespondReadyCheckForTest(true, 999999u); // Stale/wrong readyCheckId must reject cleanly
                             yield return new WaitForSeconds(0.5f);
                             potCdRej = lp.Potions == potsBeforeUse - 1 && me.Health.Value == hpAfterPot;
                         }
 
-                        authorityPass = posClampOk && outRangeRej && unknownAtkRej && cooldownRej && goldAfterChest > 0 && aliveRespRej && restFullRej && dupLmRej && zebraBlockedEarly && zebraUnlockedOk && temperOk && deadRejOk && revBackOk && restDmgOk && potOk && potCdRej;
-                        combatInfo += $", clientAuth={(authorityPass ? "PASS" : "FAIL")}(clamp={posClampOk},rngRej={outRangeRej},unkAtkRej={unknownAtkRej},cdRej={cooldownRej},aliveRespRej={aliveRespRej},restRej={restFullRej},dupLmRej={dupLmRej},zEarly={zebraBlockedEarly},zOk={zebraUnlockedOk},temper={temperOk},deadRej={deadRejOk},rev={revBackOk},restOk={restDmgOk}[g={restG0}->{me.Gold.Value},h={restH0}->{me.Health.Value}/{me.MaxHealth.Value}],potOk={potOk},potCdRej={potCdRej})";
+                        bool leaderSpoofRej = !me.IsLeader.Value && me.ReadyStatus.Value == 0;
+                        authorityPass = posClampOk && outRangeRej && unknownAtkRej && cooldownRej && goldAfterChest > 0 && aliveRespRej && restFullRej && dupLmRej && zebraBlockedEarly && zebraUnlockedOk && temperOk && deadRejOk && revBackOk && restDmgOk && potOk && potCdRej && leaderSpoofRej;
+                        combatInfo += $", clientAuth={(authorityPass ? "PASS" : "FAIL")}(clamp={posClampOk},rngRej={outRangeRej},unkAtkRej={unknownAtkRej},cdRej={cooldownRej},aliveRespRej={aliveRespRej},restRej={restFullRej},dupLmRej={dupLmRej},zEarly={zebraBlockedEarly},zOk={zebraUnlockedOk},temper={temperOk},deadRej={deadRejOk},rev={revBackOk},restOk={restDmgOk}[g={restG0}->{me.Gold.Value},h={restH0}->{me.Health.Value}/{me.MaxHealth.Value}],potOk={potOk},potCdRej={potCdRej},ldrSpoofRej={leaderSpoofRej})";
                     }
                 }
                 else
@@ -1696,7 +1942,76 @@ namespace Riftbound.Network
                 }
             }
 
-            bool pass = players >= minPlayers && RiftboundCoopPlayer.LocalOwner != null && activeCams == 1 && activeListeners == 1 && sep >= 1.0f && combatPass && lateJoinPass && progPass && clientLeavePass && fullAcceptPass && authorityPass;
+            bool visualPass = true;
+            if (CoopSessionConfig.VisualSmoke && players >= 2 && RiftboundCoopPlayer.LocalOwner != null)
+            {
+                var me = RiftboundCoopPlayer.LocalOwner;
+                var peer = GetFirstRemotePlayer();
+                var lp = FindFirstObjectByType<PlayerController>();
+                string capDir = CoopSessionConfig.CaptureDir;
+                if (!string.IsNullOrEmpty(capDir)) System.IO.Directory.CreateDirectory(capDir);
+
+                // Phase 1: Both mount Horse and observe real MountVisual (never capsule)
+                me.RequestSetMount(true, "horse");
+                float wH = Time.realtimeSinceStartup;
+                while (Time.realtimeSinceStartup - wH < 5f && (peer == null || !peer.IsMounted.Value || peer.RemoteMountComponent == null))
+                {
+                    if (peer == null) peer = GetFirstRemotePlayer();
+                    yield return new WaitForSeconds(0.15f);
+                }
+                if (lp && peer && lp.orbit)
+                {
+                    Vector3 look = peer.transform.position - lp.transform.position; look.y = 0f;
+                    if (look.sqrMagnitude > 0.01f) lp.transform.rotation = Quaternion.LookRotation(look);
+                }
+                yield return new WaitForSeconds(0.6f);
+                bool horseReal = peer != null && peer.IsMounted.Value && peer.RemoteMountComponent != null && !peer.HasRemoteCapsuleFallback && peer.MountId.Value.ToString() == "horse";
+                if (!string.IsNullOrEmpty(capDir))
+                {
+                    ScreenCapture.CaptureScreenshot(System.IO.Path.Combine(capDir, (isHost ? "host" : "guest") + "_horse_roster.png"));
+                    yield return new WaitForSeconds(0.4f);
+                }
+
+                // Phase 2: Switch live mount to Gryphon without dismounting
+                me.RequestSetMount(true, "gryphon");
+                float wG = Time.realtimeSinceStartup;
+                while (Time.realtimeSinceStartup - wG < 5f && (peer == null || peer.MountId.Value.ToString() != "gryphon" || peer.RemoteMountComponent == null))
+                    yield return new WaitForSeconds(0.15f);
+                yield return new WaitForSeconds(0.6f);
+                bool gryphonReal = peer != null && peer.IsMounted.Value && peer.RemoteMountComponent != null && !peer.HasRemoteCapsuleFallback && peer.MountId.Value.ToString() == "gryphon";
+                if (!string.IsNullOrEmpty(capDir))
+                {
+                    ScreenCapture.CaptureScreenshot(System.IO.Path.Combine(capDir, (isHost ? "host" : "guest") + "_gryphon.png"));
+                    yield return new WaitForSeconds(0.4f);
+                }
+
+                // Phase 3: Group Menu [O] check + Dismount & teardown
+                if (!isHost)
+                {
+                    SetGroupMenuOpenForTest(true);
+                    yield return new WaitForSeconds(0.3f);
+                    if (!string.IsNullOrEmpty(capDir))
+                    {
+                        ScreenCapture.CaptureScreenshot(System.IO.Path.Combine(capDir, "guest_group_menu.png"));
+                        yield return new WaitForSeconds(0.4f);
+                    }
+                    CloseGroupMenu();
+                }
+
+                me.RequestSetMount(false, "horse");
+                float wD = Time.realtimeSinceStartup;
+                while (Time.realtimeSinceStartup - wD < 5f && (peer == null || peer.IsMounted.Value || peer.RemoteMountComponent != null))
+                    yield return new WaitForSeconds(0.15f);
+                yield return new WaitForSeconds(0.3f);
+                bool dismountClear = peer != null && !peer.IsMounted.Value && peer.RemoteMountComponent == null;
+
+                me.TriggerActionAnim("Dodge", 0.32f);
+                yield return new WaitForSeconds(0.45f);
+                visualPass = horseReal && gryphonReal && dismountClear;
+                combatInfo += $", visualSmoke={(visualPass ? "PASS" : "FAIL")}(horseReal={horseReal},gryphonReal={gryphonReal},dismountClear={dismountClear})";
+            }
+
+            bool pass = players >= minPlayers && RiftboundCoopPlayer.LocalOwner != null && activeCams == 1 && activeListeners == 1 && sep >= 1.0f && combatPass && lateJoinPass && progPass && clientLeavePass && fullAcceptPass && authorityPass && visualPass;
             string msg = $"{(pass ? "PASS" : "FAIL")} {role}: players={players}, localOwner={(RiftboundCoopPlayer.LocalOwner != null)}, cams={activeCams}, listeners={activeListeners}, sep={sep:F2}m ({posInfo}){combatInfo}";
             Debug.Log(msg);
             System.Console.WriteLine(msg);

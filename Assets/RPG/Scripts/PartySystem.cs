@@ -481,8 +481,8 @@ namespace Riftbound
             DrawPartyFrames();
             if (IsCompanionMenuOpen) DrawCompanionMenu(screenW, screenH);
 
-            // 4. Draw Ready Check Modal Dialog
-            if (ReadyCheckActive)
+            // 4. Draw Ready Check Modal Dialog (only offline; online peers use CoopWorldManager Ready Check)
+            if (ReadyCheckActive && !Network.CoopSessionConfig.IsMultiplayer)
             {
                 DrawReadyCheckModal(screenW, screenH);
             }
