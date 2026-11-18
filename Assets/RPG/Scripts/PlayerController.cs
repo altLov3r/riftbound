@@ -50,6 +50,7 @@ namespace Riftbound
         public int BufferedAbilitySlot => Time.time < bufferedAbilityExpiresAt ? bufferedAbilitySlot : 0;
         public void ClearCombatInputBuffer() { bufferedAbilitySlot = 0; bufferedAbilityExpiresAt = 0f; }
         Vector3 moveVelocity;
+        readonly JumpInputBuffer jumpInput = new JumpInputBuffer();
         Quaternion visualBaseRotation = Quaternion.identity;
         bool hasVisualBaseRotation;
         float visualYawOffset;
@@ -176,12 +177,18 @@ namespace Riftbound
             UpdateClassResource();
             if (FlightMaster.IsAnyTaxiInFlight)
             {
+                jumpInput.Reset();
                 moveVelocity = Vector3.zero;
                 vertical = 0f;
                 return;
             }
             var keys = Keyboard.current;
-            if (keys == null || FrontendMenu.IsOpen || (orbit && orbit.Paused)) return;
+            if (keys == null || FrontendMenu.IsOpen || (orbit && orbit.Paused))
+            {
+                jumpInput.Reset(); ClearCombatInputBuffer();
+                return;
+            }
+            if (orbit) orbit.RefreshInput();
             if (PrototypeHUD.MenuOpen || (PartySystem.Instance && PartySystem.Instance.IsCompanionMenuOpen))
             {
                 moveVelocity = Vector3.zero;
@@ -350,14 +357,16 @@ namespace Riftbound
             }
             else
             {
-                if (forwardInput) moveDirection += transform.forward;
-                if (backInput) moveDirection -= transform.forward;
+                var forward = Vector3.ProjectOnPlane(transform.forward, Vector3.up).normalized;
+                var right = Vector3.ProjectOnPlane(transform.right, Vector3.up).normalized;
+                if (forwardInput) moveDirection += forward;
+                if (backInput) moveDirection -= forward;
 
                 if (rightMouseSteering)
                 {
                     // A and D strafe when holding right-click
-                    if (leftInput) moveDirection -= transform.right;
-                    if (rightInput) moveDirection += transform.right;
+                    if (leftInput) moveDirection -= right;
+                    if (rightInput) moveDirection += right;
                 }
             }
 
@@ -374,6 +383,7 @@ namespace Riftbound
 
             if (isFlyingMount)
             {
+                jumpInput.Reset();
                 if (running) speed = SelectedMount.flySpeed;
                 if (keys.leftShiftKey.isPressed) speed *= 1.5f;
 
@@ -396,7 +406,8 @@ namespace Riftbound
             else
             {
                 if (motor.isGrounded && vertical < 0) vertical = -2;
-                if (keys.spaceKey.wasPressedThisFrame && motor.isGrounded && Time.time >= busyUntil && !Blocking) vertical = 6.4f;
+                if (jumpInput.TryJump(Time.time, motor.isGrounded && vertical <= 0,
+                    keys.spaceKey.wasPressedThisFrame, Time.time >= busyUntil && !Blocking)) vertical = 6.4f;
                 vertical += Physics.gravity.y * 2.1f * Time.deltaTime;
             }
 
@@ -407,7 +418,10 @@ namespace Riftbound
             moveVelocity = Time.time < dodgeEnds ? dodgeDir * 15.5f : desiredVelocity;
             if (Mounted && !MountPathClear(moveVelocity)) moveVelocity = Vector3.zero;
             if (motor && motor.enabled)
-                motor.Move((moveVelocity + Vector3.up * vertical) * Time.deltaTime);
+            {
+                var collision = motor.Move((moveVelocity + Vector3.up * vertical) * Time.deltaTime);
+                if ((collision & CollisionFlags.Above) != 0 && vertical > 0) vertical = 0;
+            }
             EnsureAboveTerrain(isFlyingMount);
             if (transform.position.y < -10 && !WorldRegions.Underground(transform.position)) Respawn();
 
@@ -464,15 +478,15 @@ namespace Riftbound
                     animator.speed = playback;
                 }
             }
-            if (bufferedAbilitySlot == 1 && Time.time < bufferedAbilityExpiresAt && Time.time >= attackReady)
+            if (bufferedAbilitySlot != 0)
             {
-                ClearCombatInputBuffer();
-                if (!Blocking && !InventoryOpen && !AnyBlockingWindowOpen() && motor.isGrounded && Stats && Stats.Alive)
+                if (Time.time >= bufferedAbilityExpiresAt || !Stats || !Stats.Alive || Blocking || AnyBlockingWindowOpen() || !Target || !Target.Alive)
+                    ClearCombatInputBuffer();
+                else if (bufferedAbilitySlot == 1 && Time.time >= attackReady && motor.isGrounded)
+                {
+                    ClearCombatInputBuffer();
                     CastAbility1();
-            }
-            else if (bufferedAbilitySlot != 0 && (Time.time >= bufferedAbilityExpiresAt || !Stats || !Stats.Alive || Blocking || AnyBlockingWindowOpen() || !Target || !Target.Alive))
-            {
-                ClearCombatInputBuffer();
+                }
             }
 
             if (keys.digit1Key.wasPressedThisFrame) RequestPrimaryAttackInput();
@@ -499,7 +513,7 @@ namespace Riftbound
             if (attackReady - Time.time <= 0.35f)
             {
                 bufferedAbilitySlot = 1;
-                bufferedAbilityExpiresAt = Time.time + 0.16f;
+                bufferedAbilityExpiresAt = attackReady + 0.16f;
             }
         }
 
@@ -1121,6 +1135,7 @@ namespace Riftbound
             StopGuard(); ReturningHome = false;
             StopAllCoroutines(); motor.enabled = false; transform.position = safeSpawn; motor.enabled = true;
             vertical = 0; moveVelocity = Vector3.zero;
+            jumpInput.Reset(); ClearCombatInputBuffer();
             visualYawOffset = 0f;
             if (animator && hasVisualBaseRotation) animator.transform.localRotation = visualBaseRotation;
             Cursor.lockState = CursorLockMode.None; Cursor.visible = true;
@@ -1144,6 +1159,7 @@ namespace Riftbound
         float GaitPhase(string state) => state == "Walk" ? walkPhase : state == "Run" ? runPhase : state == "WalkBack" ? backWalkPhase : backRunPhase;
         void GravityOnly()
         {
+            jumpInput.Reset(); ClearCombatInputBuffer();
             if (!motor || !motor.enabled) return;
             if (motor.isGrounded && vertical < 0) vertical = -2;
             vertical += Physics.gravity.y * 1.8f * Time.deltaTime;

@@ -8,7 +8,15 @@ Abe introduces the road-raider, stolen-supply and Ashwood Captain quest chain. Q
 
 ## Travel
 
-Running is the normal movement mode; C toggles slow walking. Z summons/dismisses the selected unlocked mount and V cycles mounts. Movement, damage and incompatible actions can interrupt a summon. Mount availability and exploration requirements still apply.
+Running is the normal movement mode; slash or numpad divide toggles slow walking. A/D turn; hold right mouse to steer and strafe, or both mouse buttons to move forward. Left mouse alone orbits the camera. C opens the character sheet.
+
+Space jumps, with a short grace period at ledges and a brief input buffer just before landing. Holding Space does not repeatedly jump. Menus and interrupted actions clear pending jump input. Ground travel stays level after dismounting a flying mount.
+
+Z summons/dismisses the selected unlocked mount and V cycles mounts. Movement, damage and incompatible actions can interrupt a summon. Mount availability and exploration requirements still apply.
+
+## Combat input
+
+The primary ability accepts one queued press near the end of its recovery. It executes once when recovery ends and the character can act on the ground; a brief contact interruption can defer it within the queue grace period. Invalid targets, death and blocking windows cancel pending actions. A queued press does not grant damage or resources before the ability executes.
 
 Travel between Emberwatch, Highspire, Westbank and the Reaver camp, or north to Greenhollow. Test bridge decks, steep approaches and camera clearance when reporting movement defects; a location on the map is not proof it is traversable.
 

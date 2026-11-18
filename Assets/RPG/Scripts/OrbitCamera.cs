@@ -81,35 +81,38 @@ namespace Riftbound
                 if (SettingsSystem.Instance) { SettingsSystem.Instance.ToggleMenu(); } else { SetPaused(!Paused); }
             }
         }
+        int inputFrame = -1;
+
+        public void RefreshInput()
+        {
+            var mouse = Mouse.current;
+            bool blocked = !target || FrontendMenu.IsOpen || Paused || FlightMaster.IsAnyTaxiMapOpen ||
+                (player && player.AnyBlockingWindowOpen()) || PrototypeHUD.MenuOpen ||
+                (PartySystem.Instance && PartySystem.Instance.IsCompanionMenuOpen);
+            if (blocked || mouse == null)
+            {
+                IsSteering = IsFreeLooking = BothMouseButtonsPressed = false;
+                return;
+            }
+            if (inputFrame == Time.frameCount) return;
+            inputFrame = Time.frameCount;
+            bool rightDown = mouse.rightButton.isPressed, leftDown = mouse.leftButton.isPressed;
+            IsSteering = rightDown;
+            IsFreeLooking = leftDown && !rightDown;
+            BothMouseButtonsPressed = rightDown && leftDown;
+            if (rightDown || leftDown)
+            {
+                bool flying = player && player.Mounted && player.SelectedMount && player.SelectedMount.isFlying;
+                yaw += mouse.delta.ReadValue().x * .22f * mouseSensitivity;
+                pitch = Mathf.Clamp(pitch - mouse.delta.ReadValue().y * .16f * mouseSensitivity, flying ? -65f : -15f, 75f);
+            }
+            distance = Mathf.Clamp(distance - mouse.scroll.ReadValue().y * .008f, 2.5f, 15f);
+        }
+
         void LateUpdate()
         {
+            RefreshInput();
             if (!target || FrontendMenu.IsOpen) return;
-            var mouse = Mouse.current;
-            bool uiBlocking = FlightMaster.IsAnyTaxiMapOpen || (player && (player.DialogueOpen || player.ShopOpen || player.MapOpen || player.JournalOpen || player.EncounterJournalOpen || player.InventoryOpen || player.TalentsOpen || player.SpellbookOpen || player.AchievementOpen || player.ReputationOpen || ProfessionSystem.IsOpen || AuctionHouseSystem.AuctionOpen || (GuildSystem.Instance && GuildSystem.Instance.IsOpen) || (MailboxSystem.Instance && MailboxSystem.Instance.IsOpen) || (BattlegroundSystem.Instance && BattlegroundSystem.Instance.IsWindowOpen) || (CharacterSheetSystem.Instance && CharacterSheetSystem.Instance.IsOpen) || (MacroSystem.Instance && MacroSystem.Instance.IsOpen) || (SettingsSystem.Instance && SettingsSystem.Instance.IsMenuOpen) || (DungeonFinderSystem.Instance && DungeonFinderSystem.Instance.IsWindowOpen) || (ArchaeologySystem.Instance && ArchaeologySystem.Instance.IsWindowOpen) || (TransmogSystem.Instance && TransmogSystem.Instance.IsWindowOpen) || (FishingSystem.Instance && FishingSystem.Instance.IsWindowOpen) || (CalendarEventSystem.Instance && CalendarEventSystem.Instance.IsWindowOpen) || (BarberShopSystem.Instance && BarberShopSystem.Instance.IsWindowOpen) || (WorldPvPSystem.Instance && WorldPvPSystem.Instance.IsOverviewOpen) || (EquipmentSetSystem.Instance && EquipmentSetSystem.Instance.IsWindowOpen) || (GlyphSystem.Instance && GlyphSystem.Instance.IsWindowOpen) || (GemSocketSystem.Instance && GemSocketSystem.Instance.IsWindowOpen) || (PetBattleSystem.Instance && (PetBattleSystem.Instance.IsJournalOpen || PetBattleSystem.Instance.IsBattleActive))));
-            uiBlocking |= PrototypeHUD.MenuOpen || (PartySystem.Instance && PartySystem.Instance.IsCompanionMenuOpen);
-            if (!Paused && !uiBlocking && mouse != null)
-            {
-                bool rightDown = mouse.rightButton.isPressed;
-                bool leftDown = mouse.leftButton.isPressed;
-                IsSteering = rightDown;
-                IsFreeLooking = leftDown && !rightDown;
-                BothMouseButtonsPressed = rightDown && leftDown;
-
-                if (rightDown || leftDown)
-                {
-                    bool isFlyingMount = player && player.Mounted && player.SelectedMount && player.SelectedMount.isFlying;
-                    float minPitch = isFlyingMount ? -65f : -15f;
-                    yaw += mouse.delta.ReadValue().x * .22f * mouseSensitivity;
-                    pitch = Mathf.Clamp(pitch - mouse.delta.ReadValue().y * .16f * mouseSensitivity, minPitch, 75f);
-                }
-                distance = Mathf.Clamp(distance - mouse.scroll.ReadValue().y * .008f, 2.5f, 15f);
-            }
-            else
-            {
-                IsSteering = false;
-                IsFreeLooking = false;
-                BothMouseButtonsPressed = false;
-            }
             var rotation = Quaternion.Euler(pitch, yaw, 0);
             float targetHeight = player ? (player.Mounted ? 2.4f : player.EyeHeight) : 1.6f;
             viewHeight = Mathf.Lerp(viewHeight, targetHeight, 1 - Mathf.Exp(-6 * Time.deltaTime));
