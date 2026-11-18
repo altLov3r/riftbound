@@ -16,6 +16,9 @@ namespace Riftbound.Editor
         {
             public string evidence = "Native saved-scene physics inspection; NOT running gameplay or traversal acceptance";
             public string sceneHashBefore, sceneHashAfter;
+            public string reaverTerrainPath;
+            public int reaverTrees, reaverPrototypes;
+            public bool reaverColliderMatches;
             public bool unsavedCandidatePreview;
             public List<ActorRow> actors = new List<ActorRow>();
             public List<string> errors = new List<string>();
@@ -63,6 +66,13 @@ namespace Riftbound.Editor
                 report.sceneHashBefore = Hash(WorldRegions.ScenePath);
                 EditorSceneManager.OpenScene(WorldRegions.ScenePath);
                 Physics.SyncTransforms();
+                var reaver = WorldRegions.TerrainAt(RiverReaverCamp.Position);
+                if (!reaver || !reaver.terrainData) throw new InvalidOperationException("Reaver terrain reference is missing.");
+                report.reaverTerrainPath = AssetDatabase.GetAssetPath(reaver.terrainData);
+                report.reaverTrees = reaver.terrainData.treeInstanceCount;
+                report.reaverPrototypes = reaver.terrainData.treePrototypes.Length;
+                var terrainCollider = reaver.GetComponent<TerrainCollider>();
+                report.reaverColliderMatches = terrainCollider && terrainCollider.terrainData == reaver.terrainData;
                 var actors = UnityEngine.Object.FindObjectsByType<Transform>(FindObjectsSortMode.None)
                     .Where(t => t.name == "Ember Hatchling" || t.name == "Outrider Lyra" || t.name == "Vermithrax the Ember Sovereign")
                     .OrderBy(t => t.name).ThenBy(t => t.position.x).ToArray();

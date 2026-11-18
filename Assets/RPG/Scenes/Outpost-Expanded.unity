@@ -68154,7 +68154,7 @@ Transform:
   m_GameObject: {fileID: 235028304}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: 1, z: -0, w: -0.00000004371139}
-  m_LocalPosition: {x: 0, y: 0.05000305, z: 2.5}
+  m_LocalPosition: {x: 0, y: 0.65000153, z: 2.5}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -386496,6 +386496,7 @@ GameObject:
   - component: {fileID: 1371700964}
   - component: {fileID: 1371700963}
   - component: {fileID: 1371700967}
+  - component: {fileID: 719823500000000002}
   m_Layer: 0
   m_Name: Molten Roost Pit
   m_TagString: Untagged
@@ -386649,7 +386650,7 @@ CapsuleCollider:
   m_LayerOverridePriority: 0
   m_IsTrigger: 0
   m_ProvidesContacts: 0
-  m_Enabled: 1
+  m_Enabled: 0
   serializedVersion: 2
   m_Radius: 0.5
   m_Height: 2
@@ -448549,7 +448550,7 @@ Transform:
   m_GameObject: {fileID: 1598433396}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0.86602545, z: -0, w: 0.49999997}
-  m_LocalPosition: {x: 6.5, y: 0.05000305, z: -1}
+  m_LocalPosition: {x: 6.5, y: 0.65000153, z: -1}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -529925,7 +529926,7 @@ Transform:
   m_GameObject: {fileID: 1897978581}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: 0.86602545, z: -0, w: 0.49999997}
-  m_LocalPosition: {x: -6.5, y: 0.05000305, z: -1}
+  m_LocalPosition: {x: -6.5, y: 0.65000153, z: -1}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -553227,6 +553228,7 @@ GameObject:
   - component: {fileID: 1976386428}
   - component: {fileID: 1976386427}
   - component: {fileID: 1976386426}
+  - component: {fileID: 719823500000000001}
   m_Layer: 0
   m_Name: Summit Dais Platform
   m_TagString: Untagged
@@ -553315,7 +553317,7 @@ CapsuleCollider:
   m_LayerOverridePriority: 0
   m_IsTrigger: 0
   m_ProvidesContacts: 0
-  m_Enabled: 1
+  m_Enabled: 0
   serializedVersion: 2
   m_Radius: 0.5
   m_Height: 2
@@ -669399,7 +669401,7 @@ Transform:
   m_GameObject: {fileID: 6056976545848387688}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: 0.92387956, z: -0, w: 0.38268346}
-  m_LocalPosition: {x: -22.5, y: 5.420336, z: 159.5}
+  m_LocalPosition: {x: -22.5, y: 9.35402775, z: 159.5}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -814402,3 +814404,47 @@ SceneRoots:
   - {fileID: 1026834749}
   - {fileID: 609671006}
   - {fileID: 1768412084}
+--- !u!64 &719823500000000001
+MeshCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1976386424}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 5
+  m_Convex: 0
+  m_CookingOptions: 30
+  m_Mesh: {fileID: 10206, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!64 &719823500000000002
+MeshCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1371700961}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 5
+  m_Convex: 0
+  m_CookingOptions: 30
+  m_Mesh: {fileID: 10206, guid: 0000000000000000e000000000000000, type: 0}

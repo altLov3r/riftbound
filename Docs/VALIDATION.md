@@ -17,7 +17,7 @@ Run batch methods with `-batchmode -projectPath <checkout> -executeMethod <metho
 | Riftbound.Editor.PresentationAssetAudit.Run | Prefab/rig/clip and sampled-pose inventory |
 | Riftbound.Editor.PresentationWorldProbe.Run | Running-world contact observation with explicit synthetic idle/title fixture and scene reload |
 | Riftbound.Editor.RiderPoseAudit.Run | Idle/Ride samples and optional GPU bench renders for Humanoid resource characters; reports excluded rigs |
-| Riftbound.Editor.SupportSurfaceAudit.Run | Saved-scene summit/Lyra collider bounds, filtered short/long rays and scene hash preservation |
+| Riftbound.Editor.SupportSurfaceAudit.Run | Saved-scene summit/Lyra bounds and rays, scene hash preservation, and actual Reaver terrain reference/vegetation counts |
 | Riftbound.Editor.SupportSurfaceAudit.RunBoth | Saved baseline plus an unsaved, temporary two-platform/four-actor repair preview with bounded native motor steps |
 
 GPU rendering methods require a real graphics device; omit `-nographics`. Native physics, sampled poses, rendered captures, scripted movement, headless online sessions and manual two-PC play are distinct evidence categories.

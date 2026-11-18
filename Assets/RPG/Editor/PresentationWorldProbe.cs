@@ -162,10 +162,11 @@ namespace Riftbound.Editor
                         row.hasSupport = true; row.supportY = hit.point.y; row.support = hit.collider.name; break;
                     }
                     if (row.hasSoleEstimate && row.hasSupport) row.estimatedGap = row.soleY - row.supportY;
-                    if (!row.hasSupport && SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Null)
+                    bool repairedActor = row.actor == "Ember Hatchling" || row.actor == "Outrider Lyra" || row.actor == "Vermithrax the Ember Sovereign";
+                    if ((!row.hasSupport || repairedActor) && SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Null)
                     {
-                        string name = "unsupported-" + receipt.actors.Count + ".png";
-                        Capture(grounding.transform, name); receipt.captures.Add(name);
+                        string name = "contact-" + receipt.actors.Count + ".png";
+                        Capture(grounding.transform, name, repairedActor); receipt.captures.Add(name);
                     }
                 }
                 var player = Object.FindAnyObjectByType<PlayerController>();
@@ -185,7 +186,7 @@ namespace Riftbound.Editor
             EditorApplication.isPlaying = false;
         }
 
-        static void Capture(Transform target, string filename)
+        static void Capture(Transform target, string filename, bool frameActor = false)
         {
             var camera = new GameObject("Disposable contact probe camera").AddComponent<Camera>();
             var texture = new RenderTexture(900, 800, 24);
@@ -197,6 +198,16 @@ namespace Riftbound.Editor
                 camera.transform.position = target.position + new Vector3(2.7f, 1.3f, 2.5f);
                 camera.transform.LookAt(target.position + Vector3.up * .8f);
                 camera.fieldOfView = 38; camera.nearClipPlane = .05f; camera.farClipPlane = 80;
+                if (frameActor)
+                {
+                    var bounds = new Bounds(target.position + Vector3.up, Vector3.zero);
+                    foreach (var renderer in target.GetComponentsInChildren<SkinnedMeshRenderer>())
+                        if (renderer.enabled) bounds.Encapsulate(renderer.bounds);
+                    float radius = Mathf.Max(1, bounds.extents.magnitude);
+                    float distance = radius / Mathf.Sin(camera.fieldOfView * .5f * Mathf.Deg2Rad) * 1.15f;
+                    camera.transform.position = bounds.center + new Vector3(1, .6f, 1).normalized * distance;
+                    camera.transform.LookAt(bounds.center);
+                }
                 camera.targetTexture = texture;
                 ShaderUtil.allowAsyncCompilation = false;
                 camera.Render(); camera.Render(); RenderTexture.active = texture;

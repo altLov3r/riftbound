@@ -14,9 +14,10 @@ This plan covers the diploma demonstration, competition build and a possible pub
 
 - The reviewed maintenance baseline is `f4ce09fcecb5a7ca4d3986f40a24aa584f3aea41`. Follow-up diagnostic changes do not constitute a newly verified combined runtime build.
 - Native Idle/Ride samples cover 20 Humanoid character variants. The Human Mage remains upright in the isolated saddle bench; the reported severe tilt is **not reproduced** there. Actual local/observer transitions remain required before closure. Four Generic Undead variants need their separate rig-specific checks.
-- A running-world contact fixture reproduces four unsupported actors after scene reload. The three summit enemies are displaced from their saved roots and are not motor-grounded; Lyra is below terrain. Their names do not establish intentional flight.
-- The summit dais artwork reaches Y=75.6 while its scaled capsule reaches Y=90.4. The pit artwork reaches Y=75.2 while its capsule reaches Y=79.55. Review mesh-shaped collision and localized actor heights; do not enlarge visual correction bounds to conceal the mismatch.
-- An unsaved native repair preview restores support for all four scoped actors and keeps all three enemy motors grounded through bounded downward steps. **The authored repair is not applied.** Scene approval, real traversal, encounter behavior and host/guest validation remain outstanding.
+- The original contact fixture reproduced four unsupported actors: three summit enemies displaced by oversized platform capsules, and Lyra below terrain. Their names did not establish intentional flight.
+- The localized scene repair now uses the existing dais/pit meshes for collision, retains the old disabled capsule components and positions the three summit actors on the dais and Lyra above terrain. Existing scene identities, X/Z positions, rotations, artwork and terrain remain preserved.
+- After repair, the running-world contact fixture finds support for all 95 observed actors after scene reload. The three summit enemy motors remain grounded at their intended roots; the four repaired actors have estimated sole clearances of 0.024–0.031 m. Rendered contact captures were inspected.
+- All 32 spawn checks and 145 quest checks pass, including the unchanged separate-Reaver-terrain and approach-grade assertions. These fixtures do not establish normal-input traversal, encounter feel or host/guest acceptance of the scene repair. The existing standalone predates this repair and must be rebuilt from the reviewed combined source.
 - The contact fixture completed with advancing frames, but the editor emitted a search-index startup exception. No source compilation error was reported; do not describe the entire console as clean.
 
 ## Priorities
