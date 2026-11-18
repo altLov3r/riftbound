@@ -67,6 +67,8 @@ namespace Riftbound.Network
         string currentRemoteAnim = "";
         string builtRace = "";
         string builtClass = "";
+        GroundedVisual remoteGrounding;
+        bool remoteObserverBound;
         float syncTimer;
         float lastServerMoveTime;
         bool hostTeleportAuthorized;
@@ -83,6 +85,18 @@ namespace Riftbound.Network
         float lastServerReadyCheckTime = -10f;
         static readonly Dictionary<string, MountDefinition> cachedMounts = new Dictionary<string, MountDefinition>(System.StringComparer.OrdinalIgnoreCase);
 
+        public GameObject RemoteVisualRoot => remoteVisualRoot;
+        public Animator RemoteAnimator => remoteAnimator;
+        public GroundedVisual RemoteGroundedVisual => remoteGrounding;
+        public bool IsObserverContextBound =>
+            remoteObserverBound
+            && remoteGrounding != null
+            && remoteAnimator != null
+            && remoteGrounding.animator == remoteAnimator
+            && GetComponents<GroundedVisual>().Length == 1;
+        public bool IsRemoteObserverMounted => IsMounted.Value;
+        public bool IsRemoteObserverAlive => Health.Value > 0;
+        public bool IsRemoteObserverAirborne => (LocomotionFlags.Value & 1) != 0;
         public MountVisual RemoteMountComponent => remoteMountComp;
         public bool HasRemoteCapsuleFallback => remoteMountVisual != null && remoteMountComp == null;
         public float RemoteSmoothedSpeed => remoteSmoothedSpeed;
@@ -167,7 +181,14 @@ namespace Riftbound.Network
             MountId.OnValueChanged -= OnMountIdChanged;
             Health.OnValueChanged -= OnRemoteHealthChanged;
             ClearRemoteMountVisual();
-            if (remoteVisualRoot) Destroy(remoteVisualRoot);
+            ReleaseRemoteGroundingObserver();
+            if (remoteVisualRoot)
+            {
+                remoteVisualRoot.SetActive(false);
+                Destroy(remoteVisualRoot);
+                remoteVisualRoot = null;
+                remoteAnimator = null;
+            }
         }
 
         void OnAuthoritativeGoldChanged(int prev, int next)
@@ -279,6 +300,32 @@ namespace Riftbound.Network
             return null;
         }
 
+        void BindRemoteGroundingObserver()
+        {
+            if (IsOwner || !remoteAnimator) return;
+            var grounding = GroundedVisual.EnsureFor(gameObject, remoteAnimator);
+            if (grounding)
+            {
+                grounding.BindObserver(
+                    remoteAnimator,
+                    () => IsMounted.Value,
+                    () => Health.Value > 0,
+                    () => (LocomotionFlags.Value & 1) != 0);
+                remoteGrounding = grounding;
+                remoteObserverBound = true;
+            }
+        }
+
+        void ReleaseRemoteGroundingObserver()
+        {
+            remoteObserverBound = false;
+            if (remoteGrounding)
+            {
+                remoteGrounding.BindAnimator(null);
+                remoteGrounding = null;
+            }
+        }
+
         void RebuildRemoteVisual()
         {
             string r = Race.Value.ToString();
@@ -288,7 +335,14 @@ namespace Riftbound.Network
             if (remoteVisualRoot && builtRace == r && builtClass == c) return;
 
             ClearRemoteMountVisual();
-            if (remoteVisualRoot) Destroy(remoteVisualRoot);
+            ReleaseRemoteGroundingObserver();
+            if (remoteVisualRoot)
+            {
+                remoteVisualRoot.SetActive(false);
+                Destroy(remoteVisualRoot);
+                remoteVisualRoot = null;
+                remoteAnimator = null;
+            }
             builtRace = r;
             builtClass = c;
             remoteVisualRoot = CharacterVisualFactory.CreateVisualInstance(r, c, transform);
@@ -301,8 +355,9 @@ namespace Riftbound.Network
                 remoteVisualYawOffset = 0f;
                 foreach (var cam in remoteVisualRoot.GetComponentsInChildren<Camera>(true)) Destroy(cam);
                 foreach (var al in remoteVisualRoot.GetComponentsInChildren<AudioListener>(true)) Destroy(al);
-                remoteAnimator = remoteVisualRoot.GetComponentInChildren<Animator>();
+                remoteAnimator = remoteVisualRoot.GetComponentInChildren<Animator>(true);
                 currentRemoteAnim = "";
+                BindRemoteGroundingObserver();
             }
             UpdateRemoteMountVisual();
         }
@@ -326,6 +381,7 @@ namespace Riftbound.Network
 
         void ClearRemoteMountVisual()
         {
+            bool hadMount = remoteMountVisual != null || remoteMountComp != null || !string.IsNullOrEmpty(builtMountId);
             if (remoteMountVisual)
             {
                 Destroy(remoteMountVisual);
@@ -339,7 +395,17 @@ namespace Riftbound.Network
                 remoteWeaponRenderer = null;
             }
             remoteRiderHips = null;
-            if (remoteVisualRoot) remoteVisualRoot.transform.localPosition = remoteBaseVisualPos;
+            if (remoteVisualRoot)
+            {
+                bool separateAnimatorChild = !remoteAnimator || remoteAnimator.transform != remoteVisualRoot.transform;
+                if (hadMount || separateAnimatorChild)
+                    remoteVisualRoot.transform.localPosition = remoteBaseVisualPos;
+                if (Health.Value <= 0)
+                {
+                    remoteVisualYawOffset = 0f;
+                    remoteVisualRoot.transform.localRotation = remoteBaseVisualRot;
+                }
+            }
         }
 
         void UpdateRemoteMountVisual()
