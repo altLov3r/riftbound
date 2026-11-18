@@ -1098,6 +1098,9 @@ namespace Riftbound.Network
                         clientTookDamage = lp && lp.Stats && lp.Stats.Health < lp.Stats.maxHealth;
                     }
 
+                    if (isHost)
+                        yield return new WaitForSeconds(1.0f);
+
                     combatPass = enemyStats.Health < initialHp && clientTookDamage;
                     combatInfo = $", enemy={targetEnemy.NetworkKey} hp={enemyStats.Health:F0}/{initialHp:F0}, clientDamaged={clientTookDamage}";
                 }
@@ -1703,8 +1706,8 @@ namespace Riftbound.Network
                         yield return new WaitForSeconds(1.2f);
 
                         if (clientAvatar != null)
-                            clientAvatar.AuthorizeHostTeleport(targetEnemy.transform.position + new Vector3(14f, 0f, 0f));
-                        yield return new WaitForSeconds(2.0f);
+                            clientAvatar.AuthorizeHostTeleport(targetEnemy.transform.position + new Vector3(15.5f, 0f, 0f));
+                        yield return new WaitForSeconds(3.2f);
 
                         if (clientAvatar != null)
                             clientAvatar.AuthorizeHostTeleport(targetEnemy.transform.position + new Vector3(2.2f, 0f, 0f));
@@ -1804,12 +1807,24 @@ namespace Riftbound.Network
                         bool posClampOk = Vector3.Distance(lp.transform.position, prePos) < 25f;
 
                         float wtFar = Time.realtimeSinceStartup;
-                        while (Time.realtimeSinceStartup - wtFar < 8f && Vector3.Distance(lp.transform.position, targetEnemy.transform.position) < 10f)
+                        while (Time.realtimeSinceStartup - wtFar < 8f && Vector3.Distance(lp.transform.position, targetEnemy.transform.position) < 12f)
                             yield return new WaitForSeconds(0.15f);
                         float hpBeforeFar = eStats.Health;
                         me.RequestAbilityAttack(eStats, "melee");
                         yield return new WaitForSeconds(0.6f);
                         bool outRangeRej = Mathf.Approximately(eStats.Health, hpBeforeFar);
+
+                        // Verify immediate enemy-state replication on an accepted guest hit while enemy is idle (>14m pursuit range, zero 0.1s chasing ticks)
+                        bool enemyIdleHitOk = true;
+                        if (rightAb == "fireball")
+                        {
+                            float hpBeforeIdleHit = eStats.Health;
+                            me.RequestAbilityAttack(eStats, "fireball");
+                            float wtIdleHit = Time.realtimeSinceStartup;
+                            while (Time.realtimeSinceStartup - wtIdleHit < 1.2f && Mathf.Approximately(eStats.Health, hpBeforeIdleHit))
+                                yield return new WaitForSeconds(0.05f);
+                            enemyIdleHitOk = hpBeforeIdleHit - eStats.Health >= 30f && eStats.Health > 0f;
+                        }
 
                         float wtNear = Time.realtimeSinceStartup;
                         while (Time.realtimeSinceStartup - wtNear < 8f && Vector3.Distance(lp.transform.position, targetEnemy.transform.position) > 5f)
@@ -1956,11 +1971,15 @@ namespace Riftbound.Network
                             potCdRej = lp.Potions == potsBeforeUse - 1 && me.Health.Value == hpAfterPot;
                         }
 
+                        uint enemySeqBeforeSpoof = targetEnemy.LastRemoteActionSeq;
+                        byte enemyKindBeforeSpoof = targetEnemy.ActiveRemoteActionKind;
+                        bool rpcSpoofThrew = me.AttemptSpoofedEnemyActionFromClientForTest(targetEnemy.NetworkKey);
                         var hostPeer = GetFirstRemotePlayer();
                         bool peerObsGvOk = HasValidObserverGrounding(hostPeer) && IsWrapperAtRest(hostPeer);
                         bool leaderSpoofRej = !me.IsLeader.Value && me.ReadyStatus.Value == 0;
-                        authorityPass = posClampOk && outRangeRej && unknownAtkRej && cooldownRej && goldAfterChest > 0 && aliveRespRej && restFullRej && dupLmRej && zebraBlockedEarly && zebraUnlockedOk && temperOk && deadRejOk && revBackOk && restDmgOk && potOk && potCdRej && leaderSpoofRej && peerObsGvOk;
-                        combatInfo += $", clientAuth={(authorityPass ? "PASS" : "FAIL")}(clamp={posClampOk},rngRej={outRangeRej},unkAtkRej={unknownAtkRej},cdRej={cooldownRej},aliveRespRej={aliveRespRej},restRej={restFullRej},dupLmRej={dupLmRej},zEarly={zebraBlockedEarly},zOk={zebraUnlockedOk},temper={temperOk},deadRej={deadRejOk},rev={revBackOk},restOk={restDmgOk}[g={restG0}->{me.Gold.Value},h={restH0}->{me.Health.Value}/{me.MaxHealth.Value}],potOk={potOk},potCdRej={potCdRej},ldrSpoofRej={leaderSpoofRej},obsGv={peerObsGvOk})";
+                        bool enemySpoofRej = rpcSpoofThrew && targetEnemy.LastRemoteActionSeq == enemySeqBeforeSpoof && targetEnemy.ActiveRemoteActionKind == enemyKindBeforeSpoof && !targetEnemy.IsWarningActive;
+                        authorityPass = posClampOk && outRangeRej && enemyIdleHitOk && unknownAtkRej && cooldownRej && goldAfterChest > 0 && aliveRespRej && restFullRej && dupLmRej && zebraBlockedEarly && zebraUnlockedOk && temperOk && deadRejOk && revBackOk && restDmgOk && potOk && potCdRej && leaderSpoofRej && peerObsGvOk && enemySpoofRej;
+                        combatInfo += $", clientAuth={(authorityPass ? "PASS" : "FAIL")}(clamp={posClampOk},rngRej={outRangeRej},idleHit={enemyIdleHitOk},unkAtkRej={unknownAtkRej},cdRej={cooldownRej},aliveRespRej={aliveRespRej},restRej={restFullRej},dupLmRej={dupLmRej},zEarly={zebraBlockedEarly},zOk={zebraUnlockedOk},temper={temperOk},deadRej={deadRejOk},rev={revBackOk},restOk={restDmgOk}[g={restG0}->{me.Gold.Value},h={restH0}->{me.Health.Value}/{me.MaxHealth.Value}],potOk={potOk},potCdRej={potCdRej},ldrSpoofRej={leaderSpoofRej},obsGv={peerObsGvOk},enemySpoofRej={enemySpoofRej})";
                     }
                 }
                 else
@@ -2041,7 +2060,133 @@ namespace Riftbound.Network
                 combatInfo += $", visualSmoke={(visualPass ? "PASS" : "FAIL")}(horseReal={horseReal},gryphonReal={gryphonReal},dismountClear={dismountClear},obsBefore={obsBefore},obsAfter={obsAfter})";
             }
 
-            bool pass = players >= minPlayers && RiftboundCoopPlayer.LocalOwner != null && activeCams == 1 && activeListeners == 1 && sep >= 1.0f && combatPass && lateJoinPass && progPass && clientLeavePass && fullAcceptPass && authorityPass && visualPass;
+            bool combatVisPass = true;
+            if (CoopSessionConfig.CombatVisualSmoke && players >= 2 && RiftboundCoopPlayer.LocalOwner != null)
+            {
+                var cap = EnemyController.FindByKey("ashwood-captain");
+                var capStats = cap ? cap.GetComponent<Combatant>() : null;
+                var lp = FindFirstObjectByType<PlayerController>();
+                string capDir = CoopSessionConfig.CaptureDir;
+                if (!string.IsNullOrEmpty(capDir)) System.IO.Directory.CreateDirectory(capDir);
+
+                if (cap && capStats)
+                {
+                    if (isHost)
+                    {
+                        if (!cap.gameObject.activeInHierarchy || !capStats.Alive)
+                        {
+                            cap.gameObject.SetActive(true);
+                            cap.ResetForLoad();
+                            RiftboundCoopPlayer.LocalOwner.BroadcastEnemyState(cap);
+                            yield return new WaitForSeconds(0.25f);
+                        }
+                        var cli = GetFirstRemotePlayer();
+                        Vector3 hostSpot = cap.transform.position + new Vector3(-1.4f, 0f, -3.2f);
+                        Vector3 guestSpot = cap.transform.position + new Vector3(1.4f, 0f, -3.2f);
+                        RiftboundCoopPlayer.LocalOwner.AuthorizeHostTeleport(hostSpot);
+                        if (cli != null) cli.AuthorizeHostTeleport(guestSpot);
+                        yield return new WaitForSeconds(0.45f);
+                        if (lp && lp.orbit)
+                        {
+                            Vector3 look = cap.transform.position - lp.transform.position; look.y = 0f;
+                            if (look.sqrMagnitude > 0.01f) lp.transform.rotation = Quaternion.LookRotation(look);
+                        }
+
+                        float wWindupH = Time.realtimeSinceStartup;
+                        while (Time.realtimeSinceStartup - wWindupH < 10f && !cap.IsWarningActive && !cap.HasPendingAttack)
+                            yield return new WaitForSeconds(0.08f);
+                        bool hostSawWindup = cap.IsWarningActive || cap.HasPendingAttack;
+                        yield return new WaitForSeconds(0.25f);
+                        if (!string.IsNullOrEmpty(capDir))
+                        {
+                            ScreenCapture.CaptureScreenshot(System.IO.Path.Combine(capDir, "host_combat_windup.png"));
+                            yield return new WaitForSeconds(0.35f);
+                        }
+
+                        // Give guest time to see heavy windup, send interrupt, and confirm finite stagger expiry before finishing kill
+                        float wKill = Time.realtimeSinceStartup;
+                        while (Time.realtimeSinceStartup - wKill < 22f && capStats.Alive && RiftboundCoopPlayer.LocalOwner != null)
+                        {
+                            if (Time.realtimeSinceStartup - wKill > 6.5f && capStats.Alive)
+                                RiftboundCoopPlayer.LocalOwner.RequestAbilityAttack(capStats, "melee");
+                            yield return new WaitForSeconds(0.5f);
+                        }
+                        yield return new WaitForSeconds(2.0f);
+                        bool hostDeadClean = !capStats.Alive && !cap.IsWarningActive;
+                        combatVisPass = hostSawWindup && hostDeadClean;
+                        combatInfo += $", combatVisH={(combatVisPass ? "PASS" : "FAIL")}(windup={hostSawWindup},deadClr={hostDeadClean})";
+                    }
+                    else
+                    {
+                        float wPos = Time.realtimeSinceStartup;
+                        while (Time.realtimeSinceStartup - wPos < 8f && (!cap.gameObject.activeInHierarchy || Vector3.Distance(lp.transform.position, cap.transform.position) > 8f))
+                            yield return new WaitForSeconds(0.15f);
+                        if (lp && lp.orbit)
+                        {
+                            Vector3 look = cap.transform.position - lp.transform.position; look.y = 0f;
+                            if (look.sqrMagnitude > 0.01f) lp.transform.rotation = Quaternion.LookRotation(look);
+                        }
+
+                        float wAction = Time.realtimeSinceStartup;
+                        while (Time.realtimeSinceStartup - wAction < 12f && RiftboundCoopPlayer.LocalOwner != null && cap.ActiveRemoteActionKind == 0 && !cap.IsWarningActive)
+                            yield return new WaitForSeconds(0.08f);
+                        bool guestSawWindupOrAtk = cap.ActiveRemoteActionKind != 0 || cap.IsWarningActive;
+                        yield return new WaitForSeconds(0.2f);
+                        bool notOverwrittenMidAction = cap.ActiveRemoteActionKind != 0;
+                        if (!string.IsNullOrEmpty(capDir))
+                        {
+                            ScreenCapture.CaptureScreenshot(System.IO.Path.Combine(capDir, "guest_combat_windup.png"));
+                            yield return new WaitForSeconds(0.35f);
+                        }
+
+                        // Test remote interrupt clearing warning & cast bar cleanly
+                        if (RiftboundCoopPlayer.LocalOwner != null)
+                            RiftboundCoopPlayer.LocalOwner.RequestAbilityAttack(capStats, "interrupt");
+                        float wInt = Time.realtimeSinceStartup;
+                        while (Time.realtimeSinceStartup - wInt < 4f && RiftboundCoopPlayer.LocalOwner != null && cap.ActiveRemoteActionKind != EnemyController.ActionInterrupt && (CastBarSystem.GetTargetCast(capStats) == null || !CastBarSystem.GetTargetCast(capStats).isInterrupted))
+                            yield return new WaitForSeconds(0.08f);
+                        yield return new WaitForSeconds(0.15f);
+                        var tCast = CastBarSystem.GetTargetCast(capStats);
+                        bool guestInterrupted = !cap.IsWarningActive && (cap.ActiveRemoteActionKind == EnemyController.ActionInterrupt || (tCast != null && tCast.isInterrupted));
+                        if (!string.IsNullOrEmpty(capDir))
+                        {
+                            ScreenCapture.CaptureScreenshot(System.IO.Path.Combine(capDir, "guest_combat_interrupt.png"));
+                            yield return new WaitForSeconds(0.35f);
+                        }
+
+                        // Verify finite expiry (no lock) and assist kill for death cleanup check
+                        float wExp = Time.realtimeSinceStartup;
+                        while (Time.realtimeSinceStartup - wExp < 3.5f && RiftboundCoopPlayer.LocalOwner != null && cap.ActiveRemoteActionKind == EnemyController.ActionInterrupt)
+                            yield return new WaitForSeconds(0.1f);
+                        bool expiryReturned = cap.ActiveRemoteActionKind != EnemyController.ActionInterrupt;
+
+                        float wDeath = Time.realtimeSinceStartup;
+                        while (Time.realtimeSinceStartup - wDeath < 15f && capStats.Alive && RiftboundCoopPlayer.LocalOwner != null)
+                        {
+                            if (Time.realtimeSinceStartup - wDeath > 1.5f)
+                                RiftboundCoopPlayer.LocalOwner.RequestAbilityAttack(capStats, "melee");
+                            yield return new WaitForSeconds(0.5f);
+                        }
+                        yield return new WaitForSeconds(0.45f);
+                        bool guestDeadClean = !capStats.Alive && !cap.IsWarningActive && cap.ActiveRemoteActionKind == 0;
+                        if (!string.IsNullOrEmpty(capDir))
+                        {
+                            ScreenCapture.CaptureScreenshot(System.IO.Path.Combine(capDir, "guest_combat_death.png"));
+                            yield return new WaitForSeconds(0.35f);
+                        }
+
+                        combatVisPass = guestSawWindupOrAtk && notOverwrittenMidAction && guestInterrupted && expiryReturned && guestDeadClean;
+                        combatInfo += $", combatVisG={(combatVisPass ? "PASS" : "FAIL")}(saw={guestSawWindupOrAtk},held={notOverwrittenMidAction},int={guestInterrupted},exp={expiryReturned},deadClr={guestDeadClean})";
+                    }
+                }
+                else
+                {
+                    combatVisPass = false;
+                    combatInfo += ", combatVis=FAIL(missingCaptain)";
+                }
+            }
+
+            bool pass = players >= minPlayers && RiftboundCoopPlayer.LocalOwner != null && activeCams == 1 && activeListeners == 1 && sep >= 1.0f && combatPass && lateJoinPass && progPass && clientLeavePass && fullAcceptPass && authorityPass && visualPass && combatVisPass;
             string msg = $"{(pass ? "PASS" : "FAIL")} {role}: players={players}, localOwner={(RiftboundCoopPlayer.LocalOwner != null)}, cams={activeCams}, listeners={activeListeners}, sep={sep:F2}m ({posInfo}){combatInfo}";
             Debug.Log(msg);
             System.Console.WriteLine(msg);

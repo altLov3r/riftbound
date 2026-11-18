@@ -1019,31 +1019,98 @@ namespace Riftbound.Network
             }
         }
 
-        public void BroadcastVisualEnemyProjectile(Vector3 origin, Vector3 direction)
+        public static RiftboundCoopPlayer ResolveCanonicalHostChannel(RiftboundCoopPlayer candidate = null)
         {
-            if (!IsServer || !IsSpawned) return;
-            BroadcastVisualEnemyProjectileClientRpc(origin, direction);
+            if (NetworkManager.Singleton == null) return null;
+            ulong serverId = NetworkManager.ServerClientId;
+            if (LocalOwner && LocalOwner.IsSpawned && LocalOwner.IsServer && LocalOwner.OwnerClientId == serverId)
+                return LocalOwner;
+            var byServerId = FindByClientId(serverId);
+            if (byServerId && byServerId.IsSpawned && byServerId.IsServer && byServerId.OwnerClientId == serverId)
+                return byServerId;
+            if (candidate && candidate.IsSpawned && candidate.IsServer && candidate.OwnerClientId == serverId)
+                return candidate;
+            return null;
         }
 
-        [Rpc(SendTo.Everyone)]
-        void BroadcastVisualEnemyProjectileClientRpc(Vector3 origin, Vector3 direction)
+        public static bool IsAuthorizedEnemySenderForIds(ulong ownerClientId, ulong senderClientId, ulong serverClientId) =>
+            ownerClientId == serverClientId && senderClientId == serverClientId;
+
+        bool IsAuthorizedServerEnemySender(ulong senderClientId) =>
+            NetworkManager.Singleton != null
+            && IsAuthorizedEnemySenderForIds(OwnerClientId, senderClientId, NetworkManager.ServerClientId);
+
+        public void BroadcastVisualEnemyProjectile(Vector3 origin, Vector3 direction)
+        {
+            var hostChannel = ResolveCanonicalHostChannel(this);
+            if (!hostChannel) return;
+            hostChannel.BroadcastVisualEnemyProjectileClientRpc(origin, direction);
+        }
+
+        [Rpc(SendTo.Everyone, InvokePermission = RpcInvokePermission.Server)]
+        void BroadcastVisualEnemyProjectileClientRpc(Vector3 origin, Vector3 direction, RpcParams rpcParams = default)
         {
             if (IsServer) return;
+            if (!IsAuthorizedServerEnemySender(rpcParams.Receive.SenderClientId)) return;
             EnemyProjectile.LaunchVisualOnly(origin, direction);
         }
 
         public void BroadcastEnemyState(EnemyController enemy)
         {
-            if (!IsServer || !IsSpawned || !enemy) return;
+            if (!enemy) return;
+            var hostChannel = ResolveCanonicalHostChannel(this);
+            if (!hostChannel) return;
             var c = enemy.GetComponent<Combatant>();
             if (!c) return;
-            BroadcastEnemyStateClientRpc(enemy.NetworkKey, c.Health, c.maxHealth, c.Alive, enemy.transform.position, enemy.transform.eulerAngles.y);
+            hostChannel.BroadcastEnemyStateClientRpc(enemy.NetworkKey, c.Health, c.maxHealth, c.Alive, enemy.transform.position, enemy.transform.eulerAngles.y);
         }
 
-        [Rpc(SendTo.Everyone)]
-        void BroadcastEnemyStateClientRpc(string enemyKey, float hp, float maxHp, bool alive, Vector3 pos, float yaw)
+        public void BroadcastEnemyAction(EnemyController enemy, byte actionKind, float duration, Vector3 origin, string spellName, string icon, uint actionSeq, float castDuration = -1f)
+        {
+            if (!enemy) return;
+            var hostChannel = ResolveCanonicalHostChannel(this);
+            if (!hostChannel) return;
+            hostChannel.BroadcastEnemyActionClientRpc(enemy.NetworkKey ?? "", actionKind, Mathf.Clamp(duration, 0f, 3.5f), origin, spellName ?? "", icon ?? "", actionSeq, castDuration);
+        }
+
+        public bool AttemptSpoofedEnemyActionFromClientForTest(string enemyKey)
+        {
+            if (!CoopSessionConfig.IsMultiplayer || !IsSpawned || IsServer) return false;
+            bool actionRpcBlocked = false;
+            bool snapRpcBlocked = false;
+            try
+            {
+                BroadcastEnemyActionClientRpc(enemyKey, EnemyController.ActionHeavyWindup, 2.5f, transform.position, "Spoofed", "!", 999999u, 2.5f);
+            }
+            catch (RpcException)
+            {
+                actionRpcBlocked = true;
+            }
+            try
+            {
+                SendEnemyActionSnapshotClientRpc(enemyKey, EnemyController.ActionHeavyWindup, 2.5f, transform.position, "Spoofed", "!", 999999u, 2.5f, RpcTarget.Single(OwnerClientId, RpcTargetUse.Temp));
+            }
+            catch (RpcException)
+            {
+                snapRpcBlocked = true;
+            }
+            return actionRpcBlocked && snapRpcBlocked;
+        }
+
+        [Rpc(SendTo.Everyone, InvokePermission = RpcInvokePermission.Server)]
+        void BroadcastEnemyActionClientRpc(string enemyKey, byte actionKind, float duration, Vector3 origin, string spellName, string icon, uint actionSeq, float castDuration, RpcParams rpcParams = default)
         {
             if (IsServer) return;
+            if (!IsAuthorizedServerEnemySender(rpcParams.Receive.SenderClientId)) return;
+            var enemy = EnemyController.FindByKey(enemyKey);
+            if (enemy) enemy.ApplyReplicatedAction(actionSeq, actionKind, duration, origin, spellName, icon, castDuration);
+        }
+
+        [Rpc(SendTo.Everyone, InvokePermission = RpcInvokePermission.Server)]
+        void BroadcastEnemyStateClientRpc(string enemyKey, float hp, float maxHp, bool alive, Vector3 pos, float yaw, RpcParams rpcParams = default)
+        {
+            if (IsServer) return;
+            if (!IsAuthorizedServerEnemySender(rpcParams.Receive.SenderClientId)) return;
             var enemy = EnemyController.FindByKey(enemyKey);
             if (enemy) enemy.ApplyReplicatedState(hp, maxHp, alive, pos, yaw);
         }
@@ -1506,28 +1573,32 @@ namespace Riftbound.Network
 
         public void SendWorldSnapshotToClient(ulong clientId)
         {
-            if (!IsServer || !IsSpawned) return;
-            var rpcParams = RpcTarget.Single(clientId, RpcTargetUse.Temp);
+            var hostChannel = ResolveCanonicalHostChannel(this);
+            if (!hostChannel) return;
+            var rpcParams = hostChannel.RpcTarget.Single(clientId, RpcTargetUse.Temp);
             foreach (var kv in EnemyController.AllByKey)
             {
                 var enemy = kv.Value;
                 if (!enemy || enemy.trainingDummy) continue;
                 var c = enemy.GetComponent<Combatant>();
                 if (!c) continue;
-                if (!c.Alive || c.Health < c.maxHealth || !enemy.gameObject.activeInHierarchy)
+                bool hasAction = enemy.TryGetActiveActionSnapshot(out byte ak, out float rem, out float castRem, out Vector3 orig, out string sp, out string ic, out uint aseq);
+                if (!c.Alive || c.Health < c.maxHealth || !enemy.gameObject.activeInHierarchy || hasAction)
                 {
-                    SendEnemySnapshotClientRpc(enemy.NetworkKey, c.Health, c.maxHealth, c.Alive, enemy.transform.position, enemy.transform.eulerAngles.y, rpcParams);
+                    hostChannel.SendEnemySnapshotClientRpc(enemy.NetworkKey, c.Health, c.maxHealth, c.Alive, enemy.transform.position, enemy.transform.eulerAngles.y, rpcParams);
+                    if (hasAction)
+                        hostChannel.SendEnemyActionSnapshotClientRpc(enemy.NetworkKey, ak, rem, orig, sp, ic, aseq, castRem, rpcParams);
                 }
             }
             if (CoopWorldManager.Instance != null && CoopWorldManager.Instance.TryGetActiveReadyCheck(out string rcInitiator))
             {
                 var joiningPeer = FindByClientId(clientId);
                 if (joiningPeer) joiningPeer.ReadyCheckId.Value = activeGlobalReadyCheckSeq;
-                SendReadyCheckSnapshotClientRpc(rcInitiator, activeGlobalReadyCheckSeq, rpcParams);
+                hostChannel.SendReadyCheckSnapshotClientRpc(rcInitiator, activeGlobalReadyCheckSeq, rpcParams);
             }
             if (LivingWorldEvents.Instance != null)
             {
-                LivingWorldEvents.Instance.SendEventSnapshotToClient(this, rpcParams);
+                LivingWorldEvents.Instance.SendEventSnapshotToClient(hostChannel, rpcParams);
             }
         }
 
@@ -1566,12 +1637,22 @@ namespace Riftbound.Network
             if (lwe) lwe.ApplyClientEventState(eventId, active, pos);
         }
 
-        [Rpc(SendTo.SpecifiedInParams)]
+        [Rpc(SendTo.SpecifiedInParams, InvokePermission = RpcInvokePermission.Server)]
         void SendEnemySnapshotClientRpc(string enemyKey, float hp, float maxHp, bool alive, Vector3 pos, float yaw, RpcParams rpcParams = default)
         {
             if (IsServer) return;
+            if (!IsAuthorizedServerEnemySender(rpcParams.Receive.SenderClientId)) return;
             var enemy = EnemyController.FindByKey(enemyKey);
             if (enemy) enemy.ApplyReplicatedState(hp, maxHp, alive, pos, yaw);
+        }
+
+        [Rpc(SendTo.SpecifiedInParams, InvokePermission = RpcInvokePermission.Server)]
+        void SendEnemyActionSnapshotClientRpc(string enemyKey, byte actionKind, float duration, Vector3 origin, string spellName, string icon, uint actionSeq, float castDuration, RpcParams rpcParams = default)
+        {
+            if (IsServer) return;
+            if (!IsAuthorizedServerEnemySender(rpcParams.Receive.SenderClientId)) return;
+            var enemy = EnemyController.FindByKey(enemyKey);
+            if (enemy) enemy.ApplyReplicatedAction(actionSeq, actionKind, duration, origin, spellName, icon, castDuration);
         }
 
         public static void BroadcastWorldEventReward(string eventId, Vector3 eventCenter, int baseXp, int baseGold)
