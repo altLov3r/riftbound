@@ -25,6 +25,8 @@ namespace Riftbound.Editor
         static int stage, passed, frame, hits;
         static double deadline;
         static float due, cameraYaw, ready;
+        static bool ceilingHit;
+        static float ceilingDeadline;
 
         static PlayerMovementChecks() { EditorApplication.playModeStateChanged += Changed; }
 
@@ -173,6 +175,24 @@ namespace Riftbound.Editor
                     var position = player.transform.position; player.transform.rotation = Quaternion.Euler(35, 70, 15);
                     player.Dismount();
                     Check("dismount_restores_upright_root", !player.Mounted && Vector3.Dot(player.transform.up, Vector3.up) > .9999f && Mathf.Abs(Mathf.DeltaAngle(player.transform.eulerAngles.y, 70)) < .01f && player.transform.position == position);
+                    Settle(); Set(player, "busyUntil", 0f); Set(player, "vertical", -2f);
+                    Get<JumpInputBuffer>(player, "jumpInput").Reset();
+                    var ceiling = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                    ceiling.transform.position = player.transform.position + Vector3.up * (motor.height + .12f);
+                    ceiling.transform.localScale = new Vector3(4, .16f, 4); Physics.SyncTransforms();
+                    InputSystem.QueueStateEvent(keyboard, new KeyboardState(UnityEngine.InputSystem.Key.Space)); InputSystem.Update();
+                    Invoke(player, "Update"); ceilingHit = (motor.collisionFlags & CollisionFlags.Above) != 0;
+                    ceilingDeadline = Time.time + .35f; due = 0; stage++; return;
+                }
+                if (stage == 6)
+                {
+                    if (!ceilingHit)
+                    {
+                        Invoke(player, "Update"); ceilingHit = (motor.collisionFlags & CollisionFlags.Above) != 0;
+                        if (!ceilingHit && Time.time < ceilingDeadline) return;
+                    }
+                    Check("low_ceiling_contact_observed", ceilingHit);
+                    Check("ceiling_cancels_upward_velocity", Get<float>(player, "vertical") <= 0);
                     Finish(null);
                 }
             }

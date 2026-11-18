@@ -14,7 +14,7 @@ Run batch methods with `-batchmode -projectPath <checkout> -executeMethod <metho
 | Riftbound.Editor.CombinedSpawnVerification.Run | Native terrain/collider spawn checks; requires local read-only context |
 | Riftbound.Editor.MountVisualChecks.Run |16focused native cadence/state/binding checks |
 | Riftbound.Editor.GroundedVisualChecks.Run |19native contact/root/rebinding/support fixtures |
-| Riftbound.Editor.PlayerMovementChecks.Run |23 fixed-60Hz native/synthetic-input cases: jump timing, current-frame camera input, queued primary dispatch/single impact, modal cancellation and upright dismount |
+| Riftbound.Editor.PlayerMovementChecks.Run |25 fixed-60Hz native/synthetic-input cases: jump timing/ceiling contact, current-frame camera input, queued primary dispatch/single impact, modal cancellation and upright dismount |
 | Riftbound.Editor.PresentationAssetAudit.Run | Prefab/rig/clip and sampled-pose inventory |
 | Riftbound.Editor.PresentationWorldProbe.Run | Running-world contact observation with explicit synthetic idle/title fixture and scene reload |
 | Riftbound.Editor.RiderPoseAudit.Run | Idle/Ride samples and optional GPU bench renders for Humanoid resource characters; reports excluded rigs |
