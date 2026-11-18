@@ -1,0 +1,57 @@
+diff --git a/Assets/RPG/Animations/Player Undead Mage.controller b/Assets/RPG/Animations/Player Undead Mage.controller
+index aaaecd1..f82c02d 100644
+--- "a/Assets/RPG/Animations/Player Undead Mage.controller"
++++ "b/Assets/RPG/Animations/Player Undead Mage.controller"
+@@ -23 +23 @@ AnimatorState:
+-  m_Motion: {fileID: -3100369314251171874, guid: ef3b31bef3d3d1947a85c8184c14c05f, type: 3}
++  m_Motion: {fileID: 7779023693546330386, guid: ef3b31bef3d3d1947a85c8184c14c05f, type: 3}
+@@ -37 +37 @@ AnimatorState:
+-  m_Speed: -1
++  m_Speed: 1
+@@ -49 +49 @@ AnimatorState:
+-  m_Motion: {fileID: 7060811993321468294, guid: ef3b31bef3d3d1947a85c8184c14c05f, type: 3}
++  m_Motion: {fileID: -6411013857362534180, guid: ef3b31bef3d3d1947a85c8184c14c05f, type: 3}
+@@ -349 +349 @@ AnimatorState:
+-  m_Speed: 0.75
++  m_Speed: 1
+@@ -361 +361 @@ AnimatorState:
+-  m_Motion: {fileID: 3543698089625107784, guid: ef3b31bef3d3d1947a85c8184c14c05f, type: 3}
++  m_Motion: {fileID: 5069180758234724613, guid: ef3b31bef3d3d1947a85c8184c14c05f, type: 3}
+diff --git a/Assets/RPG/Animations/Player Undead Rogue.controller b/Assets/RPG/Animations/Player Undead Rogue.controller
+index 2c600e8..c70f7c2 100644
+--- "a/Assets/RPG/Animations/Player Undead Rogue.controller"
++++ "b/Assets/RPG/Animations/Player Undead Rogue.controller"
+@@ -49 +49 @@ AnimatorState:
+-  m_Motion: {fileID: -3100369314251171874, guid: b50f13423f75fd340a152667ec0b16b9, type: 3}
++  m_Motion: {fileID: 7779023693546330386, guid: b50f13423f75fd340a152667ec0b16b9, type: 3}
+@@ -63 +63 @@ AnimatorState:
+-  m_Speed: 0.75
++  m_Speed: 1
+@@ -75 +75 @@ AnimatorState:
+-  m_Motion: {fileID: 3543698089625107784, guid: b50f13423f75fd340a152667ec0b16b9, type: 3}
++  m_Motion: {fileID: 5069180758234724613, guid: b50f13423f75fd340a152667ec0b16b9, type: 3}
+@@ -349 +349 @@ AnimatorState:
+-  m_Speed: -1
++  m_Speed: 1
+@@ -361 +361 @@ AnimatorState:
+-  m_Motion: {fileID: 7060811993321468294, guid: b50f13423f75fd340a152667ec0b16b9, type: 3}
++  m_Motion: {fileID: -6411013857362534180, guid: b50f13423f75fd340a152667ec0b16b9, type: 3}
+diff --git a/Assets/RPG/Animations/Player Undead Warrior.controller b/Assets/RPG/Animations/Player Undead Warrior.controller
+index 97c88ca..ccdbaca 100644
+--- "a/Assets/RPG/Animations/Player Undead Warrior.controller"
++++ "b/Assets/RPG/Animations/Player Undead Warrior.controller"
+@@ -101 +101 @@ AnimatorState:
+-  m_Motion: {fileID: -3100369314251171874, guid: 7d25d53b3a94a2d40947a5e01b34c24d, type: 3}
++  m_Motion: {fileID: 7779023693546330386, guid: 7d25d53b3a94a2d40947a5e01b34c24d, type: 3}
+@@ -190 +190 @@ AnimatorState:
+-  m_Speed: -1
++  m_Speed: 1
+@@ -202 +202 @@ AnimatorState:
+-  m_Motion: {fileID: 7060811993321468294, guid: 7d25d53b3a94a2d40947a5e01b34c24d, type: 3}
++  m_Motion: {fileID: -6411013857362534180, guid: 7d25d53b3a94a2d40947a5e01b34c24d, type: 3}
+@@ -216 +216 @@ AnimatorState:
+-  m_Speed: 0.75
++  m_Speed: 1
+@@ -228 +228 @@ AnimatorState:
+-  m_Motion: {fileID: 3543698089625107784, guid: 7d25d53b3a94a2d40947a5e01b34c24d, type: 3}
++  m_Motion: {fileID: 5069180758234724613, guid: 7d25d53b3a94a2d40947a5e01b34c24d, type: 3}

@@ -1,0 +1,232 @@
+{
+  "proposalId": "cv03.undead-state-bindings.v1",
+  "approval": "APPROVED_USER_EXACT_NINE_STATES",
+  "applied": true,
+  "baseCommit": "033e15408795c25204959028d706f35a5c1d7f05",
+  "evidence": "Applied only approved 3-controller/9-state/15-field change; native verification recorded separately. Proposal prepared before approval, then represented as minimal zero-context patch to avoid embedding unchanged YAML trailing whitespace.",
+  "patchSha256": "c77d1bda6d40d01777e755685edb763b0612f9baa3234323460b422f0b6a7d09",
+  "controllerCount": 3,
+  "stateCount": 9,
+  "changes": [
+    {
+      "path": "Assets/RPG/Animations/Player Undead Warrior.controller",
+      "controllerGuid": "929c253787b093042bbaf380c6d448c5",
+      "sourceWorkingBytesSha256": "fdadffd49523c407e95423c694bc46be167c33e7480614924f7dc84a04462a30",
+      "sourceCanonicalLfSha256": "fdadffd49523c407e95423c694bc46be167c33e7480614924f7dc84a04462a30",
+      "candidateCanonicalLfSha256": "d0815d0ad77d2a5abba84ef021671af763b61a95465d61ea0509a17eaeb751d8",
+      "familyFbxMeta": "Assets/RPG/Art/Skeletons/Skeleton_Warrior.fbx.meta",
+      "familyFbxGuid": "7d25d53b3a94a2d40947a5e01b34c24d",
+      "familyFbxMetaWorkingSha256": "4a95919718fa51f29d75102f3fdc3f326403cf9a0c11107728c77c0bcc230e1d",
+      "changes": [
+        {
+          "state": "Ride",
+          "stateFileId": "-3445429763125000961",
+          "from": {
+            "speed": "1",
+            "motion": "{fileID: -3100369314251171874, guid: 7d25d53b3a94a2d40947a5e01b34c24d, type: 3}"
+          },
+          "to": {
+            "speed": "1",
+            "motion": "{fileID: 7779023693546330386, guid: 7d25d53b3a94a2d40947a5e01b34c24d, type: 3}"
+          },
+          "existingClip": {
+            "name": "Sit_Chair_Idle",
+            "internalID": "7779023693546330386",
+            "loopTime": "1",
+            "firstFrame": "0",
+            "lastFrame": "108"
+          }
+        },
+        {
+          "state": "WalkBack",
+          "stateFileId": "406854706861148335",
+          "from": {
+            "speed": "-1",
+            "motion": "{fileID: 7060811993321468294, guid: 7d25d53b3a94a2d40947a5e01b34c24d, type: 3}"
+          },
+          "to": {
+            "speed": "1",
+            "motion": "{fileID: -6411013857362534180, guid: 7d25d53b3a94a2d40947a5e01b34c24d, type: 3}"
+          },
+          "existingClip": {
+            "name": "Walking_Backwards",
+            "internalID": "-6411013857362534180",
+            "loopTime": "1",
+            "firstFrame": "0",
+            "lastFrame": "32"
+          }
+        },
+        {
+          "state": "Jump",
+          "stateFileId": "3762047978932750846",
+          "from": {
+            "speed": "0.75",
+            "motion": "{fileID: 3543698089625107784, guid: 7d25d53b3a94a2d40947a5e01b34c24d, type: 3}"
+          },
+          "to": {
+            "speed": "1",
+            "motion": "{fileID: 5069180758234724613, guid: 7d25d53b3a94a2d40947a5e01b34c24d, type: 3}"
+          },
+          "existingClip": {
+            "name": "Jump_Idle",
+            "internalID": "5069180758234724613",
+            "loopTime": "1",
+            "firstFrame": "0",
+            "lastFrame": "32"
+          }
+        }
+      ]
+    },
+    {
+      "path": "Assets/RPG/Animations/Player Undead Mage.controller",
+      "controllerGuid": "fa3c75763c7044d43aef7999bd9da312",
+      "sourceWorkingBytesSha256": "8eedea85df449e8fd1fea506d3ed31313d23fc2b5a906fba5b189019395ff398",
+      "sourceCanonicalLfSha256": "8eedea85df449e8fd1fea506d3ed31313d23fc2b5a906fba5b189019395ff398",
+      "candidateCanonicalLfSha256": "d05c77549d7f8531b70be8196ec3eea2589f637fe672461d4dafdc1889c113cc",
+      "familyFbxMeta": "Assets/RPG/Art/Skeletons/Skeleton_Mage.fbx.meta",
+      "familyFbxGuid": "ef3b31bef3d3d1947a85c8184c14c05f",
+      "familyFbxMetaWorkingSha256": "a3f559d10ebf30742e740abac22141cb08d74eb5fdc7d64fd0cd5478f0b253b0",
+      "changes": [
+        {
+          "state": "Ride",
+          "stateFileId": "-6911566162913308844",
+          "from": {
+            "speed": "1",
+            "motion": "{fileID: -3100369314251171874, guid: ef3b31bef3d3d1947a85c8184c14c05f, type: 3}"
+          },
+          "to": {
+            "speed": "1",
+            "motion": "{fileID: 7779023693546330386, guid: ef3b31bef3d3d1947a85c8184c14c05f, type: 3}"
+          },
+          "existingClip": {
+            "name": "Sit_Chair_Idle",
+            "internalID": "7779023693546330386",
+            "loopTime": "1",
+            "firstFrame": "0",
+            "lastFrame": "108"
+          }
+        },
+        {
+          "state": "WalkBack",
+          "stateFileId": "-6439024768797033815",
+          "from": {
+            "speed": "-1",
+            "motion": "{fileID: 7060811993321468294, guid: ef3b31bef3d3d1947a85c8184c14c05f, type: 3}"
+          },
+          "to": {
+            "speed": "1",
+            "motion": "{fileID: -6411013857362534180, guid: ef3b31bef3d3d1947a85c8184c14c05f, type: 3}"
+          },
+          "existingClip": {
+            "name": "Walking_Backwards",
+            "internalID": "-6411013857362534180",
+            "loopTime": "1",
+            "firstFrame": "0",
+            "lastFrame": "32"
+          }
+        },
+        {
+          "state": "Jump",
+          "stateFileId": "5523575645071299018",
+          "from": {
+            "speed": "0.75",
+            "motion": "{fileID: 3543698089625107784, guid: ef3b31bef3d3d1947a85c8184c14c05f, type: 3}"
+          },
+          "to": {
+            "speed": "1",
+            "motion": "{fileID: 5069180758234724613, guid: ef3b31bef3d3d1947a85c8184c14c05f, type: 3}"
+          },
+          "existingClip": {
+            "name": "Jump_Idle",
+            "internalID": "5069180758234724613",
+            "loopTime": "1",
+            "firstFrame": "0",
+            "lastFrame": "32"
+          }
+        }
+      ]
+    },
+    {
+      "path": "Assets/RPG/Animations/Player Undead Rogue.controller",
+      "controllerGuid": "78619923806380545b038b04dab8748b",
+      "sourceWorkingBytesSha256": "d477a902abe651b332589c1a32168d1017b970514566b25e4c67d3c5a0161776",
+      "sourceCanonicalLfSha256": "d477a902abe651b332589c1a32168d1017b970514566b25e4c67d3c5a0161776",
+      "candidateCanonicalLfSha256": "2679253898562596fdaed231bde220af3b47d3532de09cb6ea7d3f691cbf016e",
+      "familyFbxMeta": "Assets/RPG/Art/Skeletons/Skeleton_Rogue.fbx.meta",
+      "familyFbxGuid": "b50f13423f75fd340a152667ec0b16b9",
+      "familyFbxMetaWorkingSha256": "8a23120ff2e2dc2459fadec580f0ce5c0c27c52906d7b7024cff4945b1eadf93",
+      "changes": [
+        {
+          "state": "Ride",
+          "stateFileId": "-6845623658969100760",
+          "from": {
+            "speed": "1",
+            "motion": "{fileID: -3100369314251171874, guid: b50f13423f75fd340a152667ec0b16b9, type: 3}"
+          },
+          "to": {
+            "speed": "1",
+            "motion": "{fileID: 7779023693546330386, guid: b50f13423f75fd340a152667ec0b16b9, type: 3}"
+          },
+          "existingClip": {
+            "name": "Sit_Chair_Idle",
+            "internalID": "7779023693546330386",
+            "loopTime": "1",
+            "firstFrame": "0",
+            "lastFrame": "108"
+          }
+        },
+        {
+          "state": "Jump",
+          "stateFileId": "-4293096105316171149",
+          "from": {
+            "speed": "0.75",
+            "motion": "{fileID: 3543698089625107784, guid: b50f13423f75fd340a152667ec0b16b9, type: 3}"
+          },
+          "to": {
+            "speed": "1",
+            "motion": "{fileID: 5069180758234724613, guid: b50f13423f75fd340a152667ec0b16b9, type: 3}"
+          },
+          "existingClip": {
+            "name": "Jump_Idle",
+            "internalID": "5069180758234724613",
+            "loopTime": "1",
+            "firstFrame": "0",
+            "lastFrame": "32"
+          }
+        },
+        {
+          "state": "WalkBack",
+          "stateFileId": "8284182953951286902",
+          "from": {
+            "speed": "-1",
+            "motion": "{fileID: 7060811993321468294, guid: b50f13423f75fd340a152667ec0b16b9, type: 3}"
+          },
+          "to": {
+            "speed": "1",
+            "motion": "{fileID: -6411013857362534180, guid: b50f13423f75fd340a152667ec0b16b9, type: 3}"
+          },
+          "existingClip": {
+            "name": "Walking_Backwards",
+            "internalID": "-6411013857362534180",
+            "loopTime": "1",
+            "firstFrame": "0",
+            "lastFrame": "32"
+          }
+        }
+      ]
+    }
+  ],
+  "deferred": [
+    "Block: actual hold/nonloop semantics not reviewed.",
+    "RunBack: no dedicated backwards-run clip selected; keep existing state unchanged."
+  ],
+  "notRun": [
+    "Applied assets",
+    "Candidate playback/transitions",
+    "Actual mounted/airborne gameplay",
+    "Host/guest replication"
+  ],
+  "preparedPatchSha256": "10fb823b0a293bf96cb58462023bb0eba94191094a33c4cab0b5d15fc1ea475e",
+  "patchApplicationMode": "git apply --unidiff-zero; exact source hashes must match first",
+  "approvalEvidence": "User selected: Approve these nine state changes, 18 November2026"
+}
