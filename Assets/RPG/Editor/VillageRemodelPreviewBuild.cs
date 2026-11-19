@@ -51,6 +51,7 @@ namespace Riftbound.Editor
             var landing = Stage(scene, "WestbankFerryLanding/Westbank Ferry Landing", new Vector3(-270, 0, 41), 4);
             if (landing.GetComponentsInChildren<MeshFilter>().Length != 5 || !landing.GetComponentInChildren<LineRenderer>())
                 throw new BuildFailedException("Westbank's moored skiff is missing from the landing.");
+            Stage(scene, "BloodrockLookout/Bloodrock Trail Lookout", new Vector3(294, 0, 184.5f), 5);
         }
 
         static GameObject Stage(Scene scene, string model, Vector3 position, int meshCount)
