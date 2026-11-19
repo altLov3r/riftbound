@@ -144,6 +144,7 @@ namespace Riftbound.Editor
                     var resProp = typeof(PlayerController).GetProperty("ClassResource");
                     var targetProp = typeof(PlayerController).GetProperty("Target");
                     var atkReadyField = typeof(PlayerController).GetField("attackReady", BindingFlags.NonPublic | BindingFlags.Instance);
+                    var recoveryField = typeof(PlayerController).GetField("busyUntil", BindingFlags.NonPublic | BindingFlags.Instance);
                     var cc = pc.GetComponent<CharacterController>();
                     Vector3 startPos = pc.transform.position;
                     targetProp.SetValue(pc, null);
@@ -232,6 +233,12 @@ namespace Riftbound.Editor
                     atkReadyField.SetValue(pc, 0f);
                     pc.CastAbility1Public();
                     Record("CF02-WarriorLegalStrike", Mathf.Approximately(pc.ClassResource, 15f), $"Warrior legal strike grants +15 Rage (got {pc.ClassResource})");
+
+                    // The next cast uses a different class. Verify the recovery gate before resetting the fixture.
+                    atkReadyField.SetValue(pc, 0f);
+                    pc.CastAbility1Public();
+                    Record("CF02-RecoveryBlocksDuplicatePrimary", Mathf.Approximately(pc.ClassResource, 15f), "Primary input cannot bypass active recovery");
+                    recoveryField.SetValue(pc, 0f);
 
                     // Valid Rogue Sinister Strike spends 40 Energy on legal target
                     pc.CharacterClass = "Rogue";
@@ -331,6 +338,7 @@ namespace Riftbound.Editor
                     // 6. AG03 Encounter Mechanics Slice (CF06 buffer, CF08 synced caster windup, CF09 dodge i-frame)
                     pc.CharacterClass = "Warrior";
                     pc.ClearCombatInputBuffer();
+                    recoveryField.SetValue(pc, 0f);
                     atkReadyField.SetValue(pc, Time.time + 0.18f);
                     pc.RequestPrimaryAttackInput();
                     int queuedSlot = pc.BufferedAbilitySlot;
