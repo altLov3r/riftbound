@@ -18,6 +18,8 @@ namespace Riftbound.Editor
     {
         const string Key = "Riftbound.WorldProductionPlayCheck";
         static readonly BindingFlags Hidden = BindingFlags.NonPublic | BindingFlags.Instance;
+        enum PreviewSite { None, Settlements, Coilbreak }
+
         sealed class Case
         {
             internal string name; internal Vector3[] points; internal bool mounted, walk, chest;
@@ -48,18 +50,25 @@ namespace Riftbound.Editor
         public static void CaptureSupplyFinal() { Start(false,true,supplies:"final"); }
         public static void RunDepartureVerification() { Start(false,false,departure:true); }
 
-        public static void RunSettlementVerification() { Start(false,false,settlement:true); }
+        public static void RunSettlementVerification() { Start(false,false,preview:PreviewSite.Settlements); }
 
-        static void Start(bool gateOnly, bool captureOnly,string supplies="",bool departure=false,bool settlement=false)
+        public static void RunCoilbreakVerification() { Start(false,false,preview:PreviewSite.Coilbreak); }
+
+        static void Start(bool gateOnly, bool captureOnly,string supplies="",bool departure=false,PreviewSite preview=PreviewSite.None)
         {
             WorldProductionAudit.Open();
-            folder = WorldProductionAudit.Evidence + (settlement ? "settlement-play-" : captureOnly ? "frames-" : "play-") + DateTime.UtcNow.ToString("yyyyMMdd-HHmmss");
+            folder = WorldProductionAudit.Evidence + (preview switch
+            {
+                PreviewSite.Settlements => "settlement-play-",
+                PreviewSite.Coilbreak => "coilbreak-play-",
+                _ => captureOnly ? "frames-" : "play-"
+            }) + DateTime.UtcNow.ToString("yyyyMMdd-HHmmss");
             Directory.CreateDirectory(folder);
             SessionState.SetString(Key + ".Folder",folder);
             SessionState.SetBool(Key,true); SessionState.SetBool(Key + ".Failed",false);
             SessionState.SetBool(Key+".GateOnly",gateOnly); SessionState.SetBool(Key+".CaptureOnly",captureOnly);
             SessionState.SetString(Key+".Supplies",supplies);SessionState.SetBool(Key+".Departure",departure);
-            SessionState.SetBool(Key + ".Settlement",settlement);
+            SessionState.SetInt(Key + ".PreviewSite",(int)preview);
             SessionState.SetBool(Key + ".DirectPlay",EditorPrefs.GetBool("Riftbound.DirectPlayInEditor",false));
             EditorPrefs.SetBool("Riftbound.DirectPlayInEditor",false);
             UIArtSetup.PrepareGameView();
@@ -97,6 +106,8 @@ namespace Riftbound.Editor
 
         static void Keys(params UnityEngine.InputSystem.Key[] keys) { InputSystem.QueueStateEvent(keyboard,new KeyboardState(keys)); }
         static float FlatDistance(Vector3 a, Vector3 b) => Vector2.Distance(new Vector2(a.x,a.z),new Vector2(b.x,b.z));
+
+        static PreviewSite CurrentPreview => (PreviewSite)SessionState.GetInt(Key + ".PreviewSite", 0);
 
         static void Tick()
         {
@@ -138,14 +149,19 @@ namespace Riftbound.Editor
                     InputSystem.settings.editorInputBehaviorInPlayMode=InputSettings.EditorInputBehaviorInPlayMode.AllDeviceInputAlwaysGoesToGameView;
                     InputSystem.settings.backgroundBehavior=InputSettings.BackgroundBehavior.IgnoreFocus;
                     keyboard=InputSystem.AddDevice<Keyboard>("WorldRouteCheckKeyboard"); keyboard.MakeCurrent();
-                    cases = SessionState.GetBool(Key + ".Settlement", false) ? SettlementCases() : ExistingCases();
+                    cases = CurrentPreview switch
+                    {
+                        PreviewSite.Settlements => SettlementCases(),
+                        PreviewSite.Coilbreak => CoilbreakCases(),
+                        _ => ExistingCases()
+                    };
                     stage=2;
                 }
                 if (stage == 2)
                 {
                     if (caseIndex >= cases.Count)
                     {
-                        if (SessionState.GetBool(Key + ".Settlement", false)) { Finish(false); return; }
+                        if (CurrentPreview != PreviewSite.None) { Finish(false); return; }
                         stage = 20; captureIndex = 0; return;
                     }
                     var c=cases[caseIndex]; Keys(); player.Dismount(); player.CloseDialogue();
@@ -277,6 +293,17 @@ namespace Riftbound.Editor
                     ? placement.RampSurface : WorldTraversalVerification.Surface;
                 routeCases.Add(new Case(route.name, route.points, mounted, reverse) { surface = surface });
             }
+            return routeCases;
+        }
+
+        static List<Case> CoilbreakCases()
+        {
+            CoilbreakYardPreview.Create(Report);
+            var route = CoilbreakYardPreview.Approach;
+            var routeCases = new List<Case>();
+            foreach (bool mounted in new[] { false, true })
+            foreach (bool reverse in new[] { false, true })
+                routeCases.Add(new Case(route.name, route.points, mounted, reverse) { surface = WorldTraversalVerification.Surface });
             return routeCases;
         }
 

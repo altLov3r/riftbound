@@ -43,11 +43,11 @@ namespace Riftbound.Editor
                 report.AppendLine($"Ramp toe={toe:F2} deck={deck:F2} toe/terrain delta={toeGap:F2}m sampled rise={rise:F2}m");
                 if (!SystemInfo.graphicsDeviceType.Equals(UnityEngine.Rendering.GraphicsDeviceType.Null))
                 {
-                    Capture("emberwatch-overview.png", terrace.bounds.center + new Vector3(12, 11, -14),
+                    Capture(Output + "emberwatch-overview.png", terrace.bounds.center + new Vector3(12, 11, -14),
                         Vector3.Lerp(terrace.bounds.center, preview.House.bounds.center, .4f));
-                    Capture("emberwatch-approach.png", toe - uphill * 4f + Vector3.up * 2.7f,
+                    Capture(Output + "emberwatch-approach.png", toe - uphill * 4f + Vector3.up * 2.7f,
                         terrace.bounds.center + Vector3.up * .4f);
-                    Capture("lantern-rest.png", preview.Shelter.bounds.center + new Vector3(-9, 3, -6), preview.Shelter.bounds.center);
+                    Capture(Output + "lantern-rest.png", preview.Shelter.bounds.center + new Vector3(-9, 3, -6), preview.Shelter.bounds.center);
                 }
 
                 File.WriteAllText(Output + "placement.txt", report.ToString());
@@ -126,18 +126,18 @@ namespace Riftbound.Editor
         static T Load<T>(string name) where T : Object =>
             AssetDatabase.LoadAssetAtPath<T>(Kit + name) ?? throw new InvalidOperationException("Missing " + name);
 
-        static MeshCollider Place(string name, Transform root, Material material, Vector3 position, Quaternion? rotation = null)
+        internal static MeshCollider Place(string name, Transform root, Material material, Vector3 position, Quaternion? rotation = null)
         {
             var model = Load<GameObject>(name + ".fbx");
             var anchor = new GameObject(name).transform;
             anchor.SetParent(root);
             anchor.SetPositionAndRotation(position, rotation ?? Quaternion.identity);
-                        var collision = PlaceModel(model, anchor);
+            var collision = PlaceModel(model, anchor);
             collision.GetComponent<MeshRenderer>().sharedMaterial = material;
             return collision;
         }
 
-        static MeshCollider PlaceProp(string name, Transform root, Vector3 position, float yaw)
+        internal static MeshCollider PlaceProp(string name, Transform root, Vector3 position, float yaw)
         {
             const string folder = "Assets/RPG/Art/FantasyProps/FBX/";
             var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(folder + name + ".fbx");
@@ -157,7 +157,7 @@ namespace Riftbound.Editor
             return collision;
         }
 
-        static void Ground(MeshCollider model, Material stone, StringBuilder report, bool shelterFeet = false, float baseWidth = 0f)
+        internal static void Ground(MeshCollider model, Material stone, StringBuilder report, bool shelterFeet = false, float baseWidth = 0f)
         {
             Physics.SyncTransforms();
             var bounds = model.bounds;
@@ -214,14 +214,14 @@ namespace Riftbound.Editor
             return hit.point;
         }
 
-        static void ReportOverlap(Collider placed, Collider[] existing, StringBuilder report)
+        internal static void ReportOverlap(Collider placed, Collider[] existing, StringBuilder report)
         {
             var bounds = placed.bounds;
             var overlaps = existing.Where(c => bounds.Intersects(c.bounds)).Select(c => c.name).Distinct().ToArray();
             report.AppendLine($"{placed.name} AABB overlap candidates: {(overlaps.Length == 0 ? "none" : string.Join(", ", overlaps))}");
         }
 
-        static void Capture(string name, Vector3 position, Vector3 focus)
+        internal static void Capture(string name, Vector3 position, Vector3 focus)
         {
             var camera = new GameObject("Temporary placement camera").AddComponent<Camera>();
             camera.transform.position = position;
@@ -240,7 +240,7 @@ namespace Riftbound.Editor
                 RenderTexture.active = target;
                 pixels.ReadPixels(new Rect(0, 0, target.width, target.height), 0, 0);
                 pixels.Apply();
-                File.WriteAllBytes(Output + name, pixels.EncodeToPNG());
+                File.WriteAllBytes(name, pixels.EncodeToPNG());
             }
             finally
             {

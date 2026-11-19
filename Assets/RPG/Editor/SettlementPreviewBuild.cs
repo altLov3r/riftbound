@@ -44,6 +44,14 @@ namespace Riftbound.Editor
                         throw new BuildFailedException("An expected settlement model was not included in the build scene.");
                 }
                 Debug.Log($"Settlement preview: staged {placement.Models.Length} models in {scene.name}.");
+                if (Array.IndexOf(Environment.GetCommandLineArgs(), "-includeCoilbreakYard") >= 0)
+                {
+                    var yard = CoilbreakYardPreview.Create(new System.Text.StringBuilder());
+                    foreach (var part in yard)
+                        if (!part || part.gameObject.scene != scene)
+                            throw new BuildFailedException("An expected Coilbreak Yard placement was missing from the build scene.");
+                    Debug.Log($"Settlement preview: staged {yard.Count} Coilbreak Yard placements in {scene.name}.");
+                }
             }
             finally
             {

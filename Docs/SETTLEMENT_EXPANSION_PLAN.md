@@ -85,3 +85,11 @@ The follow-up Play Mode fixture used the same temporary placements, the normal P
 Use a separate project copy containing Assets, Packages and ProjectSettings, with the copied Player Settings product name set to **Riftbound Settlement Preview**. Run Riftbound.Editor.SettlementPreviewBuild.Run in a Unity batch and pass a unique -gameplayBuildName. The build callback adds the two temporary groups to the processed scene, limited to this explicit entry point. The source scene and protected terrain hashes are checked by the normal build harness.
 
 Start a new solo character in the review build. Look southeast of Emberwatch's market for the slate-roof weighhouse and ramp, then follow the Greenhollow road north to the canvas shelter on the east side of the road. Use Z on clear ground to summon the horse. Leave the full build folder alongside the executable.
+
+### Coilbreak Yard review
+
+The salvage yard sits around X/Z (211, 188), roughly 26 m off Redridge Pass and 76 m east of the Brass Hollows entrance. The approach branches north from the road at (205, 162.73), passes the waypost, and reaches the yard at (207, 187). The shelter faces arrivals. Copper salvage coils, a cart, a covered anvil and sorting supplies give the stop a distinct job. The existing Hollows and Rustwater interactions remain separate.
+
+Redridge through-lane geometry passed in both directions on foot and mounted, before and after placement. The spur passed another four geometry probes and four scripted Play Mode input cases using the normal player and horse with an isolated save. Every Play Mode endpoint was grounded. The D3D11 preview rendered the yard in its landscape. This work uses temporary groups and leaves manual multiplayer, navigation marking, and production scene placement open.
+
+Run Riftbound.Editor.CoilbreakYardPreview.Run or Riftbound.Editor.WorldRoutePlayModeCheck.RunCoilbreakVerification to reproduce the checks. Pass -includeCoilbreakYard to the isolated settlement build entry point to include it alongside Emberwatch and Lantern Rest.
