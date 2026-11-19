@@ -13,6 +13,7 @@ namespace Riftbound
         public bool Paused { get; private set; }
         public float Yaw => yaw;
         public float Pitch => pitch;
+        public void FaceTravel(float heading) { yaw = heading; pitch = 18f; }
         public bool IsSteering { get; private set; }
         public bool IsFreeLooking { get; private set; }
         public bool BothMouseButtonsPressed { get; private set; }
@@ -87,6 +88,8 @@ namespace Riftbound
             var mouse = Mouse.current;
             bool uiBlocking = FlightMaster.IsAnyTaxiMapOpen || (player && (player.DialogueOpen || player.ShopOpen || player.MapOpen || player.JournalOpen || player.EncounterJournalOpen || player.InventoryOpen || player.TalentsOpen || player.SpellbookOpen || player.AchievementOpen || player.ReputationOpen || ProfessionSystem.IsOpen || AuctionHouseSystem.AuctionOpen || (GuildSystem.Instance && GuildSystem.Instance.IsOpen) || (MailboxSystem.Instance && MailboxSystem.Instance.IsOpen) || (BattlegroundSystem.Instance && BattlegroundSystem.Instance.IsWindowOpen) || (CharacterSheetSystem.Instance && CharacterSheetSystem.Instance.IsOpen) || (MacroSystem.Instance && MacroSystem.Instance.IsOpen) || (SettingsSystem.Instance && SettingsSystem.Instance.IsMenuOpen) || (DungeonFinderSystem.Instance && DungeonFinderSystem.Instance.IsWindowOpen) || (ArchaeologySystem.Instance && ArchaeologySystem.Instance.IsWindowOpen) || (TransmogSystem.Instance && TransmogSystem.Instance.IsWindowOpen) || (FishingSystem.Instance && FishingSystem.Instance.IsWindowOpen) || (CalendarEventSystem.Instance && CalendarEventSystem.Instance.IsWindowOpen) || (BarberShopSystem.Instance && BarberShopSystem.Instance.IsWindowOpen) || (WorldPvPSystem.Instance && WorldPvPSystem.Instance.IsOverviewOpen) || (EquipmentSetSystem.Instance && EquipmentSetSystem.Instance.IsWindowOpen) || (GlyphSystem.Instance && GlyphSystem.Instance.IsWindowOpen) || (GemSocketSystem.Instance && GemSocketSystem.Instance.IsWindowOpen) || (PetBattleSystem.Instance && (PetBattleSystem.Instance.IsJournalOpen || PetBattleSystem.Instance.IsBattleActive))));
             uiBlocking |= PrototypeHUD.MenuOpen || (PartySystem.Instance && PartySystem.Instance.IsCompanionMenuOpen);
+            if (mouse != null)
+                uiBlocking |= PrototypeHUD.QuestPointerTakesMouse(player, mouse.position.ReadValue(), mouse.leftButton.wasPressedThisFrame);
             if (!Paused && !uiBlocking && mouse != null)
             {
                 bool rightDown = mouse.rightButton.isPressed;

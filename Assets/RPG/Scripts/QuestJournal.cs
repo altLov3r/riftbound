@@ -14,7 +14,9 @@ namespace Riftbound
             "5. Scout Greenhollow",
             "6. The Scarlet Crypts",
             "7. Redridge Frontier",
-            "8. Apex of Wyrmcrest"
+            "8. Apex of Wyrmcrest",
+            WesternRoadCamps.QuestTitle,
+            BrassHollows.QuestTitle
         };
         static readonly string[] ChapterText =
         {
@@ -25,7 +27,9 @@ namespace Riftbound
             "Follow the north road beyond the watchtower. Scout Willow Crossing, Greenhollow Post and the Ancient Grove. Press E at each marker to earn gold and XP, then unlock the Frontier Zebra. Z summons your mount; V changes your selection.",
             "Beneath the ruins in northwest Duskwood lies the Scarlet Crypts Cathedral. Enter through the crimson portal (-55, 215), purge the corrupted zealots, and claim the Inquisitor's Sunblade from the grand altar.",
             "To the northeast lies the Redridge Frontier and Camp Bloodrock (55, 215). Warlord Gorgash and Armorer Thrak hold the frontier. Challenge the crag orcs and claim the Bloodrock Decapitator.",
-            "Mount your Celestial Winged Steed (Z) and soar to the highest peak at Wyrmcrest Summit (0, 48, 225). Defeat the apex boss Vermithrax the Ember Sovereign to claim the legendary Heart of the Ember Drake."
+            "Mount your Celestial Winged Steed (Z) and soar to the highest peak at Wyrmcrest Summit (0, 48, 225). Defeat the apex boss Vermithrax the Ember Sovereign to claim the legendary Heart of the Ember Drake.",
+            "A grain wagon never reached Emberwatch. Rowan needs its waybill, and Ferrymaster Sera has a record of what actually crossed Westbank.",
+            "The Hollow Choir took Rustwater’s regulator to an abandoned mine off Redridge Pass. Clear the cave and shut down the siphon."
         };
         void DrawQuestJournal(float width, float height)
         {
@@ -34,10 +38,14 @@ namespace Riftbound
             GUI.Label(new Rect(x + 24, y + 18, 750, 38), "QUEST JOURNAL & CAMPAIGN", title);
             GUI.Label(new Rect(x + 24, y + 66, 290, 24), "WORLD CHAPTERS", small);
 
-            journalScroll = GUI.BeginScrollView(new Rect(x + 24, y + 96, 295, 325), journalScroll, new Rect(0, 0, 275, ChapterNames.Length * 46));
-            for (int i = 0; i < ChapterNames.Length; i++)
+            int chapterCount = player.CanUseWesternRoadQuest ? ChapterNames.Length : ChapterNames.Length - 2;
+            journalSelection = Mathf.Clamp(journalSelection, 0, chapterCount - 1);
+            journalScroll = GUI.BeginScrollView(new Rect(x + 24, y + 96, 295, 325), journalScroll, new Rect(0, 0, 275, chapterCount * 46));
+            for (int i = 0; i < chapterCount; i++)
             {
-                string status = i == 7 ? (player.OwnsItem("ember-drake-scale") ? "DONE" : "APEX BOSS") :
+                string status = i == 9 ? (player.BrassHollowsStage == 3 ? "DONE" : player.BrassHollowsQuestActive ? "ACTIVE" : "AVAILABLE") :
+                                i == 8 ? (player.WesternRoadStage == 4 ? "DONE" : player.WesternRoadActive ? "ACTIVE" : player.QuestIndex >= 2 ? "AVAILABLE" : "LOCKED") :
+                                i == 7 ? (player.OwnsItem("ember-drake-scale") ? "DONE" : "APEX BOSS") :
                                 i == 6 ? (player.OwnsItem("bloodrock-waraxe") ? "DONE" : "HORDE CAMP") :
                                 i == 5 ? (player.OwnsItem("scarlet-blade") ? "DONE" : "DUNGEON") :
                                 i == 4 ? (player.LandmarksFound >= 3 ? "DONE" : "OPTIONAL") :
@@ -60,7 +68,11 @@ namespace Riftbound
             GUI.Label(new Rect(x + 338, y + 144, 450, 160), chapterText, label);
 
             string objective = "";
-            if (journalSelection == 7)
+            if (journalSelection == 9)
+                objective = player.BrassHollowsObjective;
+            else if (journalSelection == 8)
+                objective = player.WesternRoadObjective;
+            else if (journalSelection == 7)
                 objective = $"Mount: {(player.SelectedMount && player.SelectedMount.isFlying ? "WINGED STEED READY" : "SUMMON MOUNT [Z]")}\nVermithrax: {(player.OwnsItem("ember-drake-scale") ? "DEFEATED" : "ALIVE AT PEAK (Lv 8)")}\nLegendary Heart: {(player.OwnsItem("ember-drake-scale") ? "RECOVERED" : "SEALED IN HOARD")}";
             else if (journalSelection == 6)
             {
@@ -82,10 +94,14 @@ namespace Riftbound
             GUI.Label(new Rect(x + 338, y + 312, 450, 105), objective, label);
 
             if (GUI.Button(new Rect(x + 24, y + 432, 170, 36), "WORLD MAP [M]", questButton)) { player.JournalOpen = false; player.MapOpen = true; }
-            GUI.enabled = !player.QuestComplete && MinimapRadar.Instance;
-            if (GUI.Button(new Rect(x + 202, y + 432, 194, 36), "TRACK MAIN QUEST", questButton))
+            bool western = journalSelection == 8;
+            bool cave = journalSelection == 9;
+            GUI.enabled = (cave ? player.BrassHollowsQuestActive : western ? player.WesternRoadActive : !player.QuestComplete) && MinimapRadar.Instance;
+            if (GUI.Button(new Rect(x + 202, y + 432, 194, 36), cave ? "TRACK CAVE QUEST" : western ? "TRACK WESTERN QUEST" : "TRACK MAIN QUEST", questButton))
             {
-                MinimapRadar.Instance.TrackMainQuest();
+                if (cave) MinimapRadar.Instance.FollowBrassHollows();
+                else if (western) MinimapRadar.Instance.FollowWesternRoad();
+                else MinimapRadar.Instance.TrackMainQuest();
                 player.JournalOpen = false;
             }
             GUI.enabled = true;
