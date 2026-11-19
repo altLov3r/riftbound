@@ -1,5 +1,5 @@
 using System;
-using System.IO;
+using System.Text;
 using UnityEditor;
 using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
@@ -37,20 +37,28 @@ namespace Riftbound.Editor
             if (scene != previous) SceneManager.SetActiveScene(scene);
             try
             {
-                var placement = SettlementPlacementPreview.Create(new System.Text.StringBuilder());
+                var placement = SettlementPlacementPreview.Create(new StringBuilder());
                 foreach (var model in placement.Models)
                 {
                     if (!model || model.gameObject.scene != scene || !model.sharedMesh)
                         throw new BuildFailedException("An expected settlement model was not included in the build scene.");
                 }
                 Debug.Log($"Settlement preview: staged {placement.Models.Length} models in {scene.name}.");
-                if (Array.IndexOf(Environment.GetCommandLineArgs(), "-includeCoilbreakYard") >= 0)
+                bool trailheads = Array.IndexOf(Environment.GetCommandLineArgs(), "-includeSettlementTrailheads") >= 0;
+                if (trailheads || Array.IndexOf(Environment.GetCommandLineArgs(), "-includeCoilbreakYard") >= 0)
                 {
-                    var yard = CoilbreakYardPreview.Create(new System.Text.StringBuilder());
+                    var yard = CoilbreakYardPreview.Create(new StringBuilder());
                     foreach (var part in yard)
                         if (!part || part.gameObject.scene != scene)
                             throw new BuildFailedException("An expected Coilbreak Yard placement was missing from the build scene.");
                     Debug.Log($"Settlement preview: staged {yard.Count} Coilbreak Yard placements in {scene.name}.");
+                }
+                if (trailheads)
+                {
+                    var shelter = WyrmcrestRefugePreview.Create(new StringBuilder());
+                    if (!shelter || shelter.gameObject.scene != scene || shelter.childCount != 9)
+                        throw new BuildFailedException("The trailhead shelter was not fully staged in the build scene.");
+                    Debug.Log($"Settlement preview: staged the Gor'Kresh trailhead shelter in {scene.name}.");
                 }
             }
             finally

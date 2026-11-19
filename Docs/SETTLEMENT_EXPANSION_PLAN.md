@@ -93,3 +93,13 @@ The salvage yard sits around X/Z (211, 188), roughly 26 m off Redridge Pass and 
 Redridge through-lane geometry passed in both directions on foot and mounted, before and after placement. The spur passed another four geometry probes and four scripted Play Mode input cases using the normal player and horse with an isolated save. Every Play Mode endpoint was grounded. The D3D11 preview rendered the yard in its landscape. This work uses temporary groups and leaves manual multiplayer, navigation marking, and production scene placement open.
 
 Run Riftbound.Editor.CoilbreakYardPreview.Run or Riftbound.Editor.WorldRoutePlayModeCheck.RunCoilbreakVerification to reproduce the checks. Pass -includeCoilbreakYard to the isolated settlement build entry point to include it alongside Emberwatch and Lantern Rest.
+
+### Gor’Kresh trailhead and combined review
+
+The first Wyrmcrest draft serves as a lower trailhead shelter inside Gor’Kresh's eastern palisade at (371, 314). The slate roof, wind walls, bench and red survey pennant mark a rest stop ahead of the climb. The separate upper-mountain refuge still needs a site.
+
+The original switchback centreline near (347.5, 314) runs into the War-Hall tower and Wind Rider Vark. The preview approaches east of them through (352, 314). That bypass and the spur passed eight controller geometry checks. The spur ends outside the shelter so riders can turn in the open. The original centreline obstruction remains.
+
+The combined review build includes Emberwatch's service court, Lantern Rest, Coilbreak Yard and the Gor’Kresh Trailhead Shelter. In the editor, all 16 scripted Play Mode traversal cases passed with all four placements present, four cases per site covering both directions on foot and mounted. The packaged build booted and contains all four groups. Manual standalone traversal and multiplayer are still pending.
+
+Use -includeSettlementTrailheads with Riftbound.Editor.SettlementPreviewBuild.Run for the combined build. Run Riftbound.Editor.WorldRoutePlayModeCheck.RunFullSettlementVerification for the combined input check.

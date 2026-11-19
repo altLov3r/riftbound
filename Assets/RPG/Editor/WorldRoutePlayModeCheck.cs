@@ -18,7 +18,7 @@ namespace Riftbound.Editor
     {
         const string Key = "Riftbound.WorldProductionPlayCheck";
         static readonly BindingFlags Hidden = BindingFlags.NonPublic | BindingFlags.Instance;
-        enum PreviewSite { None, Settlements, Coilbreak }
+        enum PreviewSite { None, Settlements, Coilbreak, FullSettlementPreview }
 
         sealed class Case
         {
@@ -54,6 +54,8 @@ namespace Riftbound.Editor
 
         public static void RunCoilbreakVerification() { Start(false,false,preview:PreviewSite.Coilbreak); }
 
+        public static void RunFullSettlementVerification() { Start(false,false,preview:PreviewSite.FullSettlementPreview); }
+
         static void Start(bool gateOnly, bool captureOnly,string supplies="",bool departure=false,PreviewSite preview=PreviewSite.None)
         {
             WorldProductionAudit.Open();
@@ -61,6 +63,7 @@ namespace Riftbound.Editor
             {
                 PreviewSite.Settlements => "settlement-play-",
                 PreviewSite.Coilbreak => "coilbreak-play-",
+                PreviewSite.FullSettlementPreview => "full-settlement-play-",
                 _ => captureOnly ? "frames-" : "play-"
             }) + DateTime.UtcNow.ToString("yyyyMMdd-HHmmss");
             Directory.CreateDirectory(folder);
@@ -153,6 +156,7 @@ namespace Riftbound.Editor
                     {
                         PreviewSite.Settlements => SettlementCases(),
                         PreviewSite.Coilbreak => CoilbreakCases(),
+                        PreviewSite.FullSettlementPreview => FullSettlementCases(),
                         _ => ExistingCases()
                     };
                     stage=2;
@@ -299,7 +303,20 @@ namespace Riftbound.Editor
         static List<Case> CoilbreakCases()
         {
             CoilbreakYardPreview.Create(Report);
-            var route = CoilbreakYardPreview.Approach;
+            return SpurCases(CoilbreakYardPreview.Approach);
+        }
+
+        static List<Case> FullSettlementCases()
+        {
+            var routeCases = SettlementCases();
+            routeCases.AddRange(CoilbreakCases());
+            WyrmcrestRefugePreview.Create(Report);
+            routeCases.AddRange(SpurCases(WyrmcrestRefugePreview.Approach));
+            return routeCases;
+        }
+
+        static List<Case> SpurCases(WorldTraversalVerification.Route route)
+        {
             var routeCases = new List<Case>();
             foreach (bool mounted in new[] { false, true })
             foreach (bool reverse in new[] { false, true })

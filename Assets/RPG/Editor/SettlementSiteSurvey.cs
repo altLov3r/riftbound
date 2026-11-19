@@ -19,6 +19,9 @@ namespace Riftbound.Editor
             Survey(report, terrains, "Wyrmcrest switchback edge", new Vector2(378, 373), 6, 4);
             Survey(report, terrains, "Wyrmcrest lower bench", new Vector2(345, 350), 6, 4);
             Survey(report, terrains, "Wyrmcrest approach bench", new Vector2(337, 323), 6, 4);
+            foreach (int z in new[] { 314, 322, 330, 338 })
+            foreach (int x in new[] { 330, 336, 342, 365, 371 })
+                Survey(report, terrains, "Wyrmcrest refuge grid", new Vector2(x, z), 3, 3);
             File.WriteAllText(WorldProductionAudit.Evidence + "settlement-sites.txt", report.ToString());
             EditorApplication.Exit(0);
         }
