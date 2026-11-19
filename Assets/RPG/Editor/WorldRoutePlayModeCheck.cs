@@ -21,6 +21,7 @@ namespace Riftbound.Editor
         sealed class Case
         {
             internal string name; internal Vector3[] points; internal bool mounted, walk, chest;
+            internal Func<Vector3, Vector3> surface;
             internal Case(string name, Vector3[] points, bool mounted, bool reverse = false, bool walk = false, bool chest = false)
             { this.name = name + (reverse ? " return" : " outbound"); this.points = reverse ? points.Reverse().ToArray() : points; this.mounted = mounted; this.walk = walk; this.chest = chest; }
         }
@@ -47,15 +48,18 @@ namespace Riftbound.Editor
         public static void CaptureSupplyFinal() { Start(false,true,supplies:"final"); }
         public static void RunDepartureVerification() { Start(false,false,departure:true); }
 
-        static void Start(bool gateOnly, bool captureOnly,string supplies="",bool departure=false)
+        public static void RunSettlementVerification() { Start(false,false,settlement:true); }
+
+        static void Start(bool gateOnly, bool captureOnly,string supplies="",bool departure=false,bool settlement=false)
         {
             WorldProductionAudit.Open();
-            folder = WorldProductionAudit.Evidence + (captureOnly ? "frames-" : "play-") + DateTime.UtcNow.ToString("yyyyMMdd-HHmmss");
+            folder = WorldProductionAudit.Evidence + (settlement ? "settlement-play-" : captureOnly ? "frames-" : "play-") + DateTime.UtcNow.ToString("yyyyMMdd-HHmmss");
             Directory.CreateDirectory(folder);
             SessionState.SetString(Key + ".Folder",folder);
             SessionState.SetBool(Key,true); SessionState.SetBool(Key + ".Failed",false);
             SessionState.SetBool(Key+".GateOnly",gateOnly); SessionState.SetBool(Key+".CaptureOnly",captureOnly);
             SessionState.SetString(Key+".Supplies",supplies);SessionState.SetBool(Key+".Departure",departure);
+            SessionState.SetBool(Key + ".Settlement",settlement);
             SessionState.SetBool(Key + ".DirectPlay",EditorPrefs.GetBool("Riftbound.DirectPlayInEditor",false));
             EditorPrefs.SetBool("Riftbound.DirectPlayInEditor",false);
             UIArtSetup.PrepareGameView();
@@ -134,38 +138,19 @@ namespace Riftbound.Editor
                     InputSystem.settings.editorInputBehaviorInPlayMode=InputSettings.EditorInputBehaviorInPlayMode.AllDeviceInputAlwaysGoesToGameView;
                     InputSystem.settings.backgroundBehavior=InputSettings.BackgroundBehavior.IgnoreFocus;
                     keyboard=InputSystem.AddDevice<Keyboard>("WorldRouteCheckKeyboard"); keyboard.MakeCurrent();
-                    cases=new List<Case>();
-                    var bridge=new[] { new Vector3(-278,6,50),new Vector3(-235,6,50) };
-                    var gate=SettlementRoutePass.ReadPath("Highspire north footway");
-                    var green=SettlementRoutePass.ReadPath("Greenhollow arrival footway");
-                    var gateObject=GameObject.Find("Highspire north footway");
-                    Report.AppendLine($"Path source check: rendererStaticBatch={gateObject.GetComponent<MeshRenderer>().isPartOfStaticBatch} liveMesh={gateObject.GetComponent<MeshFilter>().sharedMesh.name} liveVertices={gateObject.GetComponent<MeshFilter>().sharedMesh.vertexCount} sourcePoints={gate.Length} sourceStart={gate[0]:F2} sourceEnd={gate[gate.Length-1]:F2}");
-                    if(FlatDistance(gate[0],new Vector3(-200,12,-60))>.1f || FlatDistance(gate[gate.Length-1],new Vector3(-225,9,0))>.1f)
-                        throw new Exception("Gate path fixture is not the reviewed per-route source mesh.");
-                    foreach(var pair in new[] { ("Bridge",bridge),("Highspire north gate",gate),("Greenhollow arrival",green) })
-                        foreach(bool mounted in new[] { false,true }) foreach(bool reverse in new[] { false,true }) cases.Add(new Case(pair.Item1,pair.Item2,mounted,reverse));
-                    cases.Add(new Case("Bridge slow walk",bridge,false,false,true));
-                    var fullNorth=WorldProductionAudit.Routes().Single(r=>r.name=="Complete Emberwatch to Greenhollow").points;
-                    cases.Add(new Case("Full north road",fullNorth,false));
-                    cases.Add(new Case("Full north road",fullNorth,true,true));
-                    cases.Add(new Case("Willow Rest interaction",new[] {new Vector3(-285,6,50),new Vector3(-288,7,51),new Vector3(-288.7f,7.1f,52)},false,chest:true));
-                    cases.Add(new Case("Reaver approach",new[] {new Vector3(-285,6,50),RiverReaverCamp.Position},true));
-                    if(SessionState.GetBool(Key+".GateOnly",false))
-                        cases=new List<Case> {new Case("Isolated Highspire north gate",gate,false)};
-                    if(SessionState.GetBool(Key+".CaptureOnly",false)) cases.Clear();
-                    if(SessionState.GetBool(Key+".Departure",false))
-                    {
-                        var exit=SettlementRoutePass.ReadPath("Emberwatch west departure");cases.Clear();
-                        foreach(bool mounted in new[] {false,true}) foreach(bool reverse in new[] {false,true}) cases.Add(new Case("Emberwatch departure",exit,mounted,reverse));
-                    }
+                    cases = SessionState.GetBool(Key + ".Settlement", false) ? SettlementCases() : ExistingCases();
                     stage=2;
                 }
                 if (stage == 2)
                 {
-                    if(caseIndex>=cases.Count) { stage=20; captureIndex=0; return; }
+                    if (caseIndex >= cases.Count)
+                    {
+                        if (SessionState.GetBool(Key + ".Settlement", false)) { Finish(false); return; }
+                        stage = 20; captureIndex = 0; return;
+                    }
                     var c=cases[caseIndex]; Keys(); player.Dismount(); player.CloseDialogue();
                     var motor=player.GetComponent<CharacterController>(); motor.enabled=false;
-                    player.transform.position=WorldTraversalVerification.Surface(c.points[0])+Vector3.up*.12f;
+                    player.transform.position=(c.surface?.Invoke(c.points[0]) ?? WorldTraversalVerification.Surface(c.points[0])) + Vector3.up * .12f;
                     var direction=c.points[1]-c.points[0]; direction.y=0; player.transform.rotation=Quaternion.LookRotation(direction);
                     motor.enabled=true; Physics.SyncTransforms();
                     player.orbit.SetPaused(false);
@@ -204,7 +189,9 @@ namespace Riftbound.Editor
                     while(target<c.points.Length && FlatDistance(player.transform.position,c.points[target])<.5f) target++;
                     if(target==c.points.Length)
                     {
-                        Keys(); Report.AppendLine($"PASS INPUT {c.name} mounted={c.mounted} slowWalk={c.walk} end={player.transform.position:F2}");
+                        Keys();
+                        if (c.surface != null) { stage = 10; due = now + .25; return; }
+                        Report.AppendLine($"PASS INPUT {c.name} mounted={c.mounted} slowWalk={c.walk} end={player.transform.position:F2}");
                         File.WriteAllText(folder+"/progress.txt",Report.ToString());
                         if(c.chest) { Keys(UnityEngine.InputSystem.Key.E); stage=8; due=now+.2; return; }
                         caseIndex++; stage=2; due=now+.2; return;
@@ -229,9 +216,68 @@ namespace Riftbound.Editor
                     Report.AppendLine("PASS INPUT Willow Rest E interaction; duplicate rejected; claim/gold persisted in isolated save/load.");
                     caseIndex++; stage=2; due=now+.3; return;
                 }
+                if (stage == 10)
+                {
+                    var c = cases[caseIndex];
+                    var position = player.transform.position;
+                    var support = c.surface(position);
+                    var motor = player.GetComponent<CharacterController>();
+                    float gap = position.y - support.y;
+                    if (!player.Stats.Alive || player.Mounted != c.mounted || !motor.isGrounded
+                        || gap < -.05f || gap > .30f || FlatDistance(position, c.points.Last()) > .85f)
+                        throw new Exception($"Settlement endpoint {c.name} at={position:F2} gap={gap:F2} grounded={motor.isGrounded} mounted={player.Mounted}");
+                    Report.AppendLine($"PASS INPUT {c.name} mounted={c.mounted} end={position:F2} supportGap={gap:F2}m cameraDistance={Vector3.Distance(player.orbit.transform.position, position):F2}m");
+                    if (SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Null)
+                        ScreenCapture.CaptureScreenshot(Path.Combine(folder, $"route-{caseIndex + 1:00}.png"));
+                    caseIndex++; stage = 2; due = now + .35; return;
+                }
                 if(stage==20) Capture(now);
             }
             catch(Exception e) { Report.AppendLine("FAIL "+e); Finish(true); }
+        }
+
+        static List<Case> ExistingCases()
+        {
+            var routeCases = new List<Case>();
+            var bridge=new[] { new Vector3(-278,6,50),new Vector3(-235,6,50) };
+            var gate=SettlementRoutePass.ReadPath("Highspire north footway");
+            var green=SettlementRoutePass.ReadPath("Greenhollow arrival footway");
+            var gateObject=GameObject.Find("Highspire north footway");
+            Report.AppendLine($"Path source check: rendererStaticBatch={gateObject.GetComponent<MeshRenderer>().isPartOfStaticBatch} liveMesh={gateObject.GetComponent<MeshFilter>().sharedMesh.name} liveVertices={gateObject.GetComponent<MeshFilter>().sharedMesh.vertexCount} sourcePoints={gate.Length} sourceStart={gate[0]:F2} sourceEnd={gate[gate.Length-1]:F2}");
+            if(FlatDistance(gate[0],new Vector3(-200,12,-60))>.1f || FlatDistance(gate[gate.Length-1],new Vector3(-225,9,0))>.1f)
+                throw new Exception("Gate path fixture is not the reviewed per-route source mesh.");
+            foreach(var pair in new[] { ("Bridge",bridge),("Highspire north gate",gate),("Greenhollow arrival",green) })
+                foreach(bool mounted in new[] { false,true }) foreach(bool reverse in new[] { false,true }) routeCases.Add(new Case(pair.Item1,pair.Item2,mounted,reverse));
+            routeCases.Add(new Case("Bridge slow walk",bridge,false,false,true));
+            var fullNorth=WorldProductionAudit.Routes().Single(r=>r.name=="Complete Emberwatch to Greenhollow").points;
+            routeCases.Add(new Case("Full north road",fullNorth,false));
+            routeCases.Add(new Case("Full north road",fullNorth,true,true));
+            routeCases.Add(new Case("Willow Rest interaction",new[] {new Vector3(-285,6,50),new Vector3(-288,7,51),new Vector3(-288.7f,7.1f,52)},false,chest:true));
+            routeCases.Add(new Case("Reaver approach",new[] {new Vector3(-285,6,50),RiverReaverCamp.Position},true));
+            if(SessionState.GetBool(Key+".GateOnly",false))
+                routeCases=new List<Case> {new Case("Isolated Highspire north gate",gate,false)};
+            if(SessionState.GetBool(Key+".CaptureOnly",false)) routeCases.Clear();
+            if(SessionState.GetBool(Key+".Departure",false))
+            {
+                var exit=SettlementRoutePass.ReadPath("Emberwatch west departure");routeCases.Clear();
+                foreach(bool mounted in new[] {false,true}) foreach(bool reverse in new[] {false,true}) routeCases.Add(new Case("Emberwatch departure",exit,mounted,reverse));
+            }
+            return routeCases;
+        }
+
+        static List<Case> SettlementCases()
+        {
+            var placement = SettlementPlacementPreview.Create(Report);
+            var routeCases = new List<Case>();
+            foreach (var route in new[] { placement.Ramp, placement.CampApproach })
+            foreach (bool mounted in new[] { false, true })
+            foreach (bool reverse in new[] { false, true })
+            {
+                Func<Vector3, Vector3> surface = route.name == "Emberwatch cart ramp"
+                    ? placement.RampSurface : WorldTraversalVerification.Surface;
+                routeCases.Add(new Case(route.name, route.points, mounted, reverse) { surface = surface });
+            }
+            return routeCases;
         }
 
         static void StartMoving(double now)

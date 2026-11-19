@@ -22,62 +22,21 @@ namespace Riftbound.Editor
                 var report = new StringBuilder("Temporary edit-mode placement. No scene or terrain saves.\n");
                 var existing = Object.FindObjectsByType<Collider>(FindObjectsSortMode.None)
                     .Where(c => c.enabled && !c.isTrigger && !(c is TerrainCollider)).ToArray();
-                var atlas = Load<Texture2D>("civil_surfaces.png");
-                var material = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-                material.SetTexture("_BaseMap", atlas);
-                material.SetFloat("_Smoothness", .12f);
-                var stone = new Material(material);
-                stone.SetTextureScale("_BaseMap", new Vector2(.23f, .46f));
-                stone.SetTextureOffset("_BaseMap", new Vector2(.01f, .52f));
-                var court = new GameObject("Emberwatch east court preview");
-                var camp = new GameObject("Lantern Rest preview");
-
-                var terrace = Place("Emberwatch_ServiceTerrace", court.transform, material, new Vector3(28, 0, -22), Quaternion.Euler(0, 180, 0));
-                Physics.SyncTransforms();
-                var local = terrace.bounds;
-                Vector3 near = new Vector3(local.center.x, 0, local.min.z + .12f);
-                Vector3 far = new Vector3(local.center.x, 0, local.max.z - .12f);
-                bool nearLow = Top(terrace, near).y < Top(terrace, far).y;
-                Vector3 toe = nearLow ? near : far;
-                Vector3 deck = nearLow ? far : near;
-                Vector3 uphill = (deck - toe).normalized;
-                var terraceRoot = terrace.transform.parent;
-                terraceRoot.position += Vector3.up * WorldRegions.GroundHeight(toe);
-                var houseAt = deck + uphill * 3.15f + Vector3.right * 2.55f;
-                var house = Place("Emberwatch_Weighhouse", court.transform, material, houseAt,
-                    Quaternion.LookRotation(-uphill));
-                Ground(house, stone, report);
-
-                var shelter = Place("LanternRest_RoadShelter", camp.transform, material, new Vector3(2, 0, 300),
-                    Quaternion.Euler(0, -90, 0));
-                Ground(shelter, stone, report, shelterFeet: true);
-                var lantern = Place("LanternRest_Waypost", camp.transform, material, new Vector3(-2, 0, 298));
-                Ground(lantern, stone, report, baseWidth: .50f);
-
-                var crates = PlaceProp("Crate_Wooden", court.transform, new Vector3(29.45f, Top(terrace, deck).y, -19.88f), 12);
-                var bench = PlaceProp("Bench", camp.transform, new Vector3(.15f, WorldRegions.GroundHeight(new Vector3(.15f, 0, 302.5f)), 302.5f), 10);
-                var barrel = PlaceProp("Barrel", camp.transform, new Vector3(3.2f, WorldRegions.GroundHeight(new Vector3(3.2f, 0, 302.2f)), 302.2f), 0);
-                Physics.SyncTransforms();
-                foreach (var collider in new[] { terrace, house, shelter, lantern, crates, bench, barrel })
+                var preview = Create(report);
+                foreach (var collider in preview.Models)
                     ReportOverlap(collider, existing, report);
-
-                var ramp = new WorldTraversalVerification.Route("Emberwatch cart ramp",
-                    toe - uphill * 1.4f, toe, deck - uphill * 1.3f);
+                var terrace = preview.Terrace;
+                var toe = preview.Toe;
+                var deck = preview.Deck;
+                var uphill = preview.Uphill;
                 var controller = Object.FindFirstObjectByType<PlayerController>().GetComponent<CharacterController>();
                 foreach (bool mounted in new[] { false, true })
                 foreach (bool reverse in new[] { false, true })
-                    WorldTraversalVerification.Traverse(ramp, mounted, reverse, controller, report, point =>
-                    {
-                        var surface = WorldTraversalVerification.Surface(point);
-                        return terrace.Raycast(new Ray(point + Vector3.up * 5, Vector3.down), out var hit, 10)
-                            && hit.point.y > surface.y ? hit.point : surface;
-                    });
+                    WorldTraversalVerification.Traverse(preview.Ramp, mounted, reverse, controller, report, preview.RampSurface);
 
-                var campApproach = new WorldTraversalVerification.Route("Lantern Rest road pull-off",
-                    new Vector3(-16.14f, 0, 300), new Vector3(-7, 0, 300), new Vector3(-.8f, 0, 300));
                 foreach (bool mounted in new[] { false, true })
                 foreach (bool reverse in new[] { false, true })
-                    WorldTraversalVerification.Traverse(campApproach, mounted, reverse, controller, report);
+                    WorldTraversalVerification.Traverse(preview.CampApproach, mounted, reverse, controller, report);
 
                 float toeGap = Top(terrace, toe).y - WorldRegions.GroundHeight(toe);
                 float rise = Top(terrace, deck).y - Top(terrace, toe).y;
@@ -85,10 +44,10 @@ namespace Riftbound.Editor
                 if (!SystemInfo.graphicsDeviceType.Equals(UnityEngine.Rendering.GraphicsDeviceType.Null))
                 {
                     Capture("emberwatch-overview.png", terrace.bounds.center + new Vector3(12, 11, -14),
-                        Vector3.Lerp(terrace.bounds.center, house.bounds.center, .4f));
+                        Vector3.Lerp(terrace.bounds.center, preview.House.bounds.center, .4f));
                     Capture("emberwatch-approach.png", toe - uphill * 4f + Vector3.up * 2.7f,
                         terrace.bounds.center + Vector3.up * .4f);
-                    Capture("lantern-rest.png", shelter.bounds.center + new Vector3(-9, 3, -6), shelter.bounds.center);
+                    Capture("lantern-rest.png", preview.Shelter.bounds.center + new Vector3(-9, 3, -6), preview.Shelter.bounds.center);
                 }
 
                 File.WriteAllText(Output + "placement.txt", report.ToString());
@@ -99,6 +58,69 @@ namespace Riftbound.Editor
                 Debug.LogException(e);
                 EditorApplication.Exit(1);
             }
+        }
+
+        internal sealed class Placement
+        {
+            internal MeshCollider[] Models;
+            internal MeshCollider Terrace => Models[0];
+            internal MeshCollider House => Models[1];
+            internal MeshCollider Shelter => Models[2];
+            internal Vector3 Toe, Deck;
+            internal Vector3 Uphill => (Deck - Toe).normalized;
+
+            internal WorldTraversalVerification.Route Ramp => new WorldTraversalVerification.Route("Emberwatch cart ramp",
+                Toe - Uphill * 1.4f, Toe, Deck - Uphill * 1.3f);
+            internal WorldTraversalVerification.Route CampApproach => new WorldTraversalVerification.Route("Lantern Rest road pull-off",
+                new Vector3(-16.14f, 0, 300), new Vector3(-7, 0, 300), new Vector3(-.8f, 0, 300));
+
+            internal Vector3 RampSurface(Vector3 point)
+            {
+                var surface = WorldTraversalVerification.Surface(point);
+                return Terrace.Raycast(new Ray(point + Vector3.up * 5, Vector3.down), out var hit, 10)
+                    && hit.point.y > surface.y ? hit.point : surface;
+            }
+        }
+
+        internal static Placement Create(StringBuilder report)
+        {
+            var atlas = Load<Texture2D>("civil_surfaces.png");
+            var material = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+            material.SetTexture("_BaseMap", atlas);
+            material.SetFloat("_Smoothness", .12f);
+            var stone = new Material(material);
+            stone.SetTextureScale("_BaseMap", new Vector2(.23f, .46f));
+            stone.SetTextureOffset("_BaseMap", new Vector2(.01f, .52f));
+            var court = new GameObject("Emberwatch east court preview");
+            var camp = new GameObject("Lantern Rest preview");
+
+            var terrace = Place("Emberwatch_ServiceTerrace", court.transform, material, new Vector3(28, 0, -22), Quaternion.Euler(0, 180, 0));
+            Physics.SyncTransforms();
+            var local = terrace.bounds;
+            Vector3 near = new Vector3(local.center.x, 0, local.min.z + .12f);
+            Vector3 far = new Vector3(local.center.x, 0, local.max.z - .12f);
+            bool nearLow = Top(terrace, near).y < Top(terrace, far).y;
+            Vector3 toe = nearLow ? near : far;
+            Vector3 deck = nearLow ? far : near;
+            Vector3 uphill = (deck - toe).normalized;
+            var terraceRoot = terrace.transform.parent;
+            terraceRoot.position += Vector3.up * WorldRegions.GroundHeight(toe);
+            var houseAt = deck + uphill * 3.15f + Vector3.right * 2.55f;
+            var house = Place("Emberwatch_Weighhouse", court.transform, material, houseAt,
+                Quaternion.LookRotation(-uphill));
+            Ground(house, stone, report);
+
+            var shelter = Place("LanternRest_RoadShelter", camp.transform, material, new Vector3(2, 0, 300),
+                Quaternion.Euler(0, -90, 0));
+            Ground(shelter, stone, report, shelterFeet: true);
+            var lantern = Place("LanternRest_Waypost", camp.transform, material, new Vector3(-2, 0, 298));
+            Ground(lantern, stone, report, baseWidth: .50f);
+
+            var crates = PlaceProp("Crate_Wooden", court.transform, new Vector3(29.45f, Top(terrace, deck).y, -19.88f), 12);
+            var bench = PlaceProp("Bench", camp.transform, new Vector3(.15f, WorldRegions.GroundHeight(new Vector3(.15f, 0, 302.5f)), 302.5f), 10);
+            var barrel = PlaceProp("Barrel", camp.transform, new Vector3(3.2f, WorldRegions.GroundHeight(new Vector3(3.2f, 0, 302.2f)), 302.2f), 0);
+            Physics.SyncTransforms();
+            return new Placement { Models = new[] { terrace, house, shelter, lantern, crates, bench, barrel }, Toe = toe, Deck = deck };
         }
 
         static T Load<T>(string name) where T : Object =>
