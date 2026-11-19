@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -82,7 +83,7 @@ namespace Riftbound.Editor
             }
         }
 
-        internal static Placement Create(StringBuilder report)
+        internal static Placement Create(StringBuilder report, bool replaceLanternRest = false)
         {
             var atlas = Load<Texture2D>("civil_surfaces.png");
             var material = new Material(Shader.Find("Universal Render Pipeline/Lit"));
@@ -92,7 +93,6 @@ namespace Riftbound.Editor
             stone.SetTextureScale("_BaseMap", new Vector2(.23f, .46f));
             stone.SetTextureOffset("_BaseMap", new Vector2(.01f, .52f));
             var court = new GameObject("Emberwatch east court preview");
-            var camp = new GameObject("Lantern Rest preview");
 
             var terrace = Place("Emberwatch_ServiceTerrace", court.transform, material, new Vector3(28, 0, -22), Quaternion.Euler(0, 180, 0));
             Physics.SyncTransforms();
@@ -110,17 +110,23 @@ namespace Riftbound.Editor
                 Quaternion.LookRotation(-uphill));
             Ground(house, stone, report);
 
-            var shelter = Place("LanternRest_RoadShelter", camp.transform, material, new Vector3(2, 0, 300),
-                Quaternion.Euler(0, -90, 0));
-            Ground(shelter, stone, report, shelterFeet: true);
-            var lantern = Place("LanternRest_Waypost", camp.transform, material, new Vector3(-2, 0, 298));
-            Ground(lantern, stone, report, baseWidth: .50f);
-
             var crates = PlaceProp("Crate_Wooden", court.transform, new Vector3(29.45f, Top(terrace, deck).y, -19.88f), 12);
-            var bench = PlaceProp("Bench", camp.transform, new Vector3(.15f, WorldRegions.GroundHeight(new Vector3(.15f, 0, 302.5f)), 302.5f), 10);
-            var barrel = PlaceProp("Barrel", camp.transform, new Vector3(3.2f, WorldRegions.GroundHeight(new Vector3(3.2f, 0, 302.2f)), 302.2f), 0);
+            var models = new List<MeshCollider> { terrace, house };
+            if (!replaceLanternRest)
+            {
+                var camp = new GameObject("Lantern Rest preview");
+                var shelter = Place("LanternRest_RoadShelter", camp.transform, material, new Vector3(2, 0, 300),
+                    Quaternion.Euler(0, -90, 0));
+                Ground(shelter, stone, report, shelterFeet: true);
+                var lantern = Place("LanternRest_Waypost", camp.transform, material, new Vector3(-2, 0, 298));
+                Ground(lantern, stone, report, baseWidth: .50f);
+                var bench = PlaceProp("Bench", camp.transform, new Vector3(.15f, WorldRegions.GroundHeight(new Vector3(.15f, 0, 302.5f)), 302.5f), 10);
+                var barrel = PlaceProp("Barrel", camp.transform, new Vector3(3.2f, WorldRegions.GroundHeight(new Vector3(3.2f, 0, 302.2f)), 302.2f), 0);
+                models.AddRange(new[] { shelter, lantern, bench, barrel });
+            }
+            models.Add(crates);
             Physics.SyncTransforms();
-            return new Placement { Models = new[] { terrace, house, shelter, lantern, crates, bench, barrel }, Toe = toe, Deck = deck };
+            return new Placement { Models = models.ToArray(), Toe = toe, Deck = deck };
         }
 
         static T Load<T>(string name) where T : Object =>

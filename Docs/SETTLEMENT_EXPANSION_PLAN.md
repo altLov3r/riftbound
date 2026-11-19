@@ -117,3 +117,5 @@ Preview 04 combines the four sites, four atlas waypoints and readable notices, o
 ### Three-Chimes Relay art kit
 
 The candidate Lantern Rest expansion pairs a stone-arched depot, signal tower, hoist and cargo bay with a connected entrance path. The new modular kit includes 4 m straights, a 90-degree bend, ramp, turnout, junction and lantern sign. See [kit dimensions and fit](../Art/ThreeChimes/README.md). The Unity preview is temporary. Production placement and normal-input checks require a follow-up through the world review workflow.
+
+The playable Three-Chimes candidate replaces the simple Lantern Rest group only in the isolated preview build. It adds the fitted depot, bell tower, loading bay, waypost and terrain-draped approach, and keeps the existing north road, preview save identity and waypoint location. Use M and choose Three-Chimes Relay. The bell, ladder and hoist are set dressing. The route test uses real player input with scripted steering. Standalone boot and packaged scene data are checked separately.

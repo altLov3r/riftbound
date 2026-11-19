@@ -8,7 +8,7 @@ This original kit turns a road stop into a working relay for the Greenhollow wag
 | --- | --- | ---: |
 | ThreeChimes_Relayhouse | Stone loading arch, slate eaves, shutters, lanterns and timber framing | 5,074 |
 | ThreeChimes_BellTower | 6.9 m wayfinding silhouette with belfry, ladder, bell lip and clapper | 3,572 |
-| ThreeChimes_LoadingBay | Canvas cargo station with pulley, ropes and stock racks | 2,600 |
+| ThreeChimes_LoadingBay | Canvas cargo station with pulley, ropes and stock racks | 2,644 |
 | ThreeChimes_TrailSign | Trail directions and a hanging lantern | 340 |
 | RelayRoad_Straight4m | 4 m wide × 4 m long through-lane | 564 |
 | RelayRoad_Bend90_R5 | Quarter turn with 3/5/7 m inner/center/outer radii | 824 |
@@ -27,3 +27,5 @@ Every joint is 4 m wide. The start line is X=−2..2 at Y=0. The straight ends a
 The Lantern Rest clearing is the first candidate for a Three-Chimes relay. Keep the north road clear and use independent foundations for the three structures. The in-memory Unity placement test renders a draft in context, drapes the entrance road over existing terrain, and checks the approach with foot and mount controller dimensions. Fixture checks do not cover actual input or entering building interiors.
 
 The kit also supports a relay variant outside Gor’Kresh with darker cloth and signal timbers, or a small woodland toll stop made from the sign, turnout and loading bay. Survey each footprint separately. Place paths before cargo, keep the carriageway visible from the road, and start each evening focal point with one warm lamp.
+
+The fitted tower and loading-bay exports extend their posts to meet the roofs. They are imported under the _Fitted filenames. The earlier art files remain available. The isolated Windows preview uses -includeThreeChimes together with -includeSettlementTrailheads and -includeSettlementActivity. It replaces the temporary Lantern Rest shelter with the relay, its approach and an updated atlas waypoint and notice. The entrance uses straights and a turnout. The bend, ramp and junction remain reusable modules for later placements.

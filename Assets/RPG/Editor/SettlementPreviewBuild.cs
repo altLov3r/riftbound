@@ -37,7 +37,15 @@ namespace Riftbound.Editor
             if (scene != previous) SceneManager.SetActiveScene(scene);
             try
             {
-                var placement = SettlementPlacementPreview.Create(new StringBuilder());
+                bool threeChimes = Array.IndexOf(Environment.GetCommandLineArgs(), "-includeThreeChimes") >= 0;
+                var placement = SettlementPlacementPreview.Create(new StringBuilder(), threeChimes);
+                if (threeChimes)
+                {
+                    var relay = ThreeChimesPreview.Create(new StringBuilder());
+                    if (relay.Models.Length != 4 || relay.Roads.Length != 4)
+                        throw new BuildFailedException("The Three-Chimes depot and approach were not fully staged.");
+                    Debug.Log("Settlement preview: Three-Chimes Relay staged at Lantern Rest.");
+                }
                 foreach (var model in placement.Models)
                 {
                     if (!model || model.gameObject.scene != scene || !model.sharedMesh)
@@ -60,7 +68,7 @@ namespace Riftbound.Editor
                         throw new BuildFailedException("The trailhead shelter was not fully staged in the build scene.");
                     Debug.Log($"Settlement preview: staged the Gor'Kresh trailhead shelter in {scene.name}.");
                     if (Array.IndexOf(Environment.GetCommandLineArgs(), "-includeSettlementActivity") >= 0)
-                        SettlementActivityPreview.Create(new StringBuilder());
+                        SettlementActivityPreview.Create(new StringBuilder(), threeChimes);
                 }
             }
             finally

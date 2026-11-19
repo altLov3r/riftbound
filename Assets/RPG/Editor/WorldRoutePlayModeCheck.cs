@@ -18,7 +18,7 @@ namespace Riftbound.Editor
     {
         const string Key = "Riftbound.WorldProductionPlayCheck";
         static readonly BindingFlags Hidden = BindingFlags.NonPublic | BindingFlags.Instance;
-        enum PreviewSite { None, Settlements, Coilbreak, FullSettlementPreview }
+        enum PreviewSite { None, Settlements, Coilbreak, FullSettlementPreview, ThreeChimes }
 
         sealed class Case
         {
@@ -59,6 +59,8 @@ namespace Riftbound.Editor
 
         public static void RunFullSettlementVerification() { Start(false,false,preview:PreviewSite.FullSettlementPreview); }
 
+        public static void RunThreeChimesVerification() { Start(false,false,preview:PreviewSite.ThreeChimes); }
+
         static void Start(bool gateOnly, bool captureOnly,string supplies="",bool departure=false,PreviewSite preview=PreviewSite.None)
         {
             WorldProductionAudit.Open();
@@ -67,6 +69,7 @@ namespace Riftbound.Editor
                 PreviewSite.Settlements => "settlement-play-",
                 PreviewSite.Coilbreak => "coilbreak-play-",
                 PreviewSite.FullSettlementPreview => "full-settlement-play-",
+                PreviewSite.ThreeChimes => "three-chimes-play-",
                 _ => captureOnly ? "frames-" : "play-"
             }) + DateTime.UtcNow.ToString("yyyyMMdd-HHmmss");
             Directory.CreateDirectory(folder);
@@ -160,6 +163,7 @@ namespace Riftbound.Editor
                         PreviewSite.Settlements => SettlementCases(),
                         PreviewSite.Coilbreak => CoilbreakCases(),
                         PreviewSite.FullSettlementPreview => FullSettlementCases(),
+                        PreviewSite.ThreeChimes => FullSettlementCases(threeChimes: true),
                         _ => ExistingCases()
                     };
                     stage=2;
@@ -168,7 +172,7 @@ namespace Riftbound.Editor
                 {
                     if (caseIndex >= cases.Count)
                     {
-                        if (CurrentPreview == PreviewSite.FullSettlementPreview) { noticeIndex = 0; stage = 30; return; }
+                        if (CurrentPreview == PreviewSite.FullSettlementPreview || CurrentPreview == PreviewSite.ThreeChimes) { noticeIndex = 0; stage = 30; return; }
                         if (CurrentPreview != PreviewSite.None) { Finish(false); return; }
                         stage = 20; captureIndex = 0; return;
                     }
@@ -221,7 +225,15 @@ namespace Riftbound.Editor
                         caseIndex++; stage=2; due=now+.2; return;
                     }
                     if(FlatDistance(player.transform.position,lastPosition)>.03f) { lastProgress=now; lastPosition=player.transform.position; }
-                    if(now>caseDeadline || now-lastProgress>3) throw new Exception($"Route stalled: {c.name} mounted={c.mounted} at={player.transform.position:F2} target={target}, message={player.Message}");
+                    if (now > caseDeadline || now - lastProgress > 3)
+                    {
+                        var position = player.transform.position;
+                        var nearby = Physics.OverlapCapsule(position + Vector3.up * .35f, position + Vector3.up * 1.75f,
+                                .9f, ~(1 << 2), QueryTriggerInteraction.Ignore)
+                            .Where(collider => !(collider is TerrainCollider) && collider.transform.root != player.transform)
+                            .Select(collider => collider.name).Distinct();
+                        throw new Exception($"Route stalled: {c.name} mounted={c.mounted} at={position:F2} target={target}, nearby={string.Join(", ", nearby)}, message={player.Message}");
+                    }
                     var direction=c.points[target]-player.transform.position; direction.y=0;
                     player.transform.rotation=Quaternion.LookRotation(direction);
                     // Ground movement on foot follows camera yaw. Aim the fixture at each bend.
@@ -329,18 +341,17 @@ namespace Riftbound.Editor
             return routeCases;
         }
 
-        static List<Case> SettlementCases()
+        static List<Case> SettlementCases(bool threeChimes = false)
         {
-            var placement = SettlementPlacementPreview.Create(Report);
-            var routeCases = new List<Case>();
-            foreach (var route in new[] { placement.Ramp, placement.CampApproach })
-            foreach (bool mounted in new[] { false, true })
-            foreach (bool reverse in new[] { false, true })
+            var placement = SettlementPlacementPreview.Create(Report, threeChimes);
+            var routeCases = SpurCases(placement.Ramp, placement.RampSurface);
+            if (threeChimes)
             {
-                Func<Vector3, Vector3> surface = route.name == "Emberwatch cart ramp"
-                    ? placement.RampSurface : WorldTraversalVerification.Surface;
-                routeCases.Add(new Case(route.name, route.points, mounted, reverse) { surface = surface });
+                var relay = ThreeChimesPreview.Create(Report);
+                routeCases.AddRange(SpurCases(ThreeChimesPreview.Approach, relay.Surface));
             }
+            else
+                routeCases.AddRange(SpurCases(placement.CampApproach));
             return routeCases;
         }
 
@@ -350,22 +361,22 @@ namespace Riftbound.Editor
             return SpurCases(CoilbreakYardPreview.Approach);
         }
 
-        static List<Case> FullSettlementCases()
+        static List<Case> FullSettlementCases(bool threeChimes = false)
         {
-            var routeCases = SettlementCases();
+            var routeCases = SettlementCases(threeChimes);
             routeCases.AddRange(CoilbreakCases());
             WyrmcrestRefugePreview.Create(Report);
             routeCases.AddRange(SpurCases(WyrmcrestRefugePreview.Approach));
-            porter = SettlementActivityPreview.Create(Report);
+            porter = SettlementActivityPreview.Create(Report, threeChimes);
             return routeCases;
         }
 
-        static List<Case> SpurCases(WorldTraversalVerification.Route route)
+        static List<Case> SpurCases(WorldTraversalVerification.Route route, Func<Vector3, Vector3> surface = null)
         {
             var routeCases = new List<Case>();
             foreach (bool mounted in new[] { false, true })
             foreach (bool reverse in new[] { false, true })
-                routeCases.Add(new Case(route.name, route.points, mounted, reverse) { surface = WorldTraversalVerification.Surface });
+                routeCases.Add(new Case(route.name, route.points, mounted, reverse) { surface = surface ?? WorldTraversalVerification.Surface });
             return routeCases;
         }
 

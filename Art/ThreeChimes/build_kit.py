@@ -208,7 +208,7 @@ block("Setback tower course", (0,0,.40), (2.75,2.75,.16), "stone", .06)
 for x in (-1.05,1.05):
     for y in (-1.05,1.05):
         block("Stone pier foot", (x,y,.65), (.61,.61,.37), "stone", .045)
-        beam("Tower frame", (x*1.06,y*1.06,.78),(x*.91,y*.91,5.15), .31,.31)
+        beam("Tower frame", (x*1.06,y*1.06,.78),(x*.91,y*.91,5.72), .31,.31)
     for direction in (-1,1):
         beam("Tower cross brace", (x,-direction*1.02,1.25),(x,direction*.98,3.45),.18,.16)
 for y in (-1.04,1.04):
@@ -238,7 +238,7 @@ export("ThreeChimes_BellTower")
 for x in (-2.42,2.42):
     for y in (-1.35,1.35):
         block("Loading foot", (x,y,.14), (.49,.49,.28), "stone", .05)
-        block("Loading post", (x,y,1.38),(.23,.23,2.22),"oak",.045)
+        block("Loading post", (x,y,1.48),(.23,.23,2.41),"oak",.045)
     beam("Side angle brace", (x,-1.35,1.68),(x,-.57,2.56),.15,.15)
 block("Pallet floor", (0,0,.16), (4.91,2.94,.30), "oak",.04)
 block("Stock rack", (0,1.10,1.06), (4.75,.54,.16),"oak",.04)
@@ -246,7 +246,8 @@ for x in (-1.44,-.64,1.02,1.80):
     crate(x, .97, 1.14, .75)
 for x in (-1.8,-.95,1.78):
     crate(x,-.11,.32,rng.uniform(.81,1.12))
-block("Loading canopy beam", (0,-1.41,2.61), (5.15,.19,.22),"oak",.03)
+for y in (-1.41,1.41):
+    block("Loading canopy beam", (0,y,2.61), (5.15,.19,.22),"oak",.03)
 for d in (-1,1):
     panel=block("Stitched striped canvas", (0,d*.81,2.84),(5.32,1.71,.095),"canvas",.02)
     panel.rotation_euler.x=-d*.24

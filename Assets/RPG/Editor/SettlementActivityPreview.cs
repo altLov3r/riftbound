@@ -9,13 +9,14 @@ namespace Riftbound.Editor
 {
     internal static class SettlementActivityPreview
     {
-        internal static CivilianRouteWalker Create(StringBuilder report)
+        internal static CivilianRouteWalker Create(StringBuilder report, bool threeChimes = false)
         {
             var group = new GameObject("Settlement waystops");
             Waystop(group.transform, "Emberwatch Service Court", new Vector3(32.5f, 0, -22),
                 "The north-road wagons load here at dawn. Leave the stone ramp clear for the teamsters.");
-            Waystop(group.transform, "Lantern Rest", new Vector3(-.8f, 0, 300),
-                "If the lantern goes out, wait under the canvas. Greenhollow's riders will relight it at dusk.");
+            Waystop(group.transform, threeChimes ? "Three-Chimes Relay" : "Lantern Rest", new Vector3(-.8f, 0, 300),
+                threeChimes ? "One chime calls the loaders. Two warn of a late cart. Three tell the north-road riders to shelter here."
+                    : "If the lantern goes out, wait under the canvas. Greenhollow's riders will relight it at dusk.");
             Waystop(group.transform, "Coilbreak Yard", new Vector3(207, 0, 187),
                 "Keep the recovered copper dry. Report cracked valves to the tinker in Rustwater before taking them underground.");
             Waystop(group.transform, "Gor'Kresh Trailhead Shelter", new Vector3(367.5f, 0, 314),
