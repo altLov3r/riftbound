@@ -48,6 +48,9 @@ namespace Riftbound.Editor
 
             Stage(scene, "SilverglenArrivalCourt/Silverglen Arrival Court", new Vector3(-130, 0, 55), 11);
             Stage(scene, "FrostpeakTrailStation/Frostpeak Trail Station", new Vector3(-112, 0, -109), 6);
+            var landing = Stage(scene, "WestbankFerryLanding/Westbank Ferry Landing", new Vector3(-270, 0, 41), 4);
+            if (landing.GetComponentsInChildren<MeshFilter>().Length != 5 || !landing.GetComponentInChildren<LineRenderer>())
+                throw new BuildFailedException("Westbank's moored skiff is missing from the landing.");
         }
 
         static GameObject Stage(Scene scene, string model, Vector3 position, int meshCount)
