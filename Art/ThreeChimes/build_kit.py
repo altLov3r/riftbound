@@ -24,12 +24,15 @@ palette = {
     "dark": (34, 24, 23),
 }
 tiles = tuple(palette)
-tile_width = 256
-width, height = 1024, 768
+tile_width = 512
+width, height = 2048, 2048
 
 def colour(tile, x, y):
+    if tile >= len(tiles):
+        return b"\0\0\0"
     name = tiles[tile]
-    noise = ((x * 17 ^ y * 67 ^ (x * y * 5)) % 23) - 11
+    x, y = x / 2, y / 2
+    noise = ((int(x * 2) * 17 ^ int(y * 2) * 67 ^ int(x * y * 20)) % 17) - 8
     stains = 5 * math.sin(x * .036 + math.sin(y * .04)) + 4 * math.cos(y * .057)
     if name in ("stone", "slate"):
         joint = 32 if name == "stone" else 38
@@ -41,8 +44,14 @@ def colour(tile, x, y):
         stains += -16 if grain < 1.25 else 2
     if name == "canvas":
         stains += 7 if x % 64 < 30 else -5
+    if name == "canvas":
+        stains += 3 * math.cos(x * 5.4) * math.cos(y * 6.2)
     if name == "dirt":
-        stains += 7 * math.cos(x * .14 + y * .1)
+        stains += 4 * math.sin(x * .042) * math.cos(y * .032)
+    if name == "plaster":
+        stains += 6 * math.sin(x * .065 + y * .04) * math.sin(y * .1)
+    if name == "brass":
+        stains += 4 * math.sin(y * .085 + 2 * math.cos(x * .043))
     return bytes(max(0, min(255, round(c + noise + stains))) for c in palette[name])
 
 def chunk(tag, data):
@@ -52,10 +61,10 @@ pixels = []
 for y in range(height):
     pixels.append(b"\0" + b"".join(colour(y // tile_width * 4 + x // tile_width, x % tile_width, y % tile_width)
                                      for x in range(width)))
-atlas_path = out / "three_chimes_atlas.png"
+atlas_path = out / "three_chimes_detail_atlas.png"
 atlas_path.write_bytes(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">2I5B", width, height, 8, 2, 0, 0, 0))
                        + chunk(b"IDAT", zlib.compress(b"".join(pixels), 9)) + chunk(b"IEND", b""))
-material = bpy.data.materials.new("Three Chimes | Surface atlas")
+material = bpy.data.materials.new("TC_atlas")
 material.use_nodes = True
 bsdf = material.node_tree.nodes.get("Principled BSDF")
 bsdf.inputs["Roughness"].default_value = .82
@@ -63,14 +72,24 @@ tex = material.node_tree.nodes.new("ShaderNodeTexImage")
 tex.image = bpy.data.images.load(str(atlas_path))
 material.node_tree.links.new(tex.outputs["Color"], bsdf.inputs["Base Color"])
 
+regional_names = ("stone", "plaster", "oak", "dirt", "moss")
+regional_materials = {}
+for surface in regional_names:
+    slot = material.copy()
+    slot.name = "TC_" + surface
+    regional_materials[surface] = slot
+
 assets = {}
 parts = []
 
 def finish_mesh(obj, surface):
     obj.data.materials.clear()
-    obj.data.materials.append(material)
+    obj.data.materials.append(regional_materials.get(surface, material))
     index = tiles.index(surface)
     uv = obj.data.uv_layers.active or obj.data.uv_layers.new(name="Atlas")
+    uv.name = "Atlas"
+    metres = obj.data.uv_layers.new(name="RegionalMetres", do_init=False)
+    obj.data.uv_layers.active_index = 0
     for face in obj.data.polygons:
         face.material_index = 0
         vertices = [obj.data.vertices[obj.data.loops[i].vertex_index].co for i in face.loop_indices]
@@ -80,7 +99,16 @@ def finish_mesh(obj, surface):
         for loop, v in zip(face.loop_indices, vertices):
             a, b = [(v[axis] - low) / extent for axis, low, extent in zip(axes, origin, size)]
             uv.data[loop].uv = ((index % 4 + .018 + .964 * a) / 4,
-                                (2 - index // 4 + .018 + .964 * b) / 3)
+                                (3 - index // 4 + .018 + .964 * b) / 4)
+            if surface == "oak":
+                along, across = (a, b) if size[0] >= size[1] else (b, a)
+                # Village WoodTrim is an atlas. Keep the whole face in the dark timber band.
+                metres.data[loop].uv = (.025 + .95 * along, .405 + .255 * across)
+            elif surface == "stone":
+                # Use the masonry courses, below the atlas's smooth trim panels.
+                metres.data[loop].uv = ((v[axes[0]] - origin[0]) / 2.0, .026 + .345 * b)
+            else:
+                metres.data[loop].uv = tuple((v[axis] - low) / 2.1 for axis, low in zip(axes, origin))
     parts.append(obj)
     return obj
 
@@ -93,7 +121,7 @@ def block(label, pos, size, surface, bevel=.0):
     if bevel:
         mod = obj.modifiers.new("Worn edges", "BEVEL")
         mod.width = bevel
-        mod.segments = 1
+        mod.segments = 2 if bevel >= .029 else 1
         bpy.ops.object.modifier_apply(modifier=mod.name)
     return finish_mesh(obj, surface)
 
@@ -111,7 +139,7 @@ def mesh(label, verts, faces, surface):
     bpy.context.collection.objects.link(obj)
     return finish_mesh(obj, surface)
 
-def lathe(label, pos, profile, surface, sides=16):
+def lathe(label, pos, profile, surface, sides=24):
     verts = [(radius*math.cos(a*math.tau/sides), radius*math.sin(a*math.tau/sides), z)
              for z, radius in profile for a in range(sides)]
     faces = [(j*sides+i, j*sides+(i+1)%sides, (j+1)*sides+(i+1)%sides, (j+1)*sides+i)
@@ -138,6 +166,9 @@ def roof(cx, cy, z, half_length, half_span, rise):
             beam("Roof verge", (cx+end*half_length,cy,z+rise+.13),
                  (cx+end*half_length,cy+side*half_span,z+.10), .17,.16, "oak", .02)
     block("Ridge cap", (cx,cy,z+rise+.11), (2*half_length+.15,.29,.18), "slate", .04)
+    for j in range(1, int(half_length * 3)):
+        x = cx - half_length + j * .68
+        block("Ridge joint", (x,cy,z+rise+.19),(.15,.28,.10),"slate",.028)
 
 def crate(x,y,z, scale=1):
     block("Cargo crate", (x,y,z+.33*scale), (.69*scale,.62*scale,.66*scale), "oak", .025)
@@ -181,11 +212,16 @@ for side in (-1,1):
     for end in (-1,1):
         block("Corner shoulder", (side*3.71,end*2.18,.67),(.38,.43,1.20),"stone",.035)
 block("Arched bay lintel wall", (0,-2.1,2.95), (2.53,.31,.42), "plaster",.025)
-for i in range(9):
-    a = (i+.5)*math.pi/9
-    key = block("Radial arch stone", (1.10*math.cos(a),-2.30,1.76+.79*math.sin(a)),
-                (.38,.52,.31 if i != 4 else .39),"stone",.045)
-    key.rotation_euler.y = -math.atan2(math.cos(a),math.sin(a))
+# Radial wedges replace the square prototype blocks around the loading arch.
+for i in range(13):
+    start = i * math.pi / 13 + .017
+    stop = (i + 1) * math.pi / 13 - .017
+    outer = 1.24 if i != 6 else 1.31
+    profile = [(r * math.cos(t), 1.73 + .78 * r * math.sin(t)) for r, t in
+               ((.88,start),(outer,start),(outer,stop),(.88,stop))]
+    verts = [(x,y,z) for y in (-2.58,-2.04) for x,z in profile]
+    faces = [(0,1,2,3),(7,6,5,4),(0,4,5,1),(1,5,6,2),(2,6,7,3),(3,7,4,0)]
+    mesh("Cut arch voussoir", verts, faces, "stone")
 block("Front sill", (0,-2.63,.11), (2.76,.62,.22), "stone", .04)
 block("Transom beam", (0,-2.34,3.08), (7.75,.29,.23), "oak", .025)
 for x in (-3.66,3.66):
@@ -261,7 +297,7 @@ export("ThreeChimes_LoadingBay")
 # Continuous surfaces; detail stones sit clear of connector edges.
 def stone_detail(x, y, z, width, depth):
     obj = block("Edge paving stone", (x,y,z+.022),(width,depth,.072),"stone",.022)
-    obj.rotation_euler.z = rng.uniform(-.24,.24)
+    obj.rotation_euler.z = rng.uniform(-.40,.40)
 
 def path_strip(points, label):
     samples = len(points)
@@ -274,8 +310,8 @@ def path_strip(points, label):
         mesh(label,verts,faces,"moss" if b in (0,4) else "dirt")
     for i,(x,y,nx,ny,z) in enumerate(points[1:-1]):
         for side in (-1,1):
-            if rng.random() > .18:
-                offset=side*rng.uniform(1.49,1.82)
+            if rng.random() > .32:
+                offset=side*rng.uniform(1.43,1.88)
                 stone_detail(x+offset*nx,y+offset*ny,z,rng.uniform(.21,.36),rng.uniform(.23,.41))
 
 path_strip([(0,i*.5,1,0,.025) for i in range(9)], "Straight lane")
