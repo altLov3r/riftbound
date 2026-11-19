@@ -137,7 +137,7 @@ def window(x, y, z):
     box("Center muntin", (x, y - .11, z), (.061, .035, .90), "beam")
     box("Horizontal muntin", (x, y - .11, z), (.67, .035, .060), "beam")
 
-def export(name):
+def export(name, prefix="Emberwatch"):
     bpy.ops.object.select_all(action="DESELECT")
     for obj in parts:
         obj.select_set(True)
@@ -145,7 +145,7 @@ def export(name):
     bpy.ops.object.join()
     bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
     model = bpy.context.object
-    model.name = model.data.name = "Emberwatch_" + name
+    model.name = model.data.name = prefix + "_" + name
     if model.data.validate(verbose=True):
         raise ValueError(f"Invalid mesh: {model.name}")
     bpy.ops.export_scene.fbx(filepath=str(out / (model.name + ".fbx")), use_selection=True,
@@ -155,122 +155,123 @@ def export(name):
     assets[name] = model
     parts.clear()
 
-# Two-storey inn with a plaster jetty, braces, shuttered windows and projecting hatch.
-box("Stone plinth", (0, 0, .21), (8.6, 6.3, .42), "stone")
-box("Masonry ground floor", (0, 0, 1.43), (8.15, 5.85, 2.52), "stone")
-box("Jettied plaster floor", (0, -.22, 3.68), (8.62, 6.38, 2.08), "plaster")
-for z in (2.68, 4.67):
-    box("Full-width bressummer", (0, -.22, z), (8.78, 6.46, .24), "beam")
-for x in (-4.25, -2.43, 0, 2.43, 4.25):
-    beam("Front stud", (x, -3.43, 2.75), (x, -3.43, 4.7), .18)
-for x in (-4.03, 4.03):
-    direction = 1 if x < 0 else -1
-    beam("Jetty brace", (x, -3.49, 2.85), (x + direction * 1.28, -3.49, 4.52), .17)
-for x in (-2.83, -1.16, 1.16, 2.83):
-    window(x, -3.49, 3.77)
-for x in (-2.62, 2.62):
-    window(x, -2.99, 1.67)
-box("Oak entrance door", (0, -3.04, 1.40), (1.56, .12, 2.01), "beam", .09)
-box("Door threshold", (0, -3.11, .25), (1.91, .56, .26), "stone")
-beam("Inn sign hanger", (1.2, -3.36, 3.02), (1.2, -4.34, 3.02), .12)
-box("Hanging inn sign", (1.2, -4.18, 2.63), (.075, .83, .47), "shutters")
-box("Sign brass emblem", (1.25, -4.18, 2.64), (.02, .30, .19), "amber")
-roof(4.68, 3.47, 4.82, 1.77, -.22)
-box("Chimney", (2.75, 1.27, 5.95), (.88, .92, 2.18), "stone")
-box("Chimney cap", (2.75, 1.27, 7.07), (1.08, 1.06, .17), "ash")
-export("HearthInn")
+if __name__ == "__main__":
+    # Two-storey inn with a plaster jetty, braces, shuttered windows and projecting hatch.
+    box("Stone plinth", (0, 0, .21), (8.6, 6.3, .42), "stone")
+    box("Masonry ground floor", (0, 0, 1.43), (8.15, 5.85, 2.52), "stone")
+    box("Jettied plaster floor", (0, -.22, 3.68), (8.62, 6.38, 2.08), "plaster")
+    for z in (2.68, 4.67):
+        box("Full-width bressummer", (0, -.22, z), (8.78, 6.46, .24), "beam")
+    for x in (-4.25, -2.43, 0, 2.43, 4.25):
+        beam("Front stud", (x, -3.43, 2.75), (x, -3.43, 4.7), .18)
+    for x in (-4.03, 4.03):
+        direction = 1 if x < 0 else -1
+        beam("Jetty brace", (x, -3.49, 2.85), (x + direction * 1.28, -3.49, 4.52), .17)
+    for x in (-2.83, -1.16, 1.16, 2.83):
+        window(x, -3.49, 3.77)
+    for x in (-2.62, 2.62):
+        window(x, -2.99, 1.67)
+    box("Oak entrance door", (0, -3.04, 1.40), (1.56, .12, 2.01), "beam", .09)
+    box("Door threshold", (0, -3.11, .25), (1.91, .56, .26), "stone")
+    beam("Inn sign hanger", (1.2, -3.36, 3.02), (1.2, -4.34, 3.02), .12)
+    box("Hanging inn sign", (1.2, -4.18, 2.63), (.075, .83, .47), "shutters")
+    box("Sign brass emblem", (1.25, -4.18, 2.64), (.02, .30, .19), "amber")
+    roof(4.68, 3.47, 4.82, 1.77, -.22)
+    box("Chimney", (2.75, 1.27, 5.95), (.88, .92, 2.18), "stone")
+    box("Chimney cap", (2.75, 1.27, 7.07), (1.08, 1.06, .17), "ash")
+    export("HearthInn")
 
-# Open forge with a closed rear chimney and an accessible front bay.
-box("Smithy raised floor", (0, 0, .14), (6.9, 5.15, .28), "stone")
-box("Forge back wall", (0, 2.22, 1.57), (6.55, .47, 2.82), "stone")
-for x in (-3.10, 3.10):
-    beam("Smithy post", (x, -2.23, .27), (x, -2.23, 3.28), .30)
-    beam("Rafter brace", (x, -2.23, 2.15), (x * .74, -2.23, 3.10), .16)
-beam("Lintel", (-3.38, -2.23, 3.13), (3.38, -2.23, 3.13), .27)
-roof(3.63, 2.72, 3.3, 1.18)
-box("Forge chimney breast", (1.86, 1.70, 2.79), (1.81, 1.22, 5.02), "ash", .085)
-box("Forge chimney cap", (1.86, 1.70, 5.30), (2.04, 1.45, .20), "stone")
-box("Hearth firebrick", (1.86, .89, .69), (1.75, 1.22, .17), "stone")
-box("Banked forge coals", (1.86, .82, .80), (1.36, .87, .11), "amber")
-cylinder("Anvil stump", (-1.81, -.25, .63), .39, .70, "beam")
-box("Anvil foot", (-1.81, -.25, 1.00), (.87, .4, .11), "iron")
-box("Anvil waist", (-1.81, -.25, 1.12), (.42, .27, .22), "iron")
-box("Anvil face", (-1.81, -.25, 1.26), (1.04, .34, .11), "iron")
-box("Quench trough", (2.31, -1.7, .44), (1.29, .62, .35), "beam")
-export("OpenSmithy")
+    # Open forge with a closed rear chimney and an accessible front bay.
+    box("Smithy raised floor", (0, 0, .14), (6.9, 5.15, .28), "stone")
+    box("Forge back wall", (0, 2.22, 1.57), (6.55, .47, 2.82), "stone")
+    for x in (-3.10, 3.10):
+        beam("Smithy post", (x, -2.23, .27), (x, -2.23, 3.28), .30)
+        beam("Rafter brace", (x, -2.23, 2.15), (x * .74, -2.23, 3.10), .16)
+    beam("Lintel", (-3.38, -2.23, 3.13), (3.38, -2.23, 3.13), .27)
+    roof(3.63, 2.72, 3.3, 1.18)
+    box("Forge chimney breast", (1.86, 1.70, 2.79), (1.81, 1.22, 5.02), "ash", .085)
+    box("Forge chimney cap", (1.86, 1.70, 5.30), (2.04, 1.45, .20), "stone")
+    box("Hearth firebrick", (1.86, .89, .69), (1.75, 1.22, .17), "stone")
+    box("Banked forge coals", (1.86, .82, .80), (1.36, .87, .11), "amber")
+    cylinder("Anvil stump", (-1.81, -.25, .63), .39, .70, "beam")
+    box("Anvil foot", (-1.81, -.25, 1.00), (.87, .4, .11), "iron")
+    box("Anvil waist", (-1.81, -.25, 1.12), (.42, .27, .22), "iron")
+    box("Anvil face", (-1.81, -.25, 1.26), (1.04, .34, .11), "iron")
+    box("Quench trough", (2.31, -1.7, .44), (1.29, .62, .35), "beam")
+    export("OpenSmithy")
 
-# Three sheltered market bays with an unobstructed front aisle.
-box("Market floor", (0, 0, .10), (8.8, 4.23, .20), "stone")
-for x in (-4.11, -1.37, 1.37, 4.11):
-    for y in (-1.85, 1.83):
-        box("Pier stone shoe", (x, y, .28), (.42, .42, .17), "stone")
-        beam("Market upright", (x, y, .33), (x, y, 3.11), .24)
-    if x < 4:
-        beam("Market knee brace", (x, -1.85, 2.41), (x + .54, -1.85, 3.01), .15)
-beam("Market front header", (-4.38, -1.85, 3.07), (4.38, -1.85, 3.07), .25)
-roof(4.58, 2.30, 3.21, .98)
-for index, x in enumerate((-2.74, 0, 2.74)):
-    box("Vendor counter top", (x, 1.09, 1.04), (1.98, .83, .15), "beam")
-    for sign in (-1, 1):
-        beam("Counter trestle", (x + sign * .69, 1.1, .2), (x + sign * .73, 1.1, 1.04), .14)
-    for j in range(3):
-        box("Store goods", (x + (j - 1) * .55, 1.18, 1.25), (.39, .44, .29), "linen" if j == index else "beam")
-    box("Hanging trade valance", (x, -2.15, 2.81), (2.32, .075, .42), "shutters" if index != 1 else "linen")
-export("MarketShelter")
+    # Three sheltered market bays with an unobstructed front aisle.
+    box("Market floor", (0, 0, .10), (8.8, 4.23, .20), "stone")
+    for x in (-4.11, -1.37, 1.37, 4.11):
+        for y in (-1.85, 1.83):
+            box("Pier stone shoe", (x, y, .28), (.42, .42, .17), "stone")
+            beam("Market upright", (x, y, .33), (x, y, 3.11), .24)
+        if x < 4:
+            beam("Market knee brace", (x, -1.85, 2.41), (x + .54, -1.85, 3.01), .15)
+    beam("Market front header", (-4.38, -1.85, 3.07), (4.38, -1.85, 3.07), .25)
+    roof(4.58, 2.30, 3.21, .98)
+    for index, x in enumerate((-2.74, 0, 2.74)):
+        box("Vendor counter top", (x, 1.09, 1.04), (1.98, .83, .15), "beam")
+        for sign in (-1, 1):
+            beam("Counter trestle", (x + sign * .69, 1.1, .2), (x + sign * .73, 1.1, 1.04), .14)
+        for j in range(3):
+            box("Store goods", (x + (j - 1) * .55, 1.18, 1.25), (.39, .44, .29), "linen" if j == index else "beam")
+        box("Hanging trade valance", (x, -2.15, 2.81), (2.32, .075, .42), "shutters" if index != 1 else "linen")
+    export("MarketShelter")
 
-# Landmark and seating. The well is closed by iron bars across the top.
-cylinder("Well footing", (0, 0, .11), 1.27, .22, "stone", 14)
-cylinder("Well wall", (0, 0, .52), 1.02, .79, "stone", 14)
-cylinder("Cap stones", (0, 0, .97), 1.13, .19, "stone", 14)
-cylinder("Dark well mouth", (0, 0, 1.071), .83, .022, "ash", 14)
-for i in range(-4, 5):
-    half = math.sqrt(.8 ** 2 - (i * .17) ** 2)
-    beam("Iron well grate", (-half, i * .17, 1.105), (half, i * .17, 1.105), .034, "iron")
-for x in (-.99, .99):
-    beam("Well mast", (x, 0, .86), (x, 0, 2.81), .18)
-beam("Well windlass", (-1.09, 0, 2.35), (1.09, 0, 2.35), .12, "iron")
-roof(1.43, 1.0, 2.82, .69)
-export("MarketWell")
+    # Landmark and seating. The well is closed by iron bars across the top.
+    cylinder("Well footing", (0, 0, .11), 1.27, .22, "stone", 14)
+    cylinder("Well wall", (0, 0, .52), 1.02, .79, "stone", 14)
+    cylinder("Cap stones", (0, 0, .97), 1.13, .19, "stone", 14)
+    cylinder("Dark well mouth", (0, 0, 1.071), .83, .022, "ash", 14)
+    for i in range(-4, 5):
+        half = math.sqrt(.8 ** 2 - (i * .17) ** 2)
+        beam("Iron well grate", (-half, i * .17, 1.105), (half, i * .17, 1.105), .034, "iron")
+    for x in (-.99, .99):
+        beam("Well mast", (x, 0, .86), (x, 0, 2.81), .18)
+    beam("Well windlass", (-1.09, 0, 2.35), (1.09, 0, 2.35), .12, "iron")
+    roof(1.43, 1.0, 2.82, .69)
+    export("MarketWell")
 
-# Rounded stone pavers on a thin collision deck.
-box("Square lane base", (0, 0, .043), (4.14, 4.0, .086), "stone", .014)
-for row in range(8):
-    for col in range(6):
-        x = -1.68 + col * .67
-        y = -1.75 + row * .5
-        height = rng.uniform(.026, .044)
-        box("Dressed paver", (x, y, .084), (.643, .474, height), "stone", .034, segments=1)
-export("SquareLane4m")
+    # Rounded stone pavers on a thin collision deck.
+    box("Square lane base", (0, 0, .043), (4.14, 4.0, .086), "stone", .014)
+    for row in range(8):
+        for col in range(6):
+            x = -1.68 + col * .67
+            y = -1.75 + row * .5
+            height = rng.uniform(.026, .044)
+            box("Dressed paver", (x, y, .084), (.643, .474, height), "stone", .034, segments=1)
+    export("SquareLane4m")
 
-for name, pos, yaw in [
-    ("HearthInn", (-6.4, 4.7, 0), -13), ("OpenSmithy", (7, 1.0, 0), 20),
-    ("MarketShelter", (1.8, 8.9, 0), 0), ("MarketWell", (-1.9, .5, 0), 0),
-    ("SquareLane4m", (0, -5.05, 0), 0),
-]:
-    assets[name].location = pos
-    assets[name].rotation_euler.z = math.radians(yaw)
-for x, y in ((0, -1.05), (3.8, -3.5), (-4.1, -4.7)):
-    paving = assets["SquareLane4m"].copy()
-    bpy.context.collection.objects.link(paving)
-    paving.location = (x, y, 0)
-bpy.ops.mesh.primitive_plane_add(size=180, location=(0, 0, -.015))
-ground = bpy.data.materials.new("Packed courtyard earth")
-ground.diffuse_color = (.24, .184, .125, 1)
-bpy.context.object.data.materials.append(ground)
-bpy.ops.object.camera_add(location=(15, -22, 17))
-camera = bpy.context.object
-camera.rotation_euler = (Vector((0, 2, 1.6)) - camera.location).to_track_quat("-Z", "Y").to_euler()
-camera.data.type = "ORTHO"
-camera.data.ortho_scale = 31.8
-scene.camera = camera
-scene.render.engine = "BLENDER_WORKBENCH"
-scene.display.shading.color_type = "TEXTURE"
-scene.display.shading.light = "STUDIO"
-scene.display.shading.show_shadows = True
-scene.display.shading.show_cavity = True
-scene.display.shading.cavity_type = "BOTH"
-scene.render.resolution_x, scene.render.resolution_y = 1560, 1040
-scene.render.resolution_percentage = 100
-scene.render.filepath = str(out / "emberwatch-civic-square.png")
-bpy.ops.wm.save_as_mainfile(filepath=str(out / "Emberwatch-Civic-Square.blend"))
-bpy.ops.render.render(write_still=True)
+    for name, pos, yaw in [
+        ("HearthInn", (-6.4, 4.7, 0), -13), ("OpenSmithy", (7, 1.0, 0), 20),
+        ("MarketShelter", (1.8, 8.9, 0), 0), ("MarketWell", (-1.9, .5, 0), 0),
+        ("SquareLane4m", (0, -5.05, 0), 0),
+    ]:
+        assets[name].location = pos
+        assets[name].rotation_euler.z = math.radians(yaw)
+    for x, y in ((0, -1.05), (3.8, -3.5), (-4.1, -4.7)):
+        paving = assets["SquareLane4m"].copy()
+        bpy.context.collection.objects.link(paving)
+        paving.location = (x, y, 0)
+    bpy.ops.mesh.primitive_plane_add(size=180, location=(0, 0, -.015))
+    ground = bpy.data.materials.new("Packed courtyard earth")
+    ground.diffuse_color = (.24, .184, .125, 1)
+    bpy.context.object.data.materials.append(ground)
+    bpy.ops.object.camera_add(location=(15, -22, 17))
+    camera = bpy.context.object
+    camera.rotation_euler = (Vector((0, 2, 1.6)) - camera.location).to_track_quat("-Z", "Y").to_euler()
+    camera.data.type = "ORTHO"
+    camera.data.ortho_scale = 31.8
+    scene.camera = camera
+    scene.render.engine = "BLENDER_WORKBENCH"
+    scene.display.shading.color_type = "TEXTURE"
+    scene.display.shading.light = "STUDIO"
+    scene.display.shading.show_shadows = True
+    scene.display.shading.show_cavity = True
+    scene.display.shading.cavity_type = "BOTH"
+    scene.render.resolution_x, scene.render.resolution_y = 1560, 1040
+    scene.render.resolution_percentage = 100
+    scene.render.filepath = str(out / "emberwatch-civic-square.png")
+    bpy.ops.wm.save_as_mainfile(filepath=str(out / "Emberwatch-Civic-Square.blend"))
+    bpy.ops.render.render(write_still=True)
