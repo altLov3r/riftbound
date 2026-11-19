@@ -79,3 +79,9 @@ The D3D11 render and physics review completed successfully. The new ramp had a 0
 Run the isolated editor entry point Riftbound.Editor.SettlementPlacementPreview.Run to reproduce the temporary models, geometry probes and D3D11 captures in .code-check/world-production/settlement-preview. The authored scene and terrain require their own reviewed placement change to ship the new sites.
 
 The follow-up Play Mode fixture used the same temporary placements, the normal PlayerController and horse summon, a virtual keyboard, and an isolated save. All eight input cases passed with a grounded endpoint, the expected mount state and a 0.07–0.09 m controller-to-support gap. The horse summoned on the upper deck and descended under normal movement input. The fixture took a screenshot with the active orbit camera at each endpoint. Steering was scripted and the fixture teleported between cases. The route entry point is Riftbound.Editor.WorldRoutePlayModeCheck.RunSettlementVerification, with results under .code-check/world-production/settlement-play-*.
+
+### Standalone review build
+
+Use a separate project copy containing Assets, Packages and ProjectSettings, with the copied Player Settings product name set to **Riftbound Settlement Preview**. Run Riftbound.Editor.SettlementPreviewBuild.Run in a Unity batch and pass a unique -gameplayBuildName. The build callback adds the two temporary groups to the processed scene, limited to this explicit entry point. The source scene and protected terrain hashes are checked by the normal build harness.
+
+Start a new solo character in the review build. Look southeast of Emberwatch's market for the slate-roof weighhouse and ramp, then follow the Greenhollow road north to the canvas shelter on the east side of the road. Use Z on clear ground to summon the horse. Leave the full build folder alongside the executable.
