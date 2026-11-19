@@ -24,7 +24,7 @@ keys = tuple(palette)
 tile = 256
 side = tile * 3
 
-def texel(key, x, y):
+def texel(key, x, y, colors):
     noise = ((x * 39 ^ y * 109 ^ x * y * 19) % 19) - 9
     value = noise + 4 * math.sin(x * .09 + y * .05)
     if key in ("stone", "clay"):
@@ -33,32 +33,36 @@ def texel(key, x, y):
         value += -33 if edge < 3 else 10 if edge < 6 else (row * 7 + x // 42 * 17) % 17 - 8
     if key in ("beam", "shutters"):
         value += 7 * math.sin(x * .7 + 2 * math.cos(y * .05))
-    return bytes(max(0, min(255, round(c + value))) for c in palette[key])
+    return bytes(max(0, min(255, round(c + value))) for c in colors[key])
 
 def chunk(kind, payload):
     return struct.pack(">I", len(payload)) + kind + payload + struct.pack(">I", zlib.crc32(kind + payload))
 
-pixels = b"".join(b"\0" + b"".join(texel(keys[y // tile * 3 + x // tile], x % tile, y % tile)
-                                       for x in range(side)) for y in range(side))
-atlas = out / "emberwatch_atlas.png"
-atlas.write_bytes(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">2I5B", side, side, 8, 2, 0, 0, 0))
-                  + chunk(b"IDAT", zlib.compress(pixels, 9)) + chunk(b"IEND", b""))
-texture = bpy.data.images.load(str(atlas))
-texture.pack()
 material = bpy.data.materials.new("Emberwatch timber and clay")
 material.use_nodes = True
 nodes = material.node_tree.nodes
 image = nodes.new("ShaderNodeTexImage")
-image.image = texture
 principled = nodes.get("Principled BSDF")
 principled.inputs["Roughness"].default_value = .87
 material.node_tree.links.new(image.outputs["Color"], principled.inputs["Base Color"])
 parts, assets = [], {}
 
+def use_atlas(filename, colors):
+    pixels = b"".join(b"\0" + b"".join(texel(keys[y // tile * 3 + x // tile], x % tile, y % tile, colors)
+                                           for x in range(side)) for y in range(side))
+    atlas = out / filename
+    atlas.write_bytes(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">2I5B", side, side, 8, 2, 0, 0, 0))
+                      + chunk(b"IDAT", zlib.compress(pixels, 9)) + chunk(b"IEND", b""))
+    texture = bpy.data.images.load(str(atlas))
+    texture.pack()
+    image.image = texture
+
+
 def paint(obj, key):
     index = keys.index(key)
     obj.data.materials.append(material)
-    uv = obj.data.uv_layers.active or obj.data.uv_layers.new(name="Atlas")
+    uv = obj.data.uv_layers.active or obj.data.uv_layers.new(name="UVMap")
+    uv.name = "UVMap"
     for poly in obj.data.polygons:
         a, b = [axis for axis in range(3) if axis != max(range(3), key=lambda k: abs(poly.normal[k]))]
         coords = [obj.data.vertices[obj.data.loops[i].vertex_index].co for i in poly.loop_indices]
@@ -138,6 +142,8 @@ def window(x, y, z):
     box("Horizontal muntin", (x, y - .11, z), (.67, .035, .060), "beam")
 
 def export(name, prefix="Emberwatch"):
+    if image.image is None:
+        use_atlas("emberwatch_atlas.png", palette)
     bpy.ops.object.select_all(action="DESELECT")
     for obj in parts:
         obj.select_set(True)
