@@ -257,9 +257,24 @@ namespace Riftbound.Editor
                     SendMouse(false);
                     Assert(strafeDelta.magnitude > 0.6f && Vector3.Dot(strafeDelta.normalized, pc.transform.right) < -0.7f, $"GP02 RMB+A strafes left ({strafeDelta.magnitude:F2}m)");
                     Assert(visualAngle > 20f, $"GP01 Strafe aligns visual mesh into travel direction ({visualAngle:F1} deg)");
-                    // Test Turn-in-place with A alone
-                    yawStart = pc.transform.eulerAngles.y;
+                    // A now moves laterally on foot. Arrow keys keep keyboard turning.
+                    pStart = pc.transform.position;
+                    var left = Quaternion.Euler(0f, pc.orbit.Yaw, 0f) * Vector3.left;
+                    yawStart = Mathf.Atan2(left.x, left.z) * Mathf.Rad2Deg;
                     SendKeys(Key.A);
+                    playStage = 80;
+                    dueAt = EditorApplication.timeSinceStartup + 0.35;
+                    return;
+                }
+                if (playStage == 80)
+                {
+                    Vector3 delta = pc.transform.position - pStart;
+                    delta.y = 0;
+                    Vector3 expected = Quaternion.Euler(0, yawStart, 0) * Vector3.forward;
+                    Assert(delta.magnitude > .4f && Vector3.Dot(delta.normalized, expected) > .7f,
+                        $"GP02 A moves left without right mouse ({delta.magnitude:F2}m)");
+                    yawStart = pc.transform.eulerAngles.y;
+                    SendKeys(Key.LeftArrow);
                     playStage = 8;
                     dueAt = EditorApplication.timeSinceStartup + 0.35;
                     return;
