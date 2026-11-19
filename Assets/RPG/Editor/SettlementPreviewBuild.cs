@@ -59,6 +59,8 @@ namespace Riftbound.Editor
                     if (!shelter || shelter.gameObject.scene != scene || shelter.childCount != 9)
                         throw new BuildFailedException("The trailhead shelter was not fully staged in the build scene.");
                     Debug.Log($"Settlement preview: staged the Gor'Kresh trailhead shelter in {scene.name}.");
+                    if (Array.IndexOf(Environment.GetCommandLineArgs(), "-includeSettlementActivity") >= 0)
+                        SettlementActivityPreview.Create(new StringBuilder());
                 }
             }
             finally

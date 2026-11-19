@@ -265,6 +265,8 @@ namespace Riftbound
                 Mark(area, hollows.Entrance, "", new Color(.39f, .21f, .57f), 10f);
                 DrawAtlasLabel(area, hollows.Entrance, "Brass Hollows");
             }
+            foreach (var stop in SettlementWaystop.Active)
+                Mark(area, stop.transform.position, "", new Color(.32f, .49f, .25f), 9);
             foreach(var node in FlightMaster.WorldFlightNodes) Mark(area,node.targetPos,"",new Color(1,.8f,.25f),5);
             foreach (var landmark in FindObjectsByType<Landmark>(FindObjectsSortMode.None))
                 if (!player.HasLandmark(landmark.landmarkId))
@@ -291,12 +293,15 @@ namespace Riftbound
                 DrawSiteWaypoint(new Rect(x,y+96,w,30),"Tallykeepers’ Rest",westernCamps.Rest.position);
             }
             if (hollows) DrawSiteWaypoint(new Rect(x,y+130,w,30),"Brass Hollows entrance",hollows.Entrance);
-            GUI.Label(new Rect(x,y+170,w,24),"REGIONAL WAYPOINTS",small);
+            GUI.Label(new Rect(x,y+170,w,24),"WAYPOINTS",small);
             string[] names={"Emberwatch Outpost","Duskwood Cathedral","Camp Bloodrock","Greenhollow Valley","Wyrmcrest Summit","Willowmere Wilds","Highspire Keep","Gor'Kresh Stronghold"};
             Vector3[] positions={new Vector3(0,0,10),WorldRegions.Cathedral,WorldRegions.Bloodrock,WorldRegions.Greenhollow,WorldRegions.Summit,new Vector3(-285,6,50),WorldRegions.Highspire,WorldRegions.Stronghold};
-            atlasRegionScroll = GUI.BeginScrollView(new Rect(x,y+198,w,218), atlasRegionScroll, new Rect(0,0,w-19,names.Length*35));
+            var waystops = SettlementWaystop.Active;
+            atlasRegionScroll = GUI.BeginScrollView(new Rect(x,y+198,w,218), atlasRegionScroll, new Rect(0,0,w-19,(names.Length + waystops.Count)*35));
+            for (int i = 0; i < waystops.Count; i++)
+                DrawSiteWaypoint(new Rect(0, i * 35, w - 19, 30), waystops[i].displayName, waystops[i].transform.position);
             for(int i=0;i<names.Length;i++)
-                if(GUI.Button(new Rect(0,i*35,w-19,30),names[i],questButton)) MinimapRadar.SetWaypoint(positions[i],names[i]);
+                if(GUI.Button(new Rect(0,(i + waystops.Count)*35,w-19,30),names[i],questButton)) MinimapRadar.SetWaypoint(positions[i],names[i]);
             GUI.EndScrollView();
             var radar = MinimapRadar.Instance;
             if (radar && radar.TryGetNavigationTarget(out _, out var caption))

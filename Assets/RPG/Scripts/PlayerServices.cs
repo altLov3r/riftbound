@@ -230,6 +230,13 @@ namespace Riftbound
             if (hollows && hollows.TryInteraction(this, out var caveAction))
                 Consider(caveAction.distance, caveAction.text, caveAction.execute);
 
+            foreach (var stop in SettlementWaystop.Active)
+            {
+                float distance = Vector3.Distance(pos, stop.transform.position);
+                if (distance < 3f)
+                    Consider(distance, $"Read {stop.displayName} notice", () => Message = stop.notice);
+            }
+
             if (hasCandidate) { best = winner; return true; }
 
             // Nearby out-of-range feedback hint (3.1m..6.0m)

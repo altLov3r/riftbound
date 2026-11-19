@@ -45,6 +45,10 @@ namespace Riftbound.WorldAmbient
         [Tooltip("Value written when locomotionParameter is a Float parameter and the actor is walking.")]
         [SerializeField] float locomotionFloatValue = 1f;
 
+        [SerializeField] string walkState = "";
+        [SerializeField] string idleState = "";
+        int activeState;
+
         readonly List<Transform> validWaypoints = new List<Transform>();
         int targetIndex;
         float pauseRemaining;
@@ -252,10 +256,22 @@ namespace Riftbound.WorldAmbient
 
         void ApplyAnimatorLocomotion(bool walking)
         {
-            if (!animator || !animator.isActiveAndEnabled || string.IsNullOrWhiteSpace(locomotionParameter))
+            if (!animator || !animator.isActiveAndEnabled)
                 return;
             var ctrl = animator.runtimeAnimatorController;
             if (!ctrl) return;
+            if (string.IsNullOrWhiteSpace(locomotionParameter))
+            {
+                string state = walking ? walkState : idleState;
+                if (string.IsNullOrWhiteSpace(state)) return;
+                int hash = Animator.StringToHash(state);
+                if (hash != activeState && animator.HasState(0, hash))
+                {
+                    animator.CrossFadeInFixedTime(hash, .14f, 0);
+                    activeState = hash;
+                }
+                return;
+            }
 
             if (!hasCachedParam || cachedController != ctrl)
             {

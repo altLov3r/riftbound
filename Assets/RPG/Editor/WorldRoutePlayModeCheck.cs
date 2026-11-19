@@ -36,6 +36,9 @@ namespace Riftbound.Editor
         static Vector3 lastPosition;
         static string folder;
         static int goldAfterClaim;
+        static WorldAmbient.CivilianRouteWalker porter;
+        static int noticeIndex;
+        static SettlementWaystop readingNotice;
 
         static WorldRoutePlayModeCheck() { EditorApplication.playModeStateChanged += Changed; }
 
@@ -165,6 +168,7 @@ namespace Riftbound.Editor
                 {
                     if (caseIndex >= cases.Count)
                     {
+                        if (CurrentPreview == PreviewSite.FullSettlementPreview) { noticeIndex = 0; stage = 30; return; }
                         if (CurrentPreview != PreviewSite.None) { Finish(false); return; }
                         stage = 20; captureIndex = 0; return;
                     }
@@ -251,6 +255,46 @@ namespace Riftbound.Editor
                         ScreenCapture.CaptureScreenshot(Path.Combine(folder, $"route-{caseIndex + 1:00}.png"));
                     caseIndex++; stage = 2; due = now + .35; return;
                 }
+                if (stage == 30)
+                {
+                    if (noticeIndex == SettlementWaystop.Active.Count)
+                    {
+                        if (noticeIndex != 4 || !porter || porter.CompletedLoops < 1)
+                            throw new Exception($"Settlement content incomplete: notices={noticeIndex}, porter loops={porter?.CompletedLoops}");
+                        Report.AppendLine($"PASS court porter completed {porter.CompletedLoops} loops in the combined scene.");
+                        Keys(UnityEngine.InputSystem.Key.M); stage = 32; due = now + .25; return;
+                    }
+                    readingNotice = SettlementWaystop.Active[noticeIndex];
+                    player.Dismount();
+                    var motor = player.GetComponent<CharacterController>();
+                    motor.enabled = false;
+                    player.transform.position = readingNotice.transform.position + Vector3.up * .12f;
+                    motor.enabled = true;
+                    Physics.SyncTransforms();
+                    Keys(UnityEngine.InputSystem.Key.E); stage = 31; due = now + .25; return;
+                }
+                if (stage == 31)
+                {
+                    Keys();
+                    if (player.Message != readingNotice.notice)
+                        throw new Exception($"Could not read {readingNotice.displayName} with E. UI message: {player.Message}");
+                    Report.AppendLine($"PASS INPUT read {readingNotice.displayName} notice.");
+                    noticeIndex++; stage = 30; due = now + .25; return;
+                }
+                if (stage == 32)
+                {
+                    Keys();
+                    if (!player.MapOpen) throw new Exception("M did not open the expanded atlas.");
+                    MinimapRadar.SetWaypoint(readingNotice.transform.position, readingNotice.displayName);
+                    if (!MinimapRadar.Instance.TryGetNavigationTarget(out var point, out var title)
+                        || title != readingNotice.displayName || FlatDistance(point, readingNotice.transform.position) > .01f)
+                        throw new Exception("Waypoint did not resolve to the selected settlement.");
+                    Report.AppendLine("PASS INPUT M opens atlas. Settlement destination verified via the existing waypoint API.");
+                    if (SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Null)
+                        ScreenCapture.CaptureScreenshot(Path.Combine(folder, "settlement-atlas.png"));
+                    stage = 33; due = now + .5; return;
+                }
+                if (stage == 33) { MinimapRadar.ClearWaypoint(); Finish(false); return; }
                 if(stage==20) Capture(now);
             }
             catch(Exception e) { Report.AppendLine("FAIL "+e); Finish(true); }
@@ -312,6 +356,7 @@ namespace Riftbound.Editor
             routeCases.AddRange(CoilbreakCases());
             WyrmcrestRefugePreview.Create(Report);
             routeCases.AddRange(SpurCases(WyrmcrestRefugePreview.Approach));
+            porter = SettlementActivityPreview.Create(Report);
             return routeCases;
         }
 
