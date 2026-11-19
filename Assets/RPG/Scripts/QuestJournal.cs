@@ -21,7 +21,7 @@ namespace Riftbound
         Vector2 journalDetailScroll;
         Vector2 exploreListScroll;
         Vector2 exploreDetailScroll;
-        GUIStyle guideCardStyle, guideMutedStyle, guideBadgeStyle, guideWrapButton;
+        GUIStyle guideCardStyle, guideMutedStyle, guideBadgeStyle, guideWrapButton, guideActionButton, guideHeadingStyle, guideCompactButton;
 
         void EnsureGuideStyles()
         {
@@ -34,7 +34,12 @@ namespace Riftbound
 
             guideBadgeStyle = new GUIStyle(small) { fontSize = 11, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft, wordWrap = false };
 
+            guideHeadingStyle = new GUIStyle(title) { fontSize = 21, fontStyle = FontStyle.Bold, wordWrap = true };
+            guideHeadingStyle.normal.textColor = WowTheme.Parchment;
+
             guideWrapButton = new GUIStyle(questButton) { fontSize = 14, wordWrap = true, alignment = TextAnchor.MiddleLeft, padding = new RectOffset(10, 10, 6, 6) };
+            guideActionButton = new GUIStyle(questButton) { fontSize = 13, fontStyle = FontStyle.Bold, wordWrap = false, alignment = TextAnchor.MiddleCenter, padding = new RectOffset(8, 8, 4, 4) };
+            guideCompactButton = new GUIStyle(questButton) { fontSize = 11, fontStyle = FontStyle.Bold, wordWrap = false, alignment = TextAnchor.MiddleCenter, padding = new RectOffset(6, 6, 4, 4) };
         }
 
         void DrawQuestJournal(float width, float height)
@@ -42,9 +47,9 @@ namespace Riftbound
             EnsureGuideStyles();
 
             float winW = Mathf.Clamp(width - 48f, 760f, 920f);
-            float winH = Mathf.Clamp(height - 44f, 520f, 596f);
+            float winH = Mathf.Clamp(height - 110f, 480f, 566f);
             float x = (width - winW) * 0.5f;
-            float y = (height - winH) * 0.5f;
+            float y = Mathf.Max(22f, (height - winH) * 0.5f - 18f);
 
             Panel(new Rect(x, y, winW, winH));
 
@@ -154,7 +159,7 @@ namespace Riftbound
             {
                 var side = entries[sideIndices[i]];
                 float sObjH = guideMutedStyle.CalcHeight(new GUIContent(side.objective), rightW - 24f);
-                sideTotalH += Mathf.Max(118f, 80f + sObjH) + 10f;
+                sideTotalH += Mathf.Max(124f, 98f + sObjH) + 10f;
             }
             if (sideIndices.Count == 0) sideTotalH += 76f;
 
@@ -174,7 +179,7 @@ namespace Riftbound
                 GUI.Label(new Rect(card.x + 14f, cy, leftW - 28f, 18f), $"{goal.statusLabel}  ·  {goal.regionTag}", guideBadgeStyle);
                 cy += 20f;
 
-                GUI.Label(new Rect(card.x + 14f, cy, leftW - 28f, 30f), goal.title, questHeading);
+                GUI.Label(new Rect(card.x + 14f, cy, leftW - 28f, 30f), goal.title, guideHeadingStyle);
                 cy += 32f;
 
                 GUI.Label(new Rect(card.x + 14f, cy, leftW - 28f, goalSummaryH + 4f), goal.summary, guideCardStyle);
@@ -189,7 +194,7 @@ namespace Riftbound
                 float btnY = card.yMax - 44f;
                 float halfBtn = (leftW - 36f) * 0.5f;
                 DrawPrimaryChapterAction(new Rect(card.x + 14f, btnY, halfBtn, 32f), goal, hasPin, closeOnTrack: true);
-                if (GUI.Button(new Rect(card.x + 22f + halfBtn, btnY, halfBtn, 32f), "OPEN IN JOURNAL", questButton))
+                if (GUI.Button(new Rect(card.x + 22f + halfBtn, btnY, halfBtn, 32f), "OPEN IN JOURNAL", guideActionButton))
                 {
                     AudioEffects.PlayClick();
                     journalSelection = goal.index;
@@ -229,7 +234,7 @@ namespace Riftbound
                 {
                     var side = entries[sideIndices[i]];
                     float sObjH = guideMutedStyle.CalcHeight(new GUIContent(side.objective), rightW - 24f);
-                    float sCardH = Mathf.Max(118f, 80f + sObjH);
+                    float sCardH = Mathf.Max(124f, 98f + sObjH);
                     Rect sCard = new Rect(rx, sy, rightW, sCardH);
                     Fill(sCard, new Color(.08f, .10f, .12f, .90f));
                     Fill(new Rect(sCard.x, sCard.y, 3f, sCard.height), StatusColor(side.status));
@@ -239,16 +244,17 @@ namespace Riftbound
                     GUI.Label(new Rect(sCard.x + 12f, sCard.y + 26f, rightW - 24f, 24f), side.title, label);
                     GUI.Label(new Rect(sCard.x + 12f, sCard.y + 50f, rightW - 24f, sObjH + 4f), side.objective, guideMutedStyle);
 
-                    float bY = sCard.yMax - 36f;
-                    float btnW = (rightW - 30f) * 0.5f;
-                    if (GUI.Button(new Rect(sCard.x + 12f, bY, btnW, 28f), "VIEW DETAILS", questButton))
+                    float bY = sCard.yMax - 38f;
+                    float detailsW = 104f;
+                    float actionW = rightW - 30f - detailsW;
+                    if (GUI.Button(new Rect(sCard.x + 12f, bY, detailsW, 28f), "DETAILS", guideCompactButton))
                     {
                         AudioEffects.PlayClick();
                         journalSelection = side.index;
                         journalFilter = JournalFilter.All;
                         guideTab = AdventureGuideTab.Journal;
                     }
-                    DrawPrimaryChapterAction(new Rect(sCard.x + 18f + btnW, bY, btnW, 28f), side, hasPin, closeOnTrack: true);
+                    DrawPrimaryChapterAction(new Rect(sCard.x + 18f + detailsW, bY, actionW, 28f), side, hasPin, closeOnTrack: true, compact: true);
 
                     sy += sCardH + 10f;
                 }
@@ -417,8 +423,7 @@ namespace Riftbound
             float liveH = string.IsNullOrEmpty(cur.liveObjectiveLine) ? 0f : label.CalcHeight(new GUIContent(cur.liveObjectiveLine), innerW - 16f) + 28f;
 
             int actionCount = cur.liveStops.Count + (cur.allowTrackWestern ? 1 : 0) + (cur.allowTrackHollows ? 1 : 0) + (cur.showEncountersButton ? 1 : 0);
-            int actionRows = (actionCount + 1) / 2;
-            float actionsH = actionRows * 38f + 16f;
+            float actionsH = actionCount * 38f + 16f;
             float totalH = Mathf.Max(detailBox.height - 16f, 210f + purposeH + startH + destH + hintH + liveH + actionsH);
 
             exploreDetailScroll = GUI.BeginScrollView(
@@ -435,7 +440,7 @@ namespace Riftbound
             dy += 36f;
 
             GUI.Label(new Rect(4f, dy, innerW, purposeH + 4f), cur.purpose, label);
-            dy += purposeH + 10f;
+            dy += purposeH + 6f;
 
             dy = DrawLabeledSection(4f, dy, innerW, "HOW TO START", cur.howToStart, guideCardStyle);
             dy = DrawLabeledSection(4f, dy, innerW, "NAMED DESTINATION", cur.namedDestination, guideCardStyle);
@@ -455,17 +460,15 @@ namespace Riftbound
             GUI.Label(new Rect(4f, dy, innerW, 20f), "ROUTE ACTIONS", small);
             dy += 24f;
 
-            float colW = (innerW - 12f) * 0.5f;
+            float actionW = Mathf.Min(360f, innerW - 8f);
             int slot = 0;
 
             void PlaceButton(string text, bool enabled, System.Action onClick)
             {
-                int col = slot % 2;
-                int row = slot / 2;
-                Rect r = new Rect(4f + col * (colW + 8f), dy + row * 38f, colW, 32f);
+                Rect r = new Rect(4f, dy + slot * 38f, actionW, 32f);
                 bool prevEnabled = GUI.enabled;
                 GUI.enabled = enabled;
-                if (GUI.Button(r, text, questButton))
+                if (GUI.Button(r, text, guideActionButton))
                 {
                     AudioEffects.PlayClick();
                     onClick?.Invoke();
@@ -519,10 +522,10 @@ namespace Riftbound
         float DrawLabeledSection(float x, float y, float w, string heading, string body, GUIStyle bodyStyle)
         {
             GUI.Label(new Rect(x, y, w, 18f), heading, small);
-            y += 19f;
+            y += 18f;
             float h = bodyStyle.CalcHeight(new GUIContent(body), w);
             GUI.Label(new Rect(x, y, w, h + 4f), body, bodyStyle);
-            return y + h + 10f;
+            return y + h + 7f;
         }
 
         void DrawFilterButton(Rect rect, string text, JournalFilter filter)
@@ -538,7 +541,7 @@ namespace Riftbound
             GUI.backgroundColor = prev;
         }
 
-        void DrawPrimaryChapterAction(Rect rect, JournalChapterView chapter, bool hasPin, bool closeOnTrack)
+        void DrawPrimaryChapterAction(Rect rect, JournalChapterView chapter, bool hasPin, bool closeOnTrack, bool compact = false)
         {
             bool radarReady = MinimapRadar.Instance != null;
             string btnLabel = chapter.actionLabel;
@@ -574,7 +577,7 @@ namespace Riftbound
 
             bool prevEnabled = GUI.enabled;
             GUI.enabled = enabled;
-            if (GUI.Button(rect, btnLabel, questButton))
+            if (GUI.Button(rect, btnLabel, compact ? guideCompactButton : guideActionButton))
             {
                 AudioEffects.PlayClick();
                 switch (chapter.actionKind)

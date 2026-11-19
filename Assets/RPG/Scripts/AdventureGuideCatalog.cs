@@ -667,7 +667,7 @@ namespace Riftbound
 
         static TownNPC FindTownNpc(string npcName)
         {
-            foreach (var npc in UnityEngine.Object.FindObjectsByType<TownNPC>(FindObjectsSortMode.None))
+            foreach (var npc in UnityEngine.Object.FindObjectsByType<TownNPC>())
             {
                 if (npc && string.Equals(npc.npcName, npcName, StringComparison.OrdinalIgnoreCase))
                     return npc;
@@ -677,12 +677,12 @@ namespace Riftbound
 
         static GuideDestination FindCryptDestination()
         {
-            foreach (var chest in UnityEngine.Object.FindObjectsByType<LootChest>(FindObjectsSortMode.None))
+            foreach (var chest in UnityEngine.Object.FindObjectsByType<LootChest>())
             {
                 if (chest && chest.chestId == "crypt-reliquary")
                     return new GuideDestination { label = "Western Crypt", position = chest.transform.position, available = true };
             }
-            foreach (var rune in UnityEngine.Object.FindObjectsByType<Runestone>(FindObjectsSortMode.None))
+            foreach (var rune in UnityEngine.Object.FindObjectsByType<Runestone>())
             {
                 if (rune)
                     return new GuideDestination { label = "Western Crypt", position = rune.transform.position, available = true };
