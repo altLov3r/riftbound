@@ -41,6 +41,10 @@ namespace Riftbound.Editor
             if (axles.Length != 1 || axles[0].GetComponentInChildren<Collider>() ||
                 !axles[0].transform.parent.GetComponent<BoxCollider>())
                 throw new BuildFailedException("Rustwater's sorting drum must have one visual axle and separate fixed collision.");
+
+            var cloister = Stage(scene, "DeathknellCloister/Deathknell Cloister", new Vector3(-242.5f, 0, 156.8f), 6);
+            if (cloister.GetComponentsInChildren<Light>().Length != 2)
+                throw new BuildFailedException("Deathknell's cloister requires both approach lanterns.");
         }
 
         static GameObject Stage(Scene scene, string model, Vector3 position, int meshCount)
