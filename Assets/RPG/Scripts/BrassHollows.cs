@@ -12,20 +12,47 @@ namespace Riftbound
         static readonly string[] EnemyIds = { "hollows-sentry", "hollows-lookout", "hollows-bruiser", "hollows-channeler", "hollows-veyl" };
         static readonly string[] EnemyNames = { "Choir sentry", "Choir lookout", "Choir bruiser", "Choir channeler", "Foreman Veyl" };
         static readonly Vector3[] EnemySpawns = {
-            new(-3f, 0f, 8f), new(2.4f, 0f, 13f), new(3.4f, 0f, 27f), new(-2.8f, 0f, 32f), new(0f, 0f, 49f)
+            new(-1.5f, 0f, 18.0f), new(1.5f, 0f, 20.5f), new(3.6f, 0f, 27.5f), new(-3.2f, 0f, 32.5f), new(0f, 0f, 50.5f)
         };
+
+        sealed class SteamVent
+        {
+            public Transform root;
+            public Renderer plate;
+            public LineRenderer ring;
+            public Vector3 worldPos;
+            public float radius;
+            public float damage;
+            public float idleDuration;
+            public float warningDuration;
+            public float recoveryDuration;
+            public float startDelay;
+            public bool requireVeylAlive;
+            public bool warningShown;
+            public int lastBurstCycle = -1;
+            public string warningText;
+
+            public float CycleLength => idleDuration + warningDuration + recoveryDuration;
+        }
+
         static BrassHollows current;
         [SerializeField] List<Material> materials = new();
-        Material shale, slate, oak, bronze, amber, cooled, danger;
+        readonly List<SteamVent> vents = new();
+        Material shale, slate, oak, bronze, amber, cooled, danger, ringMat;
         Transform chamber, pump;
         Renderer pumpCore, ventCore;
         Light pumpLight;
         Mesh rockMesh;
         Transform serviceDoor;
         PlayerController entrant;
-        float lastVentCycle = -1;
+        float encounterTime, bellChamberTime, veylRecoveryUntil;
+        int lastSyncedStage = -1;
+        bool wasInside, taughtSteam, veylWasWarning, notifiedPumpReady;
         public static BrassHollows Current => current;
         [field: SerializeField] public Vector3 Entrance { get; private set; }
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        static void ResetStatics() => current = null;
 
         void OnEnable()
         {
@@ -65,6 +92,12 @@ namespace Riftbound
             amber = Paint(lit, "Lantern amber", new Color(.95f, .58f, .16f), new Color(1f, .44f, .055f));
             cooled = Paint(lit, "Cold pump glass", new Color(.13f, .30f, .29f));
             danger = Paint(lit, "Steam warning", new Color(.8f, .20f, .055f), new Color(1f, .13f, .015f));
+            var unlit = Shader.Find("Universal Render Pipeline/Unlit");
+            if (!unlit) unlit = Shader.Find("Unlit/Color");
+            ringMat = new Material(unlit) { name = "Steam warning ring" };
+            ringMat.SetColor("_BaseColor", new Color(1f, .28f, .05f));
+            ringMat.color = new Color(1f, .28f, .05f);
+            materials.Add(ringMat);
 
             Entrance = Surface(EntranceSite);
             var mouth = new GameObject("Mine mouth").transform;
@@ -103,11 +136,16 @@ namespace Riftbound
 
         void BuildInterior(PlayerController player)
         {
-            if (chamber) return;
+            entrant = player;
+            if (chamber)
+            {
+                RefreshPump(player.BrassHollowsStage >= 2);
+                lastSyncedStage = player.BrassHollowsStage;
+                return;
+            }
             chamber = new GameObject("Brass Hollows underground passage").transform;
             chamber.SetParent(transform);
             chamber.position = InteriorOrigin;
-            entrant = player;
 
             Section("Ore Landing", 0f, 17f, 5.5f, 5.0f);
             Section("Lower drive", 17f, 22f, 2.4f, 3.6f);
@@ -126,8 +164,13 @@ namespace Riftbound
             foreach (float x in new[] { 1.46f, 2.34f })
                 Part(chamber, "Ore cart rail", new Vector3(x,.05f,7.3f), new Vector3(.045f,.055f,9.3f), bronze);
 
-            // The vent’s flashing plate warns players before its damage pulse.
-            ventCore = Part(chamber, "Pressure vent", new Vector3(0,.025f,29.5f), new Vector3(2.6f,.05f,2.6f), bronze).GetComponent<Renderer>();
+            vents.Clear();
+            // Teach the steam tell safely in Ore Landing before any enemy pulls, combine with the Pump Gallery fight, then flank Veyl.
+            AddSteamVent("Ore Landing steam vent", new Vector3(0f, .025f, 6.0f), 1.65f, 8f, 2.2f, 2.0f, 1.8f, 0f, false, "⚠ STEAM VENT!");
+            ventCore = AddSteamVent("Pressure vent", new Vector3(0f, .025f, 29.5f), 1.65f, 16f, 2.2f, 2.0f, 1.8f, 0f, false, "⚠ STEAM SURGE!").plate;
+            AddSteamVent("Bell Chamber west vent", new Vector3(-3.6f, .025f, 49.5f), 1.75f, 20f, 2.2f, 2.0f, 2.3f, 0f, true, "⚠ VALVE OVERPRESSURE!");
+            AddSteamVent("Bell Chamber east vent", new Vector3(3.6f, .025f, 49.5f), 1.75f, 20f, 2.2f, 2.0f, 2.3f, 3.25f, true, "⚠ VALVE OVERPRESSURE!");
+
             pump = new GameObject("Choir siphon shutoff").transform;
             pump.SetParent(chamber, false);
             pump.localPosition = new Vector3(0,0,55.5f);
@@ -153,6 +196,44 @@ namespace Riftbound
                     InteriorOrigin + EnemySpawns[i] + Vector3.up * .06f, i == 4, i == 3);
             }
             RefreshPump(player.BrassHollowsStage >= 2);
+            lastSyncedStage = player.BrassHollowsStage;
+        }
+
+        SteamVent AddSteamVent(string label, Vector3 localPos, float radius, float damage, float idle, float warn, float recovery, float startDelay, bool requireVeylAlive, string warningText)
+        {
+            var plateTransform = Part(chamber, label, localPos, new Vector3(2.6f, .05f, 2.6f), bronze);
+            var ringGo = new GameObject("Steam warning ring");
+            ringGo.transform.SetParent(plateTransform, false);
+            var ring = ringGo.AddComponent<LineRenderer>();
+            ring.useWorldSpace = true;
+            ring.loop = true;
+            ring.sharedMaterial = ringMat;
+            ring.positionCount = 48;
+            ring.startWidth = ring.endWidth = .15f;
+            Vector3 worldPos = InteriorOrigin + localPos;
+            for (int i = 0; i < 48; i++)
+            {
+                float angle = i * Mathf.PI * 2f / 48f;
+                ring.SetPosition(i, worldPos + new Vector3(Mathf.Sin(angle) * radius, .08f, Mathf.Cos(angle) * radius));
+            }
+            ring.enabled = false;
+            var vent = new SteamVent
+            {
+                root = plateTransform,
+                plate = plateTransform.GetComponent<Renderer>(),
+                ring = ring,
+                worldPos = worldPos,
+                radius = radius,
+                damage = damage,
+                idleDuration = idle,
+                warningDuration = warn,
+                recoveryDuration = recovery,
+                startDelay = startDelay,
+                requireVeylAlive = requireVeylAlive,
+                warningText = warningText
+            };
+            vents.Add(vent);
+            return vent;
         }
 
         void Section(string label, float from, float to, float halfWidth, float ceiling)
@@ -273,19 +354,196 @@ namespace Riftbound
             return rock.transform;
         }
 
+        public bool IsVeylRecovering => Time.time < veylRecoveryUntil;
+
+        public int ActiveVentWarningCount
+        {
+            get
+            {
+                int count = 0;
+                foreach (var vent in vents) if (vent.ring && vent.ring.enabled) count++;
+                return count;
+            }
+        }
+
         void Update()
         {
-            if (!chamber || !ventCore || FrontendMenu.IsOpen) return;
-            var player = entrant;
-            if (!player || !Inside(player.transform.position) || player.BrassHollowsStage != 1) return;
-            float cycle = Time.time % 6f;
-            ventCore.sharedMaterial = cycle >= 4f ? danger : bronze;
-            if (cycle < 5.4f || cycle >= 5.7f || Mathf.Floor(Time.time / 6f) == lastVentCycle) return;
-            lastVentCycle = Mathf.Floor(Time.time / 6f);
-            Vector3 vent = InteriorOrigin + new Vector3(0,0,29.5f);
-            SpellFX.CreateArcaneBurst(vent);
-            Vector3 distance = player.transform.position - vent;
-            if (Mathf.Abs(distance.x) < 1.3f && Mathf.Abs(distance.z) < 1.3f) player.Stats.Damage(15f);
+            if (!chamber || FrontendMenu.IsOpen) return;
+            var player = entrant ? entrant : FindFirstObjectByType<PlayerController>();
+            if (!player) return;
+
+            if (player.BrassHollowsStage != lastSyncedStage)
+            {
+                lastSyncedStage = player.BrassHollowsStage;
+                RefreshPump(player.BrassHollowsStage >= 2);
+                ResetEncounterState(resetEnemies: false);
+            }
+
+            bool inside = Inside(player.transform.position);
+            if (!inside || !player.Stats || !player.Stats.Alive || player.BrassHollowsStage != 1)
+            {
+                if (wasInside || encounterTime > 0f || bellChamberTime > 0f || veylWasWarning)
+                    ResetEncounterState(resetEnemies: false);
+                wasInside = false;
+                return;
+            }
+
+            if (!wasInside)
+            {
+                wasInside = true;
+                ResetEncounterState(resetEnemies: false);
+            }
+
+            float dt = Mathf.Min(Time.deltaTime, 0.2f);
+            encounterTime += dt;
+
+            var veyl = EnemyController.FindByKey(EnemyIds[4]);
+            var veylStats = veyl ? veyl.GetComponent<Combatant>() : null;
+            bool veylAlive = veyl && veyl.gameObject.activeInHierarchy && veylStats && veylStats.Alive && !player.HasDefeated(EnemyIds[4]);
+            float localZ = player.transform.position.z - InteriorOrigin.z;
+
+            if (veylAlive && localZ >= 38f && !veyl.IsEvading)
+                bellChamberTime += dt;
+            else if (!veylAlive || localZ < 36f || veyl.IsEvading)
+                bellChamberTime = 0f;
+
+            if (veylAlive)
+            {
+                if (veyl.IsWarningActive && !veylWasWarning)
+                {
+                    veylWasWarning = true;
+                    veylRecoveryUntil = 0f;
+                    player.Message = "Foreman Veyl winds up Crushing Blow — step clear of his ring!";
+                }
+                else if (!veyl.IsWarningActive && veylWasWarning)
+                {
+                    veylWasWarning = false;
+                    if (!veyl.IsEvading)
+                    {
+                        veylRecoveryUntil = Time.time + 1.8f;
+                        CombatTextManager.Spawn(veyl.transform.position + Vector3.up * 2.4f, "RECOVERY WINDOW!", new Color(.35f, .95f, .55f), true);
+                        player.Message = "Veyl is off-balance after his slam — strike now!";
+                    }
+                }
+            }
+            else
+            {
+                veylWasWarning = false;
+                veylRecoveryUntil = 0f;
+            }
+
+            if (!notifiedPumpReady && DefeatedCount(player) >= EnemyIds.Length)
+            {
+                notifiedPumpReady = true;
+                player.Message = "All Choir defeated! Shut down the siphon at the far end of the Bell Chamber.";
+            }
+
+            foreach (var vent in vents)
+            {
+                if (!vent.plate || !vent.ring) continue;
+                bool ventEnabled = !vent.requireVeylAlive || (veylAlive && bellChamberTime > 0f);
+                if (!ventEnabled)
+                {
+                    vent.plate.sharedMaterial = cooled;
+                    vent.ring.enabled = false;
+                    vent.warningShown = false;
+                    vent.lastBurstCycle = -1;
+                    continue;
+                }
+
+                float timer = (vent.requireVeylAlive ? bellChamberTime : encounterTime) - vent.startDelay;
+                if (timer < 0f)
+                {
+                    vent.plate.sharedMaterial = bronze;
+                    vent.ring.enabled = false;
+                    vent.warningShown = false;
+                    continue;
+                }
+
+                float cycleLen = vent.CycleLength;
+                int cycleIdx = Mathf.FloorToInt(timer / cycleLen);
+                float phase = timer - cycleIdx * cycleLen;
+
+                if (phase < vent.idleDuration)
+                {
+                    vent.plate.sharedMaterial = bronze;
+                    vent.ring.enabled = false;
+                    vent.warningShown = false;
+                }
+                else if (phase < vent.idleDuration + vent.warningDuration)
+                {
+                    vent.plate.sharedMaterial = danger;
+                    vent.ring.enabled = true;
+                    float pulse = .13f + .05f * Mathf.Sin(Time.time * 12f);
+                    vent.ring.startWidth = vent.ring.endWidth = pulse;
+                    if (!vent.warningShown)
+                    {
+                        vent.warningShown = true;
+                        if (Vector3.Distance(player.transform.position, vent.worldPos) <= 16f)
+                        {
+                            GameSound.Play(SoundCue.Rune, vent.worldPos);
+                            CombatTextManager.Spawn(vent.worldPos + Vector3.up * .45f, vent.warningText, new Color(1f, .55f, .12f), true);
+                            if (!taughtSteam && !vent.requireVeylAlive)
+                            {
+                                taughtSteam = true;
+                                player.Message = "Steam vent charging — step clear of the red ring before it erupts!";
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    vent.plate.sharedMaterial = cooled;
+                    vent.ring.enabled = false;
+                    vent.warningShown = false;
+                    if (cycleIdx != vent.lastBurstCycle)
+                    {
+                        vent.lastBurstCycle = cycleIdx;
+                        TriggerSteamBurst(player, vent);
+                    }
+                }
+            }
+        }
+
+        void TriggerSteamBurst(PlayerController player, SteamVent vent)
+        {
+            SpellFX.CreateExpandingRing(vent.worldPos, .35f, vent.radius, .35f, new Color(.95f, .72f, .42f, .9f), .2f);
+            SpellFX.SpawnBurst(vent.worldPos + Vector3.up * .35f, new Color(.92f, .92f, .94f), new Color(.96f, .58f, .22f),
+                24, 2.2f, 5.2f, .16f, .34f, .55f);
+            if (Vector3.Distance(player.transform.position, vent.worldPos) <= 18f)
+                GameSound.Play(SoundCue.Hit, vent.worldPos);
+            Vector2 planar = new Vector2(player.transform.position.x - vent.worldPos.x, player.transform.position.z - vent.worldPos.z);
+            float dy = Mathf.Abs(player.transform.position.y - vent.worldPos.y);
+            if (player.Stats && player.Stats.Alive && planar.magnitude <= vent.radius && dy < 2.2f)
+            {
+                player.Stats.Damage(vent.damage);
+                CombatTextManager.Spawn(player.transform.position + Vector3.up * 1.8f, "SCALDED!", new Color(1f, .35f, .15f), true);
+            }
+        }
+
+        void ResetEncounterState(bool resetEnemies)
+        {
+            encounterTime = 0f;
+            bellChamberTime = 0f;
+            veylWasWarning = false;
+            veylRecoveryUntil = 0f;
+            notifiedPumpReady = false;
+            bool stopped = entrant && entrant.BrassHollowsStage >= 2;
+            foreach (var vent in vents)
+            {
+                if (vent.plate) vent.plate.sharedMaterial = stopped ? cooled : bronze;
+                if (vent.ring) vent.ring.enabled = false;
+                vent.warningShown = false;
+                vent.lastBurstCycle = -1;
+            }
+            if (!resetEnemies || !entrant) return;
+            foreach (string id in EnemyIds)
+            {
+                if (entrant.HasDefeated(id)) continue;
+                var enemy = EnemyController.FindByKey(id);
+                if (enemy && enemy.gameObject.activeInHierarchy)
+                    enemy.ResetForLoad();
+            }
         }
 
         public int DefeatedCount(PlayerController player)
@@ -308,8 +566,11 @@ namespace Riftbound
                     caption = "Defeat " + EnemyNames[i];
                     return true;
                 }
-                position = pump.position;
-                caption = "Shut down the siphon";
+                if (pump)
+                {
+                    position = pump.position;
+                    caption = "Shut down the siphon";
+                }
             }
             else if (player.BrassHollowsStage == 2)
             {
@@ -342,36 +603,47 @@ namespace Riftbound
                 {
                     if (player.BrassHollowsStage == 0) { player.Message = "Speak to Tinker Fizzlebang in Rustwater about the sealed mine."; return; }
                     BuildInterior(player);
-                    if (player.TravelBrassHollows(InteriorOrigin + new Vector3(0,.12f,2f), Quaternion.identity))
+                    ResetEncounterState(resetEnemies: true);
+                    if (player.TravelBrassHollows(InteriorOrigin + new Vector3(0,.12f,1.5f), Quaternion.identity))
                         ZoneBanner.Show("The Brass Hollows", "Ore Landing");
                 }, out candidate);
             }
 
             if (Near(point, InteriorOrigin + new Vector3(0,0,1.1f), "Leave the Brass Hollows",
-                () => Leave(player), out candidate)) return true;
+                () => Leave(player, requireClear: player.BrassHollowsStage < 2 && DefeatedCount(player) < EnemyIds.Length), out candidate)) return true;
             if (player.BrassHollowsStage >= 2)
-                return Near(point, InteriorOrigin + new Vector3(3f,0,57.5f), "Take the service exit", () => Leave(player), out candidate);
+                return Near(point, InteriorOrigin + new Vector3(3f,0,57.5f), "Take the service exit",
+                    () => Leave(player, requireClear: false), out candidate);
             if (!pump) return false;
             return Near(point, pump.position, "Shut down the siphon", () =>
             {
                 if (DefeatedCount(player) < EnemyIds.Length) { player.Message = "Clear all five Choir enemies before touching the siphon."; return; }
                 player.ShutDownBrassSiphon();
                 RefreshPump(true);
+                lastSyncedStage = player.BrassHollowsStage;
             }, out candidate);
         }
 
         void RefreshPump(bool stopped)
         {
-            pumpCore.sharedMaterial = stopped ? cooled : amber;
-            ventCore.sharedMaterial = stopped ? cooled : bronze;
-            pumpLight.intensity = stopped ? 1f : 3.4f;
-            serviceDoor.localPosition = new Vector3(stopped ? 4.48f : 3f, 1.32f, 58.96f);
+            if (pumpCore) pumpCore.sharedMaterial = stopped ? cooled : amber;
+            foreach (var vent in vents)
+            {
+                if (vent.plate) vent.plate.sharedMaterial = stopped ? cooled : bronze;
+                if (vent.ring) vent.ring.enabled = false;
+            }
+            if (pumpLight) pumpLight.intensity = stopped ? 1f : 3.4f;
+            if (serviceDoor) serviceDoor.localPosition = new Vector3(stopped ? 4.48f : 3f, 1.32f, 58.96f);
         }
 
-        void Leave(PlayerController player)
+        void Leave(PlayerController player, bool requireClear = true)
         {
             if (player.TravelBrassHollows(Surface(Entrance - Vector3.forward * 2f) + Vector3.up * .15f,
-                Quaternion.Euler(0,180f,0))) ZoneBanner.Show("Redridge Pass", "Brass Hollows approach");
+                Quaternion.Euler(0,180f,0), savePosition: true, requireClear: requireClear))
+            {
+                ResetEncounterState(resetEnemies: false);
+                ZoneBanner.Show("Redridge Pass", "Brass Hollows approach");
+            }
         }
 
         static bool Near(Vector3 point, Vector3 goal, string name, System.Action action, out PlayerController.InteractionCandidate candidate)
@@ -445,9 +717,9 @@ namespace Riftbound
             if (SaveAdventure(false)) Message = message;
         }
 
-        public bool TravelBrassHollows(Vector3 destination, Quaternion facing, bool savePosition = true)
+        public bool TravelBrassHollows(Vector3 destination, Quaternion facing, bool savePosition = true, bool requireClear = true)
         {
-            if (Stats && Time.time - Stats.LastHit < 3f) { Message = "Get clear before using the mine passage."; return false; }
+            if (requireClear && Stats && Time.time - Stats.LastHit < 3f) { Message = "Get clear before using the mine passage."; return false; }
             if (Mounted) { Message = "Dismount before using the mine passage."; return false; }
             if (!motor || !motor.enabled) return false;
             ClearCombatInputBuffer();
