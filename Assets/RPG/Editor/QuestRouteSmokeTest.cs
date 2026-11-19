@@ -217,6 +217,7 @@ namespace Riftbound.Editor
                 else if (stage == 4)
                 {
                     Check(!MinimapRadar.Instance.TrackingMainQuest && !MinimapRadar.Instance.customWaypoint.HasValue, "Quest navigation clears after campaign completion");
+                    CheckWesternRoad(Player());
                     Finish(false);
                 }
             }
@@ -225,6 +226,56 @@ namespace Riftbound.Editor
                 Errors.Add(exception.ToString());
                 Finish(true);
             }
+        }
+
+        static void CheckWesternRoad(PlayerController player)
+        {
+            var camps = WesternRoadCamps.Current;
+            Check(camps && camps.Layby && camps.Rest && camps.Waybill && camps.Ferrymaster, "Western road sites and quest actors load");
+            var cargo = camps.Layby.Find("Spilled shipment");
+            var crateVisual = cargo ? cargo.Find("Timber supply crate") : null;
+            var art = crateVisual ? crateVisual.GetComponentInChildren<Renderer>() : null;
+            Check(art && art.sharedMaterial && art.sharedMaterial.mainTexture && cargo.Find("Grain sack"),
+                "Western cargo uses the imported meshes and palette");
+            Check(cargo.Find("Supply crate").GetComponent<Collider>().enabled, "Cargo art preserves the original collision");
+
+            var rowan = WesternRoadCamps.FindRowan();
+            Check(rowan, "Quartermaster Rowan is available for western quest turn-in");
+            var interact = typeof(PlayerController).GetMethod("Interact", BindingFlags.Instance | BindingFlags.NonPublic);
+            Move(player, rowan.transform.position);
+            interact.Invoke(player, null);
+            player.HandleWesternRoadAtRowan();
+            Check(player.WesternRoadStage == 1 && player.TryGetWesternRoadDestination(out var site, out _) && site == camps.Layby.position,
+                "Rowan starts the western quest and marks the layby");
+            player.CloseShop();
+            Move(player, camps.Waybill.position);
+            interact.Invoke(player, null);
+            Check(player.WesternRoadStage == 1, "Guarded waybill cannot be recovered early");
+
+            var guards = camps.Layby.GetComponentsInChildren<EnemyController>();
+            Check(guards.Count(enemy => enemy.enemyId.StartsWith("western-waybill-")) == 2, "Western quest spawns exactly two guards");
+            foreach (var guard in guards.Where(enemy => enemy.enemyId.StartsWith("western-waybill-")))
+                guard.GetComponent<Combatant>().Damage(100000);
+            interact.Invoke(player, null);
+            Check(player.WesternRoadStage == 2 && player.TryGetWesternRoadDestination(out var witness, out _) &&
+                  witness == camps.Ferrymaster.transform.position, "Waybill advances the objective to Sera");
+            Move(player, camps.Ferrymaster.transform.position);
+            player.OpenTownNPCDialogue(camps.Ferrymaster);
+            player.ReadFerryTally();
+            player.CloseDialogue();
+            Check(player.WesternRoadStage == 3, "Sera supplies the ferry tally");
+
+            Move(player, rowan.transform.position);
+            interact.Invoke(player, null);
+            int before = player.Gold;
+            player.HandleWesternRoadAtRowan();
+            player.HandleWesternRoadAtRowan();
+            Check(player.WesternRoadStage == 4 && player.Gold == before + 35, "Western turn-in rewards exactly once");
+            player.CloseShop();
+            player.SaveAdventure(false);
+            player.LoadAdventure();
+            Check(player.WesternRoadStage == 4 && !player.TryGetWesternRoadDestination(out _, out _),
+                "Western quest completion survives reload and clears its objective");
         }
 
         static void Move(PlayerController player, Vector3 position)

@@ -13,6 +13,7 @@ namespace Riftbound
         public bool Paused { get; private set; }
         public float Yaw => yaw;
         public float Pitch => pitch;
+        public void FaceTravel(float heading) { yaw = heading; pitch = 18f; }
         public bool IsSteering { get; private set; }
         public bool IsFreeLooking { get; private set; }
         public bool BothMouseButtonsPressed { get; private set; }
@@ -92,6 +93,8 @@ namespace Riftbound
                 (BattlegroundSystem.Instance && BattlegroundSystem.Instance.IsWindowOpen) ||
                 (MacroSystem.Instance && MacroSystem.Instance.IsOpen) ||
                 (PartySystem.Instance && PartySystem.Instance.IsCompanionMenuOpen);
+            if (mouse != null)
+                blocked |= PrototypeHUD.QuestPointerTakesMouse(player, mouse.position.ReadValue(), mouse.leftButton.wasPressedThisFrame);
             if (blocked || mouse == null)
             {
                 IsSteering = IsFreeLooking = BothMouseButtonsPressed = false;

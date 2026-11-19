@@ -19,3 +19,5 @@
 Additional classes/subclasses, distinct flying-mount artwork, deeper settlement activity and new zones require their own design, asset review and acceptance checks. Larger groups, host migration, matchmaking and persistent online characters are separate features; they are not implied by the current co-op release.
 
 Release milestones and acceptance gates are defined in [RELEASE_PLAN.md](RELEASE_PLAN.md).
+
+[The Roads That Remember](FRONTIER_PLAYABLE_PLAN.md) lays out the western quest route, Brass Hollows and the next frontier stops.

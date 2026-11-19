@@ -27,6 +27,21 @@ namespace Riftbound
         [NonSerialized] public Vector3? customWaypoint = null;
         public bool TrackingMainQuest { get; private set; }
         float nextQuestUpdate;
+        Vector3? automaticDestination;
+        string automaticCaption;
+        string waypointCaption;
+        bool preferBrassHollows;
+
+        public bool TryGetNavigationTarget(out Vector3 position, out string caption)
+        {
+            position = customWaypoint ?? automaticDestination ?? default;
+            caption = automaticCaption;
+            if (customWaypoint.HasValue)
+                caption = TrackingMainQuest && player
+                    ? (player.QuestReady ? "Return to Abe" : player.QuestName)
+                    : waypointCaption ?? "Travel waypoint";
+            return customWaypoint.HasValue || automaticDestination.HasValue;
+        }
 
         public void TrackMainQuest()
         {
@@ -35,12 +50,34 @@ namespace Riftbound
             TrackingMainQuest = true;
         }
 
+        public void FollowWesternRoad()
+        {
+            if (!player || !player.TryGetWesternRoadDestination(out var target, out var caption)) return;
+            customWaypoint = null;
+            TrackingMainQuest = false;
+            preferBrassHollows = false;
+            automaticDestination = target;
+            automaticCaption = caption;
+        }
+
+        public void FollowBrassHollows()
+        {
+            var cave = BrassHollows.Current;
+            if (!player || !player.BrassHollowsQuestActive || !cave || !cave.TryDestination(player, out var target, out var caption)) return;
+            customWaypoint = null;
+            TrackingMainQuest = false;
+            preferBrassHollows = true;
+            automaticDestination = target;
+            automaticCaption = caption;
+        }
+
         public static void SetWaypoint(Vector3 pos, string label = null)
         {
             var radar = Instance ?? FindFirstObjectByType<MinimapRadar>();
             if (radar)
             {
                 radar.customWaypoint = pos;
+                radar.waypointCaption = label;
                 radar.TrackingMainQuest = false;
                 if (!string.IsNullOrEmpty(label))
                     ChatSystem.LogSystem($"<color=#00e5ff>★ Waypoint Set: {label} ({pos.x:0.0}, {pos.z:0.0})</color>");
@@ -99,14 +136,42 @@ namespace Riftbound
 
         void Update()
         {
-            if (!TrackingMainQuest || !player || FrontendMenu.IsOpen || Time.unscaledTime < nextQuestUpdate) return;
+            if (!player || FrontendMenu.IsOpen || Time.unscaledTime < nextQuestUpdate) return;
             nextQuestUpdate = Time.unscaledTime + .5f;
-            if (player.QuestComplete)
+            if (TrackingMainQuest && player.QuestComplete)
             {
                 TrackingMainQuest = false;
                 customWaypoint = null;
             }
-            else customWaypoint = player.ObjectivePosition;
+            if (TrackingMainQuest)
+                customWaypoint = player.ObjectivePosition;
+
+            automaticDestination = null;
+            if (customWaypoint.HasValue) return;
+            var faction = FactionQuestSystem.Instance;
+            var cave = BrassHollows.Current;
+            bool caveAvailable = player.BrassHollowsQuestActive && cave;
+            if (caveAvailable && (preferBrassHollows || BrassHollows.Inside(player.transform.position) || !player.WesternRoadActive) &&
+                cave.TryDestination(player, out var caveTarget, out var caveCaption))
+            {
+                automaticDestination = caveTarget;
+                automaticCaption = caveCaption;
+            }
+            else if (player.TryGetWesternRoadDestination(out var westernTarget, out var westernCaption))
+            {
+                automaticDestination = westernTarget;
+                automaticCaption = westernCaption;
+            }
+            else if (faction && faction.TryGetActiveQuestDestination(player, out var questTarget, out var questCaption))
+            {
+                automaticDestination = questTarget;
+                automaticCaption = questCaption;
+            }
+            else if (player.QuestAccepted && !player.QuestComplete)
+            {
+                automaticDestination = player.ObjectivePosition;
+                automaticCaption = player.QuestReady ? "Return to Abe" : player.QuestName;
+            }
         }
 
         public void DrawRadarGUI(float screenW, float screenH)
@@ -705,6 +770,7 @@ namespace Riftbound
 
                     Vector3 targetPos = player.transform.position + new Vector3(worldDir.x * ratio, 0f, -worldDir.y * ratio);
                     customWaypoint = targetPos;
+                    waypointCaption = null;
                     TrackingMainQuest = false;
                     AudioEffects.PlayClick();
                     ChatSystem.LogSystem($"<color=#00e5ff>★ Waypoint Set: ({targetPos.x:0.0}, {targetPos.z:0.0})</color>");

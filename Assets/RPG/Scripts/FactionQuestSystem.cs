@@ -782,6 +782,49 @@ namespace Riftbound
 
         public QuestDef GetActiveQuest() => string.IsNullOrEmpty(ActiveQuestId) ? null : GetQuest(ActiveQuestId);
 
+        public bool TryGetActiveQuestDestination(PlayerController player, out Vector3 position, out string caption)
+        {
+            position = default;
+            caption = null;
+            var quest = GetActiveQuest();
+            if (quest == null) return false;
+
+            bool ready = IsActiveQuestReady();
+            if (quest.targetType == "discover_landmark" && !ready)
+            {
+                foreach (var id in ExplorationSites.SurveyIds)
+                {
+                    if (player.HasLandmark(id)) continue;
+                    foreach (var landmark in FindObjectsByType<Landmark>(FindObjectsSortMode.None))
+                    {
+                        if (landmark.landmarkId != id) continue;
+                        position = landmark.transform.position;
+                        caption = landmark.displayName;
+                        return true;
+                    }
+                    break;
+                }
+                return false;
+            }
+
+            if (ready || quest.targetType == "talk_npc")
+            {
+                string npcName = quest.targetType == "talk_npc" ? quest.targetId : quest.giverNpc;
+                foreach (var npc in FindObjectsByType<TownNPC>(FindObjectsSortMode.None))
+                {
+                    if (!string.Equals(npc.npcName, npcName, StringComparison.OrdinalIgnoreCase)) continue;
+                    position = npc.transform.position;
+                    caption = ready ? $"Turn in to {npcName}" : $"Speak to {npcName}";
+                    return true;
+                }
+                if (ready) return false;
+            }
+
+            position = quest.targetLocation;
+            caption = quest.title;
+            return position.sqrMagnitude > 1f;
+        }
+
         public bool HasAvailableQuest(string npcName, PlayerController player)
         {
             if (catalog.Count == 0) BuildCatalog();
