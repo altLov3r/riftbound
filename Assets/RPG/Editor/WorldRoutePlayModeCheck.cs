@@ -212,7 +212,10 @@ namespace Riftbound.Editor
                     if(FlatDistance(player.transform.position,lastPosition)>.03f) { lastProgress=now; lastPosition=player.transform.position; }
                     if(now>caseDeadline || now-lastProgress>3) throw new Exception($"Route stalled: {c.name} mounted={c.mounted} at={player.transform.position:F2} target={target}, message={player.Message}");
                     var direction=c.points[target]-player.transform.position; direction.y=0;
-                    player.transform.rotation=Quaternion.LookRotation(direction); Keys(UnityEngine.InputSystem.Key.W); return;
+                    player.transform.rotation=Quaternion.LookRotation(direction);
+                    // Ground movement on foot follows camera yaw. Aim the fixture at each bend.
+                    typeof(OrbitCamera).GetField("yaw",Hidden).SetValue(player.orbit,player.transform.eulerAngles.y);
+                    Keys(UnityEngine.InputSystem.Key.W); return;
                 }
                 if(stage==8) { Keys(); stage=9; due=now+.5; return; }
                 if(stage==9)
