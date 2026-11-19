@@ -404,6 +404,11 @@ namespace Riftbound.Editor
                     Assert(PartySystem.Instance.Members.Count == 0, "GP09 KickMember cleanly removes companion");
 
                     // GP10: Class abilities, non-doubled scaling, dead-corpse guard, and Paladin Consecration debuff
+                    var combatMotor = pc.GetComponent<CharacterController>();
+                    combatMotor.enabled = false;
+                    pc.transform.SetPositionAndRotation(new Vector3(0, .25f, -12f), Quaternion.identity);
+                    combatMotor.enabled = true;
+                    combatMotor.Move(Vector3.down * .5f);
                     var liveGo = new GameObject("Gp10TempLiveEnemy");
                     liveGo.transform.position = pc.transform.position + pc.transform.forward * 2.5f;
                     var liveCbt = liveGo.AddComponent<Combatant>();
@@ -426,8 +431,10 @@ namespace Riftbound.Editor
                     var resProp = typeof(PlayerController).GetProperty("ClassResource");
                     var cleaveProp = typeof(PlayerController).GetProperty("CleaveReady");
                     var atkReadyField = typeof(PlayerController).GetField("attackReady", BindingFlags.NonPublic | BindingFlags.Instance);
+                    var recoveryField = typeof(PlayerController).GetField("busyUntil", BindingFlags.NonPublic | BindingFlags.Instance);
 
                     pc.CharacterClass = "Paladin";
+                    recoveryField.SetValue(pc, 0f);
                     resProp.SetValue(pc, 5f);
                     cleaveProp.SetValue(pc, 0f);
                     atkReadyField.SetValue(pc, 0f);
@@ -438,6 +445,7 @@ namespace Riftbound.Editor
                     Assert(consDmg >= 35f && consDmg <= 85f, $"GP10 Consecration avoids double Weapon/Level scaling (dmg={consDmg:F1})");
 
                     pc.CharacterClass = "Mage";
+                    recoveryField.SetValue(pc, 0f);
                     resProp.SetValue(pc, 100f);
                     cleaveProp.SetValue(pc, 0f);
                     atkReadyField.SetValue(pc, 0f);
@@ -446,6 +454,7 @@ namespace Riftbound.Editor
 
                     var targetProp = typeof(PlayerController).GetProperty("Target");
                     pc.CharacterClass = "Rogue";
+                    recoveryField.SetValue(pc, 0f);
                     resProp.SetValue(pc, 100f);
                     cleaveProp.SetValue(pc, 0f);
                     atkReadyField.SetValue(pc, 0f);
