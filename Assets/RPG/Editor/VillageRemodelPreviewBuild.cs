@@ -36,9 +36,14 @@ namespace Riftbound.Editor
             Stage(scene, "VillageLandmarks/Emberwatch Supply Lane", new Vector3(43, 0, -40), 4);
             Stage(scene, "VillageLandmarks/Greenhollow Rest Stop", new Vector3(-33, 0, 377), 3);
             Stage(scene, "GorKreshForgeCourt/GorKresh Forge Court", new Vector3(340, 0, 269), 5);
+            var rustwater = Stage(scene, "RustwaterSalvageYard/Rustwater Salvage Yard", new Vector3(224, 0, 171), 5);
+            var axles = rustwater.GetComponentsInChildren<AmbientAxle>();
+            if (axles.Length != 1 || axles[0].GetComponentInChildren<Collider>() ||
+                !axles[0].transform.parent.GetComponent<BoxCollider>())
+                throw new BuildFailedException("Rustwater's sorting drum must have one visual axle and separate fixed collision.");
         }
 
-        static void Stage(Scene scene, string model, Vector3 position, int meshCount)
+        static GameObject Stage(Scene scene, string model, Vector3 position, int meshCount)
         {
             var path = "Assets/RPG/Art/" + model + ".prefab";
             var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
@@ -53,6 +58,7 @@ namespace Riftbound.Editor
                 if (!collider.sharedMesh || !collider.GetComponent<MeshRenderer>().sharedMaterial)
                     throw new BuildFailedException($"{prefab.name} has a missing mesh or material.");
             Debug.Log($"Village preview staged {prefab.name} with {colliders.Length} model colliders.");
+            return instance;
         }
     }
 }
