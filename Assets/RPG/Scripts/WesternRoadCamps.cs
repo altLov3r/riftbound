@@ -498,6 +498,7 @@ namespace Riftbound
         {
             WesternRoadStage = stage;
             WesternRoadCamps.Ensure(this);
+            MinimapRadar.Instance?.RefreshQuestNavigation();
             AudioEffects.PlayClick();
             ChatSystem.LogQuest(message);
             if (SaveAdventure(false)) Message = message;

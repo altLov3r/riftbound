@@ -392,7 +392,9 @@ namespace Riftbound.Editor
                     // GP05: MinimapRadar Main Quest tracking
                     Assert(MinimapRadar.Instance != null, "GP05 MinimapRadar active");
                     MinimapRadar.Instance.TrackMainQuest();
-                    Assert(MinimapRadar.Instance.TrackingMainQuest && MinimapRadar.Instance.customWaypoint.HasValue, "GP05 TrackMainQuest sets active objective waypoint");
+                    Assert(MinimapRadar.Instance.TrackingMainQuest &&
+                        MinimapRadar.Instance.TryGetNavigationTarget(out var objective, out _) && objective == pc.ObjectivePosition,
+                        "GP05 Main quest tracking points at the live objective");
                     MinimapRadar.ClearWaypoint();
 
                     // GP09: PartySystem opt-in companion spawn & dismiss

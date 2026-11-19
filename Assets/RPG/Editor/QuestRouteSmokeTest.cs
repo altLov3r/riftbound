@@ -185,7 +185,8 @@ namespace Riftbound.Editor
                 {
                     var player = Player();
                     var radar = MinimapRadar.Instance;
-                    Check(radar.TrackingMainQuest && radar.customWaypoint.HasValue && Vector3.Distance(radar.customWaypoint.Value, player.questGiver.position) < .1f, "Live quest tracking returns to Abe when the objective is ready");
+                    Check(radar.TrackingMainQuest && radar.TryGetNavigationTarget(out var destination, out _) &&
+                        Vector3.Distance(destination, player.questGiver.position) < .1f, "Live quest tracking returns to Abe when the objective is ready");
                     TurnIn(player);
                     Check(player.QuestIndex == 1 && !player.QuestAccepted, "Road quest turns in and advances exactly once");
                     OpenAbe(player); player.AcceptQuest();
@@ -216,7 +217,8 @@ namespace Riftbound.Editor
                 }
                 else if (stage == 4)
                 {
-                    Check(!MinimapRadar.Instance.TrackingMainQuest && !MinimapRadar.Instance.customWaypoint.HasValue, "Quest navigation clears after campaign completion");
+                    Check(!MinimapRadar.Instance.TrackingMainQuest && !MinimapRadar.Instance.TryGetNavigationTarget(out _, out _),
+                        "Quest navigation clears after campaign completion");
                     CheckWesternRoad(Player());
                     Finish(false);
                 }
@@ -248,6 +250,29 @@ namespace Riftbound.Editor
             Check(player.WesternRoadStage == 1 && player.TryGetWesternRoadDestination(out var site, out _) && site == camps.Layby.position,
                 "Rowan starts the western quest and marks the layby");
             player.CloseShop();
+
+            var engineer = Object.FindObjectsByType<TownNPC>(FindObjectsSortMode.None)
+                .Single(npc => npc.npcName == BrassHollows.Engineer);
+            Move(player, engineer.transform.position);
+            player.OpenTownNPCDialogue(engineer);
+            player.HandleBrassHollowsQuest();
+            player.CloseDialogue();
+            var radar = MinimapRadar.Instance;
+            var cave = BrassHollows.Current;
+            Check(player.BrassHollowsQuestActive && cave &&
+                radar.TryGetNavigationTarget(out var entrance, out _) && entrance == cave.Entrance,
+                "Explicit cave tracking selects the mine entrance");
+            Move(player, new Vector3(642, 36.5f, 167));
+            Check(BrassHollows.Inside(player.transform.position), "Navigation fixture enters cave bounds");
+            radar.FollowWesternRoad();
+            var pin = cave.Entrance + Vector3.forward * 5;
+            MinimapRadar.SetWaypoint(pin, "Personal map pin");
+            Check(radar.TryGetNavigationTarget(out var selected, out var caption) && selected == pin && caption == "Personal map pin",
+                "Manual pin overrides the tracked quest");
+            MinimapRadar.ClearWaypoint();
+            Check(radar.TryGetNavigationTarget(out var western, out _) && western == camps.Layby.position,
+                "Clearing a pin inside the cave resumes the explicitly tracked western quest");
+
             Move(player, camps.Waybill.position);
             interact.Invoke(player, null);
             Check(player.WesternRoadStage == 1, "Guarded waybill cannot be recovered early");
@@ -276,6 +301,8 @@ namespace Riftbound.Editor
             player.LoadAdventure();
             Check(player.WesternRoadStage == 4 && !player.TryGetWesternRoadDestination(out _, out _),
                 "Western quest completion survives reload and clears its objective");
+            Check(radar.TryGetNavigationTarget(out var next, out _) && next == cave.Entrance,
+                "Completing the tracked western quest falls back to the active cave quest");
         }
 
         static void Move(PlayerController player, Vector3 position)
@@ -336,12 +363,23 @@ namespace Riftbound.Editor
                 Check(system.CurrentProgress == 1, "Survey ignores repeated discoveries");
                 player.LoadAdventure(); system.LoadData();
                 Check(system.CurrentProgress == 1, "Survey progress survives reload");
+                Vector3 personalPin = WorldRegions.Highspire;
+                MinimapRadar.SetWaypoint(personalPin, "Keep this pin");
                 player.DiscoverLandmark(ExplorationSites.SurveyIds[1]); player.DiscoverLandmark(ExplorationSites.SurveyIds[2]);
                 Check(system.HasActiveQuestToComplete(npc.npcName, player), "All sites make the survey ready for hand-in");
-                Check(MinimapRadar.Instance.customWaypoint.HasValue && Vector3.Distance(MinimapRadar.Instance.customWaypoint.Value, npc.transform.position) < .1f, "Completed survey waypoint returns to the cartographer");
+                var radar = MinimapRadar.Instance;
+                Check(radar.TryGetNavigationTarget(out var pinned, out _) && pinned == personalPin,
+                    "Survey discoveries preserve a manual pin");
+                MinimapRadar.ClearWaypoint();
+                Check(radar.TryGetNavigationTarget(out var turnIn, out _) && Vector3.Distance(turnIn, npc.transform.position) < .1f,
+                    "Removing the pin resumes the survey turn-in objective");
+                MinimapRadar.SetWaypoint(personalPin, "Keep this pin");
                 Move(player, npc.transform.position + Vector3.forward);
                 system.CompleteQuest(player);
                 Check(system.IsQuestCompleted("frontier_cartography"), "Survey completion is recorded");
+                Check(radar.TryGetNavigationTarget(out var afterTurnIn, out _) && afterTurnIn == personalPin,
+                    "Faction turn-in preserves a manual pin");
+                MinimapRadar.ClearWaypoint();
                 int gold = player.Gold, xp = player.Experience;
                 system.CompleteQuest(player);
                 Check(player.Gold == gold && player.Experience == xp, "Survey hand-in rewards cannot repeat");

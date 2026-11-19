@@ -23,78 +23,63 @@ namespace Riftbound
         public bool trackChests = true;
         public bool trackNPCs = true;
 
-        // Custom Waypoint
-        [NonSerialized] public Vector3? customWaypoint = null;
-        public bool TrackingMainQuest { get; private set; }
+        enum QuestFocus { Automatic, Main, Western, Hollows, Faction }
+
+        public Vector3? customWaypoint { get; private set; }
+        public bool TrackingMainQuest => questFocus == QuestFocus.Main && !customWaypoint.HasValue;
+        QuestFocus questFocus;
         float nextQuestUpdate;
-        Vector3? automaticDestination;
-        string automaticCaption;
+        Vector3? questDestination;
+        string questCaption;
         string waypointCaption;
-        bool preferBrassHollows;
 
         public bool TryGetNavigationTarget(out Vector3 position, out string caption)
         {
-            position = customWaypoint ?? automaticDestination ?? default;
-            caption = automaticCaption;
-            if (customWaypoint.HasValue)
-                caption = TrackingMainQuest && player
-                    ? (player.QuestReady ? "Return to Abe" : player.QuestName)
-                    : waypointCaption ?? "Travel waypoint";
-            return customWaypoint.HasValue || automaticDestination.HasValue;
+            position = customWaypoint ?? questDestination ?? default;
+            caption = customWaypoint.HasValue ? waypointCaption ?? "Travel waypoint" : questCaption;
+            return customWaypoint.HasValue || questDestination.HasValue;
         }
 
-        public void TrackMainQuest()
-        {
-            if (!player || player.QuestComplete) return;
-            SetWaypoint(player.ObjectivePosition, player.QuestName);
-            TrackingMainQuest = true;
-        }
+        public void TrackMainQuest() => FollowQuest(QuestFocus.Main);
+        public void FollowWesternRoad() => FollowQuest(QuestFocus.Western);
+        public void FollowBrassHollows() => FollowQuest(QuestFocus.Hollows);
 
-        public void FollowWesternRoad()
+        void FollowQuest(QuestFocus focus)
         {
-            if (!player || !player.TryGetWesternRoadDestination(out var target, out var caption)) return;
+            if (!TryGetQuestDestination(focus, out var target, out var caption)) return;
+            questFocus = focus;
+            questDestination = target;
+            questCaption = caption;
             customWaypoint = null;
-            TrackingMainQuest = false;
-            preferBrassHollows = false;
-            automaticDestination = target;
-            automaticCaption = caption;
+            waypointCaption = null;
         }
 
-        public void FollowBrassHollows()
+        internal void StartFactionNavigation()
         {
-            var cave = BrassHollows.Current;
-            if (!player || !player.BrassHollowsQuestActive || !cave || !cave.TryDestination(player, out var target, out var caption)) return;
-            customWaypoint = null;
-            TrackingMainQuest = false;
-            preferBrassHollows = true;
-            automaticDestination = target;
-            automaticCaption = caption;
+            if (questFocus == QuestFocus.Automatic) questFocus = QuestFocus.Faction;
+            RefreshQuestNavigation();
         }
 
         public static void SetWaypoint(Vector3 pos, string label = null)
         {
             var radar = Instance ?? FindFirstObjectByType<MinimapRadar>();
-            if (radar)
-            {
-                radar.customWaypoint = pos;
-                radar.waypointCaption = label;
-                radar.TrackingMainQuest = false;
-                if (!string.IsNullOrEmpty(label))
-                    ChatSystem.LogSystem($"<color=#00e5ff>★ Waypoint Set: {label} ({pos.x:0.0}, {pos.z:0.0})</color>");
-                AudioEffects.PlayClick();
-            }
+            if (!radar) return;
+            radar.customWaypoint = pos;
+            radar.waypointCaption = label;
+            string name = string.IsNullOrEmpty(label) ? "Waypoint set" : $"Waypoint set: {label}";
+            ChatSystem.LogSystem($"<color=#00e5ff>{name} ({pos.x:0.0}, {pos.z:0.0})</color>");
+            AudioEffects.PlayClick();
         }
 
         public static void ClearWaypoint()
         {
             var radar = Instance ?? FindFirstObjectByType<MinimapRadar>();
-            if (radar && radar.customWaypoint.HasValue)
-            {
-                radar.customWaypoint = null;
-                radar.TrackingMainQuest = false;
-                ChatSystem.LogSystem("<color=#aaa>Waypoint Cleared.</color>");
-                AudioEffects.PlayClick();
-            }
+            if (!radar || !radar.customWaypoint.HasValue) return;
+            radar.customWaypoint = null;
+            radar.waypointCaption = null;
+            radar.RefreshQuestNavigation();
+            ChatSystem.LogSystem("<color=#aaa>Waypoint cleared.</color>");
+            AudioEffects.PlayClick();
         }
 
         PlayerController player;
@@ -138,39 +123,58 @@ namespace Riftbound
         {
             if (!player || FrontendMenu.IsOpen || Time.unscaledTime < nextQuestUpdate) return;
             nextQuestUpdate = Time.unscaledTime + .5f;
-            if (TrackingMainQuest && player.QuestComplete)
-            {
-                TrackingMainQuest = false;
-                customWaypoint = null;
-            }
-            if (TrackingMainQuest)
-                customWaypoint = player.ObjectivePosition;
+            RefreshQuestNavigation();
+        }
 
-            automaticDestination = null;
-            if (customWaypoint.HasValue) return;
-            var faction = FactionQuestSystem.Instance;
-            var cave = BrassHollows.Current;
-            bool caveAvailable = player.BrassHollowsQuestActive && cave;
-            if (caveAvailable && (preferBrassHollows || BrassHollows.Inside(player.transform.position) || !player.WesternRoadActive) &&
-                cave.TryDestination(player, out var caveTarget, out var caveCaption))
+        internal void RefreshQuestNavigation()
+        {
+            if (questFocus != QuestFocus.Automatic && TryGetQuestDestination(questFocus, out var target, out var caption))
             {
-                automaticDestination = caveTarget;
-                automaticCaption = caveCaption;
+                questDestination = target;
+                questCaption = caption;
+                return;
             }
-            else if (player.TryGetWesternRoadDestination(out var westernTarget, out var westernCaption))
+
+            questFocus = QuestFocus.Automatic;
+            bool insideHollows = player && BrassHollows.Inside(player.transform.position);
+            if ((insideHollows && TryGetQuestDestination(QuestFocus.Hollows, out target, out caption)) ||
+                TryGetQuestDestination(QuestFocus.Western, out target, out caption) ||
+                (!insideHollows && TryGetQuestDestination(QuestFocus.Hollows, out target, out caption)) ||
+                TryGetQuestDestination(QuestFocus.Faction, out target, out caption) ||
+                (player && player.QuestAccepted && TryGetQuestDestination(QuestFocus.Main, out target, out caption)))
             {
-                automaticDestination = westernTarget;
-                automaticCaption = westernCaption;
+                questDestination = target;
+                questCaption = caption;
             }
-            else if (faction && faction.TryGetActiveQuestDestination(player, out var questTarget, out var questCaption))
+            else
             {
-                automaticDestination = questTarget;
-                automaticCaption = questCaption;
+                questDestination = null;
+                questCaption = null;
             }
-            else if (player.QuestAccepted && !player.QuestComplete)
+        }
+
+        bool TryGetQuestDestination(QuestFocus focus, out Vector3 target, out string caption)
+        {
+            target = default;
+            caption = null;
+            if (!player) return false;
+            switch (focus)
             {
-                automaticDestination = player.ObjectivePosition;
-                automaticCaption = player.QuestReady ? "Return to Abe" : player.QuestName;
+                case QuestFocus.Main:
+                    if (player.QuestComplete) return false;
+                    target = player.ObjectivePosition;
+                    caption = player.QuestReady ? "Return to Abe" : player.QuestName;
+                    return true;
+                case QuestFocus.Western:
+                    return player.TryGetWesternRoadDestination(out target, out caption);
+                case QuestFocus.Hollows:
+                    var cave = BrassHollows.Current;
+                    return player.BrassHollowsQuestActive && cave && cave.TryDestination(player, out target, out caption);
+                case QuestFocus.Faction:
+                    var faction = FactionQuestSystem.Instance;
+                    return faction && faction.TryGetActiveQuestDestination(player, out target, out caption);
+                default:
+                    return false;
             }
         }
 
@@ -218,15 +222,14 @@ namespace Riftbound
             // Draw World Tracking Blips
             DrawTrackingBlips(cx, cy, radarRadius, player.transform.position);
 
-            // Custom Waypoint Blip inside radar
-            if (customWaypoint.HasValue)
+            if ((customWaypoint.HasValue || trackQuests) && TryGetNavigationTarget(out var destination, out _))
             {
-                Vector2 wpPos = WorldToRadar(player.transform.position, customWaypoint.Value, cx, cy, radarRadius);
-                if (wpPos.x > 0)
+                Vector2 pin = WorldToRadar(player.transform.position, destination, cx, cy, radarRadius);
+                if (pin.x > 0)
                 {
                     float pulse = 8f + Mathf.PingPong(Time.time * 6f, 3f);
-                    GUI.DrawTexture(new Rect(wpPos.x - pulse / 2f, wpPos.y - pulse / 2f, pulse, pulse), blipCyanTex);
-                    GUI.Label(new Rect(wpPos.x - 7f, wpPos.y - 8f, 16f, 16f), "", blipLabelStyle);
+                    var marker = customWaypoint.HasValue ? blipCyanTex : blipGoldTex;
+                    GUI.DrawTexture(new Rect(pin.x - pulse / 2f, pin.y - pulse / 2f, pulse, pulse), marker);
                 }
             }
 
@@ -549,89 +552,32 @@ namespace Riftbound
                     }
                 }
 
-                // Active Quest Objective Beacon if within range
-                if (player.QuestAccepted && !player.QuestComplete)
-                {
-                    Vector3 objPos = player.ObjectivePosition;
-                    Vector2 blip = WorldToRadar(playerPos, objPos, cx, cy, radius);
-                    if (blip.x > 0)
-                    {
-                        float ringSize = 12f + Mathf.PingPong(Time.time * 5f, 4f);
-                        GUI.DrawTexture(new Rect(blip.x - ringSize / 2f, blip.y - ringSize / 2f, ringSize, ringSize), blipGoldTex);
-                        blipLabelStyle.normal.textColor = new Color(1f, 0.95f, 0.25f);
-                        GUI.Label(new Rect(blip.x - 6f, blip.y - 8f, 14f, 16f), "★", blipLabelStyle);
-                    }
-                }
             }
         }
 
         void DrawOffScreenArrows(float cx, float cy, float radius, float viewRot)
         {
-            Vector3 playerPos = player.transform.position;
+            bool manual = customWaypoint.HasValue;
+            if ((!manual && !trackQuests) || !TryGetNavigationTarget(out var destination, out var caption)) return;
 
-            // 1. Off-screen Quest Objective Chevron
-            if (trackQuests && player.QuestAccepted && !player.QuestComplete)
-            {
-                Vector3 objPos = player.ObjectivePosition;
-                Vector3 diff = objPos - playerPos;
-                Vector2 horiz = new Vector2(diff.x, diff.z);
-                float dist = horiz.magnitude;
+            Vector3 offset = destination - player.transform.position;
+            Vector2 horizontal = new Vector2(offset.x, offset.z);
+            float distance = horizontal.magnitude;
+            if (distance <= radarRange) return;
 
-                if (dist > radarRange)
-                {
-                    float angleDeg = Mathf.Atan2(horiz.x, horiz.y) * Mathf.Rad2Deg;
-                    if (rotateWithCamera) angleDeg -= viewRot;
+            float angle = Mathf.Atan2(horizontal.x, horizontal.y) * Mathf.Rad2Deg;
+            if (rotateWithCamera) angle -= viewRot;
+            float radians = angle * Mathf.Deg2Rad;
+            float x = cx + Mathf.Sin(radians) * (radius - 8f);
+            float y = cy - Mathf.Cos(radians) * (radius - 8f);
+            var matrix = GUI.matrix;
+            GUIUtility.RotateAroundPivot(angle, new Vector2(x, y));
+            GUI.DrawTexture(new Rect(x - 6f, y - 6f, 12f, 12f), manual ? blipCyanTex : blipGoldTex);
+            GUI.matrix = matrix;
 
-                    float rad = angleDeg * Mathf.Deg2Rad;
-                    float rimDist = radius - 8f;
-                    float ax = cx + Mathf.Sin(rad) * rimDist;
-                    float ay = cy - Mathf.Cos(rad) * rimDist;
-
-                    var matrix = GUI.matrix;
-                    GUIUtility.RotateAroundPivot(angleDeg, new Vector2(ax, ay));
-
-                    GUI.DrawTexture(new Rect(ax - 6f, ay - 8f, 12f, 12f), blipGoldTex);
-                    GUI.matrix = matrix;
-
-                    // Hover tooltip
-                    if (new Rect(ax - 10f, ay - 10f, 20f, 20f).Contains(Event.current.mousePosition))
-                    {
-                        activeTooltip = $"<b>Quest Objective</b>\n{player.QuestName}\nDistance: {dist:0}m";
-                        activeTooltipRect = new Rect(Event.current.mousePosition.x - 85f, Event.current.mousePosition.y - 42f, 170f, 38f);
-                    }
-                }
-            }
-
-            // 2. Off-screen Custom Waypoint
-            if (customWaypoint.HasValue)
-            {
-                Vector3 diff = customWaypoint.Value - playerPos;
-                Vector2 horiz = new Vector2(diff.x, diff.z);
-                float dist = horiz.magnitude;
-
-                if (dist > radarRange)
-                {
-                    float angleDeg = Mathf.Atan2(horiz.x, horiz.y) * Mathf.Rad2Deg;
-                    if (rotateWithCamera) angleDeg -= viewRot;
-
-                    float rad = angleDeg * Mathf.Deg2Rad;
-                    float rimDist = radius - 8f;
-                    float ax = cx + Mathf.Sin(rad) * rimDist;
-                    float ay = cy - Mathf.Cos(rad) * rimDist;
-
-                    var matrix = GUI.matrix;
-                    GUIUtility.RotateAroundPivot(angleDeg, new Vector2(ax, ay));
-
-                    GUI.DrawTexture(new Rect(ax - 5f, ay - 7f, 10f, 10f), blipCyanTex);
-                    GUI.matrix = matrix;
-
-                    if (new Rect(ax - 10f, ay - 10f, 20f, 20f).Contains(Event.current.mousePosition))
-                    {
-                        activeTooltip = $"<b>Custom Waypoint</b>\nDistance: {dist:0}m\n(Right-click radar to clear)";
-                        activeTooltipRect = new Rect(Event.current.mousePosition.x - 85f, Event.current.mousePosition.y - 42f, 170f, 38f);
-                    }
-                }
-            }
+            if (!new Rect(x - 10f, y - 10f, 20f, 20f).Contains(Event.current.mousePosition)) return;
+            activeTooltip = $"{caption}\n{distance:0} m" + (manual ? "\nRight-click radar to clear" : "");
+            activeTooltipRect = new Rect(Event.current.mousePosition.x - 93f, Event.current.mousePosition.y - 52f, 186f, 48f);
         }
 
         void DrawRimButtons(float cx, float cy, float radius)
@@ -769,11 +715,7 @@ namespace Riftbound
                     Vector2 worldDir = rotateWithCamera ? RotateVec2(dir, viewRotation) : dir;
 
                     Vector3 targetPos = player.transform.position + new Vector3(worldDir.x * ratio, 0f, -worldDir.y * ratio);
-                    customWaypoint = targetPos;
-                    waypointCaption = null;
-                    TrackingMainQuest = false;
-                    AudioEffects.PlayClick();
-                    ChatSystem.LogSystem($"<color=#00e5ff>★ Waypoint Set: ({targetPos.x:0.0}, {targetPos.z:0.0})</color>");
+                    SetWaypoint(targetPos);
                     e.Use();
                 }
                 // Right Click to clear waypoint
@@ -781,10 +723,7 @@ namespace Riftbound
                 {
                     if (customWaypoint.HasValue)
                     {
-                        customWaypoint = null;
-                        TrackingMainQuest = false;
-                        AudioEffects.PlayClick();
-                        ChatSystem.LogSystem("<color=#aaa>Waypoint Cleared.</color>");
+                        ClearWaypoint();
                         e.Use();
                     }
                 }

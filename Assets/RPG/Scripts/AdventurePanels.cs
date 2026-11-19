@@ -298,9 +298,15 @@ namespace Riftbound
             for(int i=0;i<names.Length;i++)
                 if(GUI.Button(new Rect(0,i*35,w-19,30),names[i],questButton)) MinimapRadar.SetWaypoint(positions[i],names[i]);
             GUI.EndScrollView();
-            GUI.Label(new Rect(x,y+423,w,30),"Gold diamond: destination · Cyan: you",small);
-            if (MinimapRadar.Instance && MinimapRadar.Instance.TryGetNavigationTarget(out _, out var caption))
-                GUI.Label(new Rect(x,y+446,w,56),caption,label);
+            var radar = MinimapRadar.Instance;
+            if (radar && radar.TryGetNavigationTarget(out _, out var caption))
+            {
+                bool pinned = radar.customWaypoint.HasValue;
+                GUI.Label(new Rect(x,y+423,w,24), pinned ? "MAP PIN" : "QUEST DESTINATION", small);
+                GUI.Label(new Rect(x,y+445,w,30), caption, label);
+                if (pinned && GUI.Button(new Rect(x,y+479,w,30), "CLEAR PIN", questButton))
+                    MinimapRadar.ClearWaypoint();
+            }
         }
 
         void DrawSiteWaypoint(Rect button, string name, Vector3 point)

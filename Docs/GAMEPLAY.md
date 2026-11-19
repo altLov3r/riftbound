@@ -16,6 +16,8 @@ Z summons/dismisses the selected unlocked mount and V cycles mounts. Movement, d
 
 In solo play, ask Rowan about the missing shipment after Abe’s Stolen Supplies quest. Follow the road through Split-Seal Layby to Ferrymaster Sera. Tinker Fizzlebang offers a separate quest into Brass Hollows.
 
+Use the journal [J] to track a quest. The HUD arrow, atlas and minimap follow the same objective. A waypoint placed on the atlas [M] takes priority while it is pinned. Use **Clear Pin** in the atlas or right-click the minimap to resume quest guidance.
+
 ## Combat input
 
 Abilities 1–3 accept one queued press near the end of recovery. The ability executes once when it is ready and its requirements are met. A brief loss of ground contact can defer an action that requires footing. Losing a primary target, death and blocking windows clear pending input. Damage and resources resolve when the ability executes.
