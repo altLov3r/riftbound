@@ -45,6 +45,8 @@ namespace Riftbound.Editor
             var cloister = Stage(scene, "DeathknellCloister/Deathknell Cloister", new Vector3(-242.5f, 0, 156.8f), 6);
             if (cloister.GetComponentsInChildren<Light>().Length != 2)
                 throw new BuildFailedException("Deathknell's cloister requires both approach lanterns.");
+
+            Stage(scene, "SilverglenArrivalCourt/Silverglen Arrival Court", new Vector3(-130, 0, 55), 11);
         }
 
         static GameObject Stage(Scene scene, string model, Vector3 position, int meshCount)
