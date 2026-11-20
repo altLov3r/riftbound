@@ -64,6 +64,9 @@ namespace Riftbound
             point.z > InteriorOrigin.z - 3f && point.z < InteriorOrigin.z + 61f &&
             point.y > InteriorOrigin.y - 2f && point.y < InteriorOrigin.y + 10f;
 
+        internal Vector3 NavigationExit(PlayerController player) =>
+            InteriorOrigin + (player.BrassHollowsStage >= 2 ? new Vector3(3f, 0f, 57.5f) : new Vector3(0f, 0f, 1.1f));
+
         public static void Ensure()
         {
             if (current || !WorldRegions.Expanded || Terrain.activeTerrains.Length == 0) return;
@@ -92,6 +95,13 @@ namespace Riftbound
             amber = Paint(lit, "Lantern amber", new Color(.95f, .58f, .16f), new Color(1f, .44f, .055f));
             cooled = Paint(lit, "Cold pump glass", new Color(.13f, .30f, .29f));
             danger = Paint(lit, "Steam warning", new Color(.8f, .20f, .055f), new Color(1f, .13f, .015f));
+            var kit = OriginalLocationProps.Current;
+            if (kit)
+            {
+                shale.SetTexture("_BaseMap", kit.stoneTexture);
+                slate.SetTexture("_BaseMap", kit.stoneTexture);
+                oak.SetTexture("_BaseMap", kit.woodTexture);
+            }
             var unlit = Shader.Find("Universal Render Pipeline/Unlit");
             if (!unlit) unlit = Shader.Find("Unlit/Color");
             ringMat = new Material(unlit) { name = "Steam warning ring" };
@@ -266,6 +276,10 @@ namespace Riftbound
 
         void PortalFrame(Transform parent, float z, float halfWidth, float height)
         {
+            var kit = OriginalLocationProps.Current;
+            var shellHeight = height + .34f;
+            if (kit && OriginalLocationProps.Place(kit.arch, parent, new Vector3(0, shellHeight * .5f, z),
+                new Vector3(halfWidth * 2.66f, shellHeight, .58f), slate)) return;
             for (int side = -1; side <= 1; side += 2)
             {
                 Part(parent, "Braced timber upright", new Vector3(side*halfWidth,height*.5f,z),
@@ -323,6 +337,13 @@ namespace Riftbound
 
         Transform Rock(Transform parent, string label, Vector3 point, Vector3 scale, Material material)
         {
+            var kit = OriginalLocationProps.Current;
+            var replacement = kit ? OriginalLocationProps.Place(kit.rock, parent, point, scale, material) : null;
+            if (replacement)
+            {
+                replacement.name = label;
+                return replacement;
+            }
             if (!rockMesh)
             {
                 Vector3[] corners = {

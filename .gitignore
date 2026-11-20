@@ -12,6 +12,10 @@
 !/Packages/
 !/ProjectSettings/
 !/Docs/
+!/Tools/
+/Tools/*
+!/Tools/Emberford/
+/Tools/Emberford/__pycache__/
 !/.github/
 
 # Unity caches, local state, diagnostics and the previous VCS stay local.

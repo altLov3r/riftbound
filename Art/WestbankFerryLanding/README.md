@@ -8,6 +8,12 @@ Place **Westbank Ferry Landing** at **(-270, 0, 41)** with zero rotation and uni
 
 The combined village preview build stages the prefab. The Willow Rest cache, bridge collision, river mesh, and terrain are authored independently.
 
+## Remodeled campaign access
+
+The newer campaign reshapes the bank below the ramp. A short raised connector loads beside the existing ferry landing in the expanded scene. From the west bridgehead, go around the west side of the shelter and follow the lower bank east to the connector. This stays south of the bridge retaining wall. The final turn leads down the original ramp to the dock.
+
+Re-export the connector against the existing Westbank atlas by running Blender 5.2 with `build_bank_connector.py -- ./WestbankBankConnectorExport Assets/RPG/Art/WestbankFerryLanding/westbank_atlas.png`.
+
 ## Editable source
 
 Export into a new folder with Blender 5.2.

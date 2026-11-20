@@ -95,6 +95,8 @@ namespace Riftbound
                 (PartySystem.Instance && PartySystem.Instance.IsCompanionMenuOpen);
             if (mouse != null)
                 blocked |= PrototypeHUD.QuestPointerTakesMouse(player, mouse.position.ReadValue(), mouse.leftButton.wasPressedThisFrame);
+            if (!blocked && mouse != null && player)
+                blocked = MinimapRadar.TakesMouse(player, mouse.position.ReadValue());
             if (blocked || mouse == null)
             {
                 IsSteering = IsFreeLooking = BothMouseButtonsPressed = false;

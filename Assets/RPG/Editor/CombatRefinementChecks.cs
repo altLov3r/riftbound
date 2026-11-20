@@ -126,9 +126,14 @@ namespace Riftbound.Editor
 
                 if (stage == 1)
                 {
+                    // Keep combat rules independent of the campaign's changing structures and terrain.
+                    var platform = new GameObject("Combat fixture platform");
+                    platform.transform.position = new Vector3(0f, 79.9f, -12f);
+                    platform.AddComponent<BoxCollider>().size = new Vector3(48f, .2f, 48f);
                     var cc = pc.GetComponent<CharacterController>();
                     if (cc) cc.enabled = false;
-                    pc.transform.position = new Vector3(0f, 0.25f, -12f);
+                    pc.transform.position = new Vector3(0f, 80.25f, -12f);
+                    Physics.SyncTransforms();
                     if (cc)
                     {
                         cc.enabled = true;
@@ -193,8 +198,13 @@ namespace Riftbound.Editor
                     wallGo.transform.position = pc.transform.position + pc.transform.forward * 1.25f + Vector3.up * 1.0f;
                     wallGo.transform.localScale = new Vector3(4f, 3f, 0.5f);
                     var ecDummy = dummyGo.AddComponent<EnemyController>();
+                    dummyGo.transform.rotation = Quaternion.LookRotation(Vector3.ProjectOnPlane(pc.transform.position - dummyGo.transform.position, Vector3.up));
+                    Physics.SyncTransforms();
                     var clearSightM = typeof(EnemyController).GetMethod("ClearSightForTarget", BindingFlags.NonPublic | BindingFlags.Instance);
                     bool sightBlocked = !(bool)clearSightM.Invoke(ecDummy, new object[] { pc.transform });
+                    wallGo.SetActive(false);
+                    dummyGo.transform.rotation = Quaternion.identity;
+                    Physics.SyncTransforms();
                     UnityEngine.Object.Destroy(wallGo);
 
                     // 4. CF01/CF02 Unknown abilityId and Range parity inspection helpers

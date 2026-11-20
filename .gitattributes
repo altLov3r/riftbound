@@ -36,3 +36,5 @@
 Assets/RPG/Terrain/WorldExpansion/*.asset filter=lfs diff=lfs merge=lfs -text
 Assets/RPG/Terrain/ReaverCamp/*.asset filter=lfs diff=lfs merge=lfs -text
 *.glb filter=lfs diff=lfs merge=lfs -text
+Assets/RPG/ProceduralKit/Landscape/*.asset filter=lfs diff=lfs merge=lfs -text
+"Assets/RPG/ProceduralKit/World Surfaces/Terrain/*.asset" filter=lfs diff=lfs merge=lfs -text

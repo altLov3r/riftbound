@@ -302,7 +302,10 @@ namespace Riftbound
         void Crate(Transform parent, Vector3 position, float size)
         {
             var crate = Box(parent, "Supply crate", position, Vector3.one * size, wood, true);
-            if (PlaceCargoArt(parent, "mdvl_props_crate_01", position, size))
+            var kit = OriginalLocationProps.Current;
+            var model = kit ? OriginalLocationProps.Place(kit.crate, parent, position, Vector3.one * size) : null;
+            if (model) model.name = "Timber supply crate";
+            if (model || PlaceCargoArt(parent, "mdvl_props_crate_01", position, size))
             {
                 crate.GetComponent<Renderer>().enabled = false;
                 return;

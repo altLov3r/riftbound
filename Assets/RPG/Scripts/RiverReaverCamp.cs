@@ -33,7 +33,7 @@ namespace Riftbound
             root.SetActive(false);
             root.transform.SetParent(parent); root.transform.position = Ground(point);
             root.transform.rotation = Quaternion.Euler(0, 180, 0);
-            var visual = CharacterVisualFactory.CreateVisualInstance(race, cls, root.transform);
+            var visual = CharacterVisualFactory.CreateVisualInstance(race, cls, root.transform, hostile: true);
             var enemy = root.AddComponent<EnemyController>();
             enemy.enemyId = id; enemy.player = player; enemy.isBoss = boss;
             enemy.ranged = ranged;

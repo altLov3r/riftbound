@@ -1,3 +1,4 @@
+using System.Linq;
 using UnityEditor;
 using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
@@ -73,7 +74,10 @@ namespace Riftbound.Editor
             var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
             if (!prefab) throw new BuildFailedException($"Missing village prefab {path}.");
 
-            var instance = (GameObject)PrefabUtility.InstantiatePrefab(prefab, scene);
+            var instance = scene.GetRootGameObjects().FirstOrDefault(root =>
+                PrefabUtility.GetCorrespondingObjectFromSource(root) == prefab ||
+                root.name == prefab.name && (root.transform.position - position).sqrMagnitude < .0001f);
+            if (!instance) instance = (GameObject)PrefabUtility.InstantiatePrefab(prefab, scene);
             instance.transform.position = position;
             var colliders = instance.GetComponentsInChildren<MeshCollider>();
             if (colliders.Length != meshCount)

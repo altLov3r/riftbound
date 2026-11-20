@@ -271,7 +271,6 @@ namespace Riftbound
             foreach (var landmark in FindObjectsByType<Landmark>(FindObjectsSortMode.None))
                 if (!player.HasLandmark(landmark.landmarkId))
                     Mark(area, landmark.transform.position, "", new Color(.15f, .37f, .29f), 4);
-            if(player.questGiver) Mark(area,player.questGiver.position,"",new Color(.4f,1,.5f),6);
             DrawAtlasDestination(area);
             bool inHollows = hollows && BrassHollows.Inside(player.transform.position);
             Vector3 playerPin = inHollows ? hollows.Entrance :
@@ -279,12 +278,21 @@ namespace Riftbound
             Mark(area, playerPin, "", new Color(.09f,.18f,.22f), 12);
             Mark(area, playerPin, "", new Color(.25f,.93f,1), 8);
             DrawAtlasLabel(area, playerPin, inHollows || WorldRegions.Underground(player.transform.position) ? "You · Below ground" : "You");
+            DrawAtlasQuestMarkers(area);
             GUI.Label(new Rect(area.x + 8, area.y + 6, 70, 24), "▲ N", new GUIStyle(small)
             {
                 fontStyle = FontStyle.Bold,
                 normal = { textColor = new Color(.16f, .12f, .08f) }
             });
             float x=panel.x+panel.height+20, y=panel.y+12, w=panel.width-panel.height-36;
+            if (GUI.Button(new Rect(x, y, w * .5f - 3, 27), "Quests", questButton)) atlasPlaces = false;
+            if (GUI.Button(new Rect(x + w * .5f + 3, y, w * .5f - 3, 27), "Places", questButton)) atlasPlaces = true;
+            y += 35f;
+            if (!atlasPlaces)
+            {
+                DrawAtlasQuestList(new Rect(x, y, w, panel.yMax - y - 9));
+                return;
+            }
             GUI.Label(new Rect(x,y,w,29),"FRONTIER SITES",title);
             GUI.Label(new Rect(x,y+34,w,24),"Choose a site to follow its waypoint.",small);
             if (westernCamps)
@@ -294,10 +302,10 @@ namespace Riftbound
             }
             if (hollows) DrawSiteWaypoint(new Rect(x,y+130,w,30),"Brass Hollows entrance",hollows.Entrance);
             GUI.Label(new Rect(x,y+170,w,24),"WAYPOINTS",small);
-            string[] names={"Emberwatch Outpost","Duskwood Cathedral","Camp Bloodrock","Greenhollow Valley","Wyrmcrest Summit","Willowmere Wilds","Highspire Keep","Gor'Kresh Stronghold"};
-            Vector3[] positions={new Vector3(0,0,10),WorldRegions.Cathedral,WorldRegions.Bloodrock,WorldRegions.Greenhollow,WorldRegions.Summit,new Vector3(-285,6,50),WorldRegions.Highspire,WorldRegions.Stronghold};
+            string[] names={"Emberwatch Outpost","Ashwood Supply Camp","Ruined Watchtower","Westbank Crossing","Duskwood Cathedral","Camp Bloodrock","Greenhollow Valley","Wyrmcrest Summit","Willowmere Wilds","Highspire Keep","Gor'Kresh Stronghold"};
+            Vector3[] positions={new Vector3(0,0,10),new Vector3(24,2,61),new Vector3(35,6,86),new Vector3(-255,6,50),WorldRegions.Cathedral,WorldRegions.Bloodrock,WorldRegions.Greenhollow,WorldRegions.Summit,new Vector3(-285,6,50),WorldRegions.Highspire,WorldRegions.Stronghold};
             var waystops = SettlementWaystop.Active;
-            atlasRegionScroll = GUI.BeginScrollView(new Rect(x,y+198,w,218), atlasRegionScroll, new Rect(0,0,w-19,(names.Length + waystops.Count)*35));
+            atlasRegionScroll = GUI.BeginScrollView(new Rect(x,y+198,w,180), atlasRegionScroll, new Rect(0,0,w-19,(names.Length + waystops.Count)*35));
             for (int i = 0; i < waystops.Count; i++)
                 DrawSiteWaypoint(new Rect(0, i * 35, w - 19, 30), waystops[i].displayName, waystops[i].transform.position);
             for(int i=0;i<names.Length;i++)
@@ -307,11 +315,65 @@ namespace Riftbound
             if (radar && radar.TryGetNavigationTarget(out _, out var caption))
             {
                 bool pinned = radar.customWaypoint.HasValue;
-                GUI.Label(new Rect(x,y+423,w,24), pinned ? "MAP PIN" : "QUEST DESTINATION", small);
-                GUI.Label(new Rect(x,y+445,w,30), caption, label);
-                if (pinned && GUI.Button(new Rect(x,y+479,w,30), "CLEAR PIN", questButton))
+                GUI.Label(new Rect(x,y+384,w,24), pinned ? "MAP PIN" : "QUEST DESTINATION", small);
+                GUI.Label(new Rect(x,y+406,w,30), caption, label);
+                if (pinned && GUI.Button(new Rect(x,y+438,w,27), "CLEAR PIN", questButton))
                     MinimapRadar.ClearWaypoint();
             }
+        }
+
+        bool atlasPlaces;
+        Vector2 atlasQuestScroll;
+        readonly System.Collections.Generic.List<Vector2> atlasQuestPoints = new();
+
+        void DrawAtlasQuestMarkers(Rect area)
+        {
+            var radar = MinimapRadar.Instance;
+            if (!radar) return;
+            atlasQuestPoints.Clear();
+            foreach (var pin in radar.QuestPins)
+            {
+                Vector2 point = MapPoint(area, MinimapRadar.AtlasPosition(pin.position));
+                bool stacked = false;
+                foreach (var placed in atlasQuestPoints)
+                    if ((placed - point).sqrMagnitude < 18f * 18f) { stacked = true; break; }
+                if (stacked) continue;
+                atlasQuestPoints.Add(point);
+                var hit = new Rect(Mathf.Clamp(point.x - 10, area.x, area.xMax - 20),
+                    Mathf.Clamp(point.y - 10, area.y, area.yMax - 20), 20, 20);
+                if (radar.DrawQuestMapPin(hit, pin)) radar.SelectQuestPin(pin);
+            }
+        }
+
+        void DrawAtlasQuestList(Rect panel)
+        {
+            var radar = MinimapRadar.Instance;
+            if (!radar) return;
+            GUI.Label(new Rect(panel.x, panel.y, panel.width, 24), "! Available   ◆ Objective   ? Turn in", small);
+            if (radar.QuestPins.Count == 0)
+                GUI.Label(new Rect(panel.x, panel.y + 31, panel.width, 32), "No visible quests at this stage.", small);
+            float listWidth = panel.width - 17, rowHeight = 44;
+            var rows = new Rect(panel.x, panel.y + 30, panel.width, panel.height - 81);
+            atlasQuestScroll = GUI.BeginScrollView(rows, atlasQuestScroll,
+                new Rect(0, 0, listWidth, rowHeight * radar.QuestPins.Count));
+            for (int i = 0; i < radar.QuestPins.Count; i++)
+            {
+                var pin = radar.QuestPins[i];
+                var row = new Rect(0, i * rowHeight, listWidth - 2, rowHeight - 3);
+                var zone = ZoneManager.GetZoneName(pin.position);
+                if (GUI.Button(row, GUIContent.none, questButton)) radar.SelectQuestPin(pin);
+                var textRect = new Rect(row.x + 8, row.y + 2, row.width - 15, 20);
+                Color saved = GUI.contentColor;
+                GUI.contentColor = pin.Ink;
+                GUI.Label(textRect, pin.Icon + "  " + pin.caption, small);
+                GUI.contentColor = saved;
+                GUI.Label(new Rect(textRect.x + 15, textRect.y + 18, textRect.width - 15, 17), zone, small);
+            }
+            GUI.EndScrollView();
+            if (radar.TryGetNavigationTarget(out _, out var destination))
+                GUI.Label(new Rect(panel.x, rows.yMax + 2, panel.width - 6, 22), destination, small);
+            if (radar.customWaypoint.HasValue && GUI.Button(new Rect(panel.x, rows.yMax + 23, panel.width, 25), "Clear pin", questButton))
+                MinimapRadar.ClearWaypoint();
         }
 
         void DrawSiteWaypoint(Rect button, string name, Vector3 point)

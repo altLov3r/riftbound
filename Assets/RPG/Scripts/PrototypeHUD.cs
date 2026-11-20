@@ -264,7 +264,7 @@ namespace Riftbound
 
             // Keep the world visible: show only active objectives, with details in the journal.
             float qtw = 236f, qtx = width - qtw - 20f;
-            float qty = (MinimapRadar.Instance != null && MinimapRadar.Instance.showMinimap) ? 198f : 20f;
+            float qty = (MinimapRadar.Instance != null && MinimapRadar.Instance.showMinimap) ? MinimapRadar.TrackerTop : 20f;
             var fqs = FactionQuestSystem.Instance;
             var fq = fqs != null ? fqs.GetActiveQuest() : null;
             bool hasObjective = fq != null || player.QuestAccepted;

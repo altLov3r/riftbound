@@ -152,10 +152,23 @@ namespace Riftbound.Editor
                     {
                         CaptureUI("HUD"); frontPhase = 3; due = EditorApplication.timeSinceStartup + 1; return;
                     }
+                    if (frontPhase == 3)
+                    {
+                        player.MapOpen = true;
+                        frontPhase = 4;
+                        due = EditorApplication.timeSinceStartup + .65;
+                        return;
+                    }
+                    if (frontPhase == 4)
+                    {
+                        CaptureUI("QuestAtlas"); frontPhase = 5; due = EditorApplication.timeSinceStartup + 1; return;
+                    }
+                    player.MapOpen = false;
                     Results.Add($"World state: menu={FrontendMenu.IsOpen}, paused={player.orbit.Paused}, timeScale={Time.timeScale}, name={player.CharacterName}, frames={Time.frameCount}");
                     Check(!FrontendMenu.IsOpen && !player.orbit.Paused && Time.timeScale > 0, "Entering the world restores gameplay time and camera control");
                     Check(player.CharacterName == "BuildCheck", "Selected character is applied after scene reload");
                     Check(player.CharacterRace == "Human", "Fresh test character retains its selected race");
+                    CheckQuestMapStart(player);
                     if (WorldRegions.Expanded) CheckExpandedWorld(player);
                     Check(player.GetComponentsInChildren<Renderer>().Length > 0, "Character has a visible model");
                     InputSystem.settings.editorInputBehaviorInPlayMode = InputSettings.EditorInputBehaviorInPlayMode.AllDeviceInputAlwaysGoesToGameView;
@@ -187,9 +200,12 @@ namespace Riftbound.Editor
                     var radar = MinimapRadar.Instance;
                     Check(radar.TrackingMainQuest && radar.TryGetNavigationTarget(out var destination, out _) &&
                         Vector3.Distance(destination, player.questGiver.position) < .1f, "Live quest tracking returns to Abe when the objective is ready");
+                    Check(RefreshMapAndHas(radar, "abe", MinimapRadar.QuestMark.TurnIn), "Abe's available marker changes to turn-in");
                     TurnIn(player);
                     Check(player.QuestIndex == 1 && !player.QuestAccepted, "Road quest turns in and advances exactly once");
                     OpenAbe(player); player.AcceptQuest();
+                    radar.RefreshQuestPins();
+                    Check(radar.QuestPins.Count(pin => pin.id.StartsWith("supply:")) == 3, "The map shows all three live supply crates");
                     foreach (var crate in Object.FindObjectsByType<SupplyCrate>(FindObjectsSortMode.None))
                     {
                         Move(player, crate.transform.position);
@@ -198,6 +214,8 @@ namespace Riftbound.Editor
                     Check(player.QuestReady && player.Supplies >= 3, "Supply quest collects the three actual crates");
                     TurnIn(player);
                     Check(player.QuestIndex == 2, "Supply hand-in unlocks the captain mission");
+                    if (WorldRegions.Expanded)
+                        Check(RefreshMapAndHas(radar, "western", MinimapRadar.QuestMark.Available), "Rowan appears when the Western Road quest unlocks");
                     var captain = Object.FindObjectsByType<EnemyController>(FindObjectsInactive.Include, FindObjectsSortMode.None).First(e => e.IsMainQuestCaptain);
                     Check(!captain.gameObject.activeSelf, "Captain remains locked until his quest is accepted");
                     OpenAbe(player); player.AcceptQuest();
@@ -228,6 +246,25 @@ namespace Riftbound.Editor
                 Errors.Add(exception.ToString());
                 Finish(true);
             }
+        }
+
+        static bool RefreshMapAndHas(MinimapRadar radar, string id, MinimapRadar.QuestMark kind)
+        {
+            radar.RefreshQuestPins();
+            return radar.QuestPins.Any(pin => pin.id == id && pin.kind == kind);
+        }
+
+        static void CheckQuestMapStart(PlayerController player)
+        {
+            var radar = MinimapRadar.Instance;
+            Check(radar && radar.showMinimap && radar.showCompass, "Minimap and compass are visible by default");
+            Check(RefreshMapAndHas(radar, "abe", MinimapRadar.QuestMark.Available), "The map offers the starting quest at Abe");
+            var abe = radar.QuestPins.First(pin => pin.id == "abe");
+            radar.SelectQuestPin(abe);
+            Check(radar.TryGetNavigationTarget(out var point, out _) && point == player.questGiver.position, "Choosing a quest pin sets a waypoint at its real position");
+            MinimapRadar.ClearWaypoint();
+            if (WorldRegions.Expanded)
+                Check(RefreshMapAndHas(radar, "hollows", MinimapRadar.QuestMark.Available), "The mine quest appears at Fizzlebang before acceptance");
         }
 
         static void CheckWesternRoad(PlayerController player)
@@ -403,7 +440,10 @@ namespace Riftbound.Editor
             var captain = actors.Single(e => e.enemyId == RiverReaverCamp.CaptainId);
             var stats = captain.GetComponent<Combatant>();
             Check(captain.animator && captain.isBoss && stats.maxHealth == 260, "River Reaver captain has a complete boss rig and vitals");
-            Check(AssetDatabase.GetAssetPath(WorldRegions.TerrainAt(RiverReaverCamp.Position).terrainData).Contains("/ReaverCamp/"), "Camp uses a separate terrain asset");
+            var tile = WorldRegions.TerrainAt(RiverReaverCamp.Position);
+            Check(tile && tile.GetComponent<TerrainCollider>().terrainData == tile.terrainData &&
+                Terrain.activeTerrains.Count(other => other.terrainData == tile.terrainData) == 1,
+                "Camp uses its own terrain data for render and collision");
             Check(ReaverCampTerrainSetup.CheckApproach() <= 35, "Camp approach supports walking and mounted travel below35 degrees");
             Check(actors.Count(e => e.enemyId.StartsWith("westbank-reaver-")) == 3, "River Reaver camp has exactly one captain and two guards");
             CheckEnemyDisengagement(player, captain);
@@ -471,9 +511,11 @@ namespace Riftbound.Editor
                     wall.name = "Isolated enemy sight test wall";
                     wall.transform.position = home + Vector3.forward * 2 + Vector3.up;
                     wall.transform.localScale = new Vector3(3, 3, .25f); Physics.SyncTransforms();
-                    Check(!(bool)type.GetMethod("ClearSight", hidden).Invoke(actor, null), "A solid wall blocks enemy line of sight");
+                    var sight = type.GetMethod("ClearSightForTarget", hidden);
+                    var sightTarget = new object[] { player.transform };
+                    Check(!(bool)sight.Invoke(actor, sightTarget), "A solid wall blocks enemy line of sight");
                     wall.SetActive(false); Physics.SyncTransforms();
-                    Check((bool)type.GetMethod("ClearSight", hidden).Invoke(actor, null), "Enemy sight accepts the player collider when the path is clear");
+                    Check((bool)sight.Invoke(actor, sightTarget), "Enemy sight accepts the player collider when the path is clear");
                 }
                 finally { Object.Destroy(wall); }
             }

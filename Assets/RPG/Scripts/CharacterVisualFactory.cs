@@ -133,7 +133,7 @@ namespace Riftbound
         /// <summary>
         /// Loads or instantiates the visual prefab for a given race and class combination.
         /// </summary>
-        public static GameObject CreateVisualInstance(string race, string characterClass, Transform parent = null, bool isPreview = false)
+        public static GameObject CreateVisualInstance(string race, string characterClass, Transform parent = null, bool isPreview = false, bool hostile = false)
         {
             race = NormalizeRace(race);
             characterClass = NormalizeClass(characterClass);
@@ -199,6 +199,11 @@ namespace Riftbound
                 foreach (var col in instance.GetComponentsInChildren<Collider>()) col.enabled = false;
                 foreach (var t in instance.GetComponentsInChildren<Transform>(true)) t.gameObject.layer = 2; // Ignore Raycast
             }
+
+            var kit = ProceduralActorCatalog.Current;
+            if (kit)
+                ProceduralActorVisual.Attach(instance, instance.GetComponentInChildren<Animator>(),
+                    kit.ForClass(race, characterClass, hostile), profile.height / 1.9f);
 
             if (Application.isPlaying && !isPreview && parent)
                 GroundedVisual.EnsureFor(parent.gameObject, instance.GetComponentInChildren<Animator>());
