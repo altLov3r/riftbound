@@ -15,9 +15,10 @@ namespace Riftbound.Editor
 
         public static void Run()
         {
-            if (!Application.isBatchMode || PlayerSettings.productName != Product)
+            if (!Application.isBatchMode ||
+                (PlayerSettings.productName != Product && PlayerSettings.productName != VillageTourMenu.Product))
             {
-                Debug.LogError($"Build the remodel preview from an isolated project named {Product}.");
+                Debug.LogError($"Build from an isolated project named {Product} or {VillageTourMenu.Product}.");
                 EditorApplication.Exit(1);
                 return;
             }
@@ -30,7 +31,11 @@ namespace Riftbound.Editor
         public void OnProcessScene(Scene scene, BuildReport report)
         {
             if (!buildingPreview || report == null || scene.path != WorldRegions.ScenePath) return;
+            StageRemodels(scene);
+        }
 
+        internal static void StageRemodels(Scene scene)
+        {
             Stage(scene, "HighspireDistrict/Highspire East Ward", new Vector3(-138, 12.30f, -49), 10);
             Stage(scene, "EmberwatchCivicSquare/Emberwatch Civic Square", new Vector3(28, 0, -29), 8);
             Stage(scene, "VillageLandmarks/Emberwatch Supply Lane", new Vector3(43, 0, -40), 4);
@@ -52,6 +57,14 @@ namespace Riftbound.Editor
             if (landing.GetComponentsInChildren<MeshFilter>().Length != 5 || !landing.GetComponentInChildren<LineRenderer>())
                 throw new BuildFailedException("Westbank's moored skiff is missing from the landing.");
             Stage(scene, "BloodrockLookout/Bloodrock Trail Lookout", new Vector3(294, 0, 184.5f), 5);
+
+            if (PlayerSettings.productName == VillageTourMenu.Product)
+            {
+                var tour = new GameObject("Village Tour");
+                SceneManager.MoveGameObjectToScene(tour, scene);
+                tour.AddComponent<VillageTourMenu>();
+                Debug.Log("Staged the offline village tour.");
+            }
         }
 
         static GameObject Stage(Scene scene, string model, Vector3 position, int meshCount)
