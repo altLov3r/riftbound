@@ -124,29 +124,34 @@ namespace Riftbound
         void Defeated(Combatant _)
         {
             CancelAttack();
-            if (!IsNetClientRuntime() && Network.CoopSessionConfig.IsMultiplayer && Unity.Netcode.NetworkManager.Singleton && Unity.Netcode.NetworkManager.Singleton.IsServer)
+            bool isNetListening = Network.CoopSessionConfig.IsMultiplayer && Unity.Netcode.NetworkManager.Singleton && Unity.Netcode.NetworkManager.Singleton.IsListening;
+            bool isNetServer = !IsNetClientRuntime() && isNetListening && Unity.Netcode.NetworkManager.Singleton.IsServer;
+            if (isNetServer)
                 BroadcastNetAction(ActionDeath, 0f, transform.position);
-            if (!trainingDummy && player)
+            if (!trainingDummy && (player || isNetServer))
             {
-                if (Network.CoopSessionConfig.IsMultiplayer && Unity.Netcode.NetworkManager.Singleton && Unity.Netcode.NetworkManager.Singleton.IsListening)
+                if (isNetListening)
                 {
                     if (Unity.Netcode.NetworkManager.Singleton.IsServer)
                         Network.RiftboundCoopPlayer.DispatchEnemyDefeatedToEligiblePlayers(this);
                 }
-                else
+                else if (player)
                 {
                     player.RecordEnemyDefeat(this);
                 }
-                CombatStreakSystem.RegisterKill(transform.position);
-                if (Affix == EnemyAffix.Molten)
-                    SpellFX.CreateHeavySlam(transform.position, 3.2f);
-                else if (Affix == EnemyAffix.Arcane)
+                if (player)
                 {
-                    player.AddExperience(40);
-                    CombatTextManager.Spawn(transform.position + Vector3.up * 2.1f, "+40 ARCANE XP", new Color(0.85f, 0.65f, 1f), true);
+                    CombatStreakSystem.RegisterKill(transform.position);
+                    if (Affix == EnemyAffix.Molten)
+                        SpellFX.CreateHeavySlam(transform.position, 3.2f);
+                    else if (Affix == EnemyAffix.Arcane)
+                    {
+                        player.AddExperience(40);
+                        CombatTextManager.Spawn(transform.position + Vector3.up * 2.1f, "+40 ARCANE XP", new Color(0.85f, 0.65f, 1f), true);
+                    }
+                    SpellFX.SpawnBurst(transform.position + Vector3.up * 0.9f, new Color(1f, 0.8f, 0.3f), new Color(0.6f, 0.25f, 0.95f), 18, 2f, 5f, 0.1f, 0.22f, 0.55f);
+                    SpellFX.CreateSoulOrb(transform.position + Vector3.up * 1.1f, player.transform);
                 }
-                SpellFX.SpawnBurst(transform.position + Vector3.up * 0.9f, new Color(1f, 0.8f, 0.3f), new Color(0.6f, 0.25f, 0.95f), 18, 2f, 5f, 0.1f, 0.22f, 0.55f);
-                SpellFX.CreateSoulOrb(transform.position + Vector3.up * 1.1f, player.transform);
             }
         }
         void OnDisable() { CancelAttack(); evading = false; }
@@ -191,8 +196,7 @@ namespace Riftbound
                 || !Unity.Netcode.NetworkManager.Singleton || !Unity.Netcode.NetworkManager.Singleton.IsListening
                 || !Unity.Netcode.NetworkManager.Singleton.IsServer)
                 return;
-            if (Network.RiftboundCoopPlayer.LocalOwner)
-                Network.RiftboundCoopPlayer.LocalOwner.BroadcastEnemyAction(this, actionKind, duration, origin, spellName, icon, ++serverActionSeq, castDuration);
+            Network.RealmWorldChannel.DispatchEnemyAction(this, actionKind, duration, origin, spellName, icon, ++serverActionSeq, castDuration);
         }
 
         public bool TryGetActiveActionSnapshot(out byte kind, out float remaining, out float castRemaining, out Vector3 origin, out string spellName, out string icon, out uint seq)
@@ -354,8 +358,12 @@ namespace Riftbound
             if (!warning)
             {
                 warning = new GameObject("Captain heavy strike warning").AddComponent<LineRenderer>();
-                warning.material = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
-                warning.material.SetColor("_BaseColor", new Color(1, .15f, .04f));
+                var warningShader = Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Unlit/Color") ?? Shader.Find("Sprites/Default");
+                if (warningShader)
+                {
+                    warning.material = new Material(warningShader);
+                    warning.material.SetColor("_BaseColor", new Color(1, .15f, .04f));
+                }
                 warning.positionCount = 65; warning.startWidth = warning.endWidth = .16f;
             }
             heavyCenter = center;
@@ -383,8 +391,8 @@ namespace Riftbound
             activeSpellIcon = heavyAttacker ? "🔨" : (ranged ? "💀" : "⚔");
             ActivateHeavyWarning(transform.position, 1.8f, activeSpellName, activeSpellIcon);
             BroadcastNetAction(ActionHeavyWindup, 1.8f, heavyCenter, activeSpellName, activeSpellIcon);
-            if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner)
-                Network.RiftboundCoopPlayer.LocalOwner.BroadcastEnemyState(this);
+            if (Network.CoopSessionConfig.IsMultiplayer)
+                Network.RealmWorldChannel.DispatchEnemyState(this);
         }
         void Update()
         {
@@ -472,8 +480,8 @@ namespace Riftbound
                 if (!dying)
                 {
                     dying = true; deathTime = Time.time; motor.enabled = false; if (animator) animator.speed = 1; Play(nativeDeathAnimation ? "Death" : "Hit", true, "Hit");
-                    if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner)
-                        Network.RiftboundCoopPlayer.LocalOwner.BroadcastEnemyState(this);
+                    if (Network.CoopSessionConfig.IsMultiplayer)
+                        Network.RealmWorldChannel.DispatchEnemyState(this);
                 }
                 if (!nativeDeathAnimation) transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.Euler(0, transform.eulerAngles.y, 82), Time.deltaTime * 3);
                 if (Time.time > deathTime + 5) gameObject.SetActive(false);
@@ -654,8 +662,8 @@ namespace Riftbound
                     }
                     activeSpellName = spellName; activeSpellIcon = icon;
                     BroadcastNetAction(ActionAttack, attackDuration, transform.position, spellName, icon, ranged ? attackDuration * 0.85f : 0f);
-                    if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner)
-                        Network.RiftboundCoopPlayer.LocalOwner.BroadcastEnemyState(this);
+                    if (Network.CoopSessionConfig.IsMultiplayer)
+                        Network.RealmWorldChannel.DispatchEnemyState(this);
                 }
                 else { Play("Idle", false, "Default"); if (animator) animator.speed = 1; }
             }
@@ -692,8 +700,7 @@ namespace Riftbound
                 if (netBroadcastTimer >= 0.1f)
                 {
                     netBroadcastTimer = 0f;
-                    if (Network.RiftboundCoopPlayer.LocalOwner)
-                        Network.RiftboundCoopPlayer.LocalOwner.BroadcastEnemyState(this);
+                    Network.RealmWorldChannel.DispatchEnemyState(this);
                 }
             }
         }

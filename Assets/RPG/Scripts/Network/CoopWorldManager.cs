@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using Unity.Netcode;
@@ -101,6 +102,55 @@ namespace Riftbound.Network
                 RiftboundCoopPlayer.LocalOwner.RequestReadyCheck();
             }
             // Note: [E] Ally Revive is handled cleanly through PlayerServices.TryGetBestInteraction / Interact() so [E] never double-fires alongside quests/NPCs/chests.
+        }
+
+        public uint ActiveReadyCheckSequence => RiftboundCoopPlayer.ActiveReadyCheckSeq;
+
+        public static int AllocateSpawnSlot(RiftboundCoopPlayer joining)
+        {
+            int startSlot = CoopSessionConfig.IsDedicatedServer ? 0 : (joining != null && joining.OwnerClientId == NetworkManager.ServerClientId ? 0 : 1);
+            if (!CoopSessionConfig.IsDedicatedServer && joining != null && joining.OwnerClientId == NetworkManager.ServerClientId)
+                return 0;
+
+            int cap = RealmConfig.GetEffectiveMaxPlayers();
+            for (int candidate = startSlot; candidate < cap + 8; candidate++)
+            {
+                bool inUse = false;
+                foreach (var p in RiftboundCoopPlayer.AllPlayers)
+                {
+                    if (p && p != joining && p.IsSpawned && p.SpawnSlot.Value == candidate)
+                    {
+                        inUse = true;
+                        break;
+                    }
+                }
+                if (!inUse) return candidate;
+            }
+            return Mathf.Max(0, RiftboundCoopPlayer.AllPlayers.Count - 1);
+        }
+
+        public static Vector3 GetRealmSpawnAnchor(string race)
+        {
+            if (!CoopSessionConfig.IsDedicatedServer)
+            {
+                var lp = FindFirstObjectByType<PlayerController>();
+                if (lp) return lp.GetRacialSpawnPosition();
+            }
+
+            Vector3 raw = race switch
+            {
+                "Dwarf" => WorldRegions.Expanded ? WorldRegions.Frostpeak : new Vector3(20f, 0.5f, -15f),
+                "Elf" or "High Elf" => WorldRegions.Expanded ? WorldRegions.Silverglen : new Vector3(-25f, 0.5f, 15f),
+                "Undead" => WorldRegions.Expanded ? WorldRegions.Deathknell : new Vector3(-28f, 5.7f, 160f),
+                "Goblin" => WorldRegions.Expanded ? WorldRegions.Rustwater : new Vector3(38f, 9.1f, 175f),
+                "Orc" or "Brute" => WorldRegions.Expanded ? WorldRegions.Bloodrock + new Vector3(-5f, 0f, -5f) : new Vector3(50f, 9.2f, 210f),
+                _ => RealmServerBootstrap.SceneDefaultSpawnAnchor
+            };
+
+            float ground = WorldRegions.GroundHeight(raw);
+            if (!float.IsNaN(ground) && !float.IsInfinity(ground))
+                raw.y = Mathf.Max(raw.y, ground + 0.30f);
+            return raw;
         }
 
         readonly Dictionary<ulong, HashSet<string>> claimedChestsByClient = new Dictionary<ulong, HashSet<string>>();
@@ -233,14 +283,19 @@ namespace Riftbound.Network
                 return;
             }
 
-            if (CoopSessionConfig.AutoSmokeExitSeconds > 0f)
+            if (CoopSessionConfig.AutoSmokeExitSeconds > 0f || !string.IsNullOrEmpty(RealmConfig.Runtime.smokeRole))
             {
                 Time.timeScale = 1f;
             }
 
             StartSelectedSessionMode();
 
-            if (CoopSessionConfig.AutoSmokeExitSeconds > 0f)
+            if (!string.IsNullOrEmpty(RealmConfig.Runtime.smokeRole) && CoopSessionConfig.IsRealmSession)
+            {
+                float smokeLimit = RealmConfig.Runtime.smokeSeconds > 0f ? RealmConfig.Runtime.smokeSeconds : 45f;
+                StartCoroutine(RunRealmSmokeRoutine(smokeLimit));
+            }
+            else if (CoopSessionConfig.AutoSmokeExitSeconds > 0f)
             {
                 StartCoroutine(RunCoopSmokeRoutine(CoopSessionConfig.AutoSmokeExitSeconds));
             }
@@ -256,6 +311,14 @@ namespace Riftbound.Network
             {
                 StartLanDevFlow();
             }
+            else if (CoopSessionConfig.IsDedicatedServer)
+            {
+                StartDedicatedServerFlow();
+            }
+            else if (CoopSessionConfig.IsRealmClient)
+            {
+                StartRealmClientFlow();
+            }
         }
 
         void EnsureNetworkManagerPrepared()
@@ -267,6 +330,7 @@ namespace Riftbound.Network
                 Debug.LogError("[CoopWorldManager] " + statusText);
                 return;
             }
+            GameObject channelPrefab = Resources.Load<GameObject>("EmberfordRealmChannel");
 
             nm = NetworkManager.Singleton;
             if (nm == null)
@@ -278,9 +342,10 @@ namespace Riftbound.Network
                 {
                     NetworkTransport = utp,
                     PlayerPrefab = avatarPrefab,
-                    ConnectionApproval = CoopSessionConfig.IsLanDevMode
+                    ConnectionApproval = CoopSessionConfig.IsLanDevMode || CoopSessionConfig.IsRealmSession
                 };
                 nm.NetworkConfig.Prefabs.Add(new NetworkPrefab { Prefab = avatarPrefab });
+                if (channelPrefab) nm.NetworkConfig.Prefabs.Add(new NetworkPrefab { Prefab = channelPrefab });
             }
             else
             {
@@ -288,7 +353,16 @@ namespace Riftbound.Network
                 if (nm.NetworkConfig == null) nm.NetworkConfig = new NetworkConfig();
                 nm.NetworkConfig.NetworkTransport = utp;
                 nm.NetworkConfig.PlayerPrefab = avatarPrefab;
-                nm.NetworkConfig.ConnectionApproval = CoopSessionConfig.IsLanDevMode;
+                nm.NetworkConfig.ConnectionApproval = CoopSessionConfig.IsLanDevMode || CoopSessionConfig.IsRealmSession;
+                if (channelPrefab)
+                {
+                    bool hasChannel = false;
+                    foreach (var np in nm.NetworkConfig.Prefabs.Prefabs)
+                    {
+                        if (np != null && np.Prefab == channelPrefab) { hasChannel = true; break; }
+                    }
+                    if (!hasChannel) nm.NetworkConfig.Prefabs.Add(new NetworkPrefab { Prefab = channelPrefab });
+                }
             }
 
             nm.OnClientConnectedCallback -= OnClientConnected;
@@ -321,6 +395,7 @@ namespace Riftbound.Network
                 nm.ConnectionApprovalCallback = ApprovalCheck;
                 utp.SetConnectionData("127.0.0.1", CoopSessionConfig.Port, "0.0.0.0");
                 bool ok = nm.StartHost();
+                if (ok) SpawnServerWorldChannelIfNeeded();
                 statusText = ok ? $"Dev LAN Host :{CoopSessionConfig.Port}" : "Failed to start Host";
                 Debug.Log($"[CoopWorldManager] {statusText}");
             }
@@ -334,21 +409,122 @@ namespace Riftbound.Network
             }
         }
 
+        void StartDedicatedServerFlow()
+        {
+            EnsureNetworkManagerPrepared();
+            if (nm == null) return;
+
+            var cfg = RealmConfig.Current;
+            string listenIp = string.IsNullOrWhiteSpace(cfg.listenAddress) ? RealmConfig.DefaultLoopback : cfg.listenAddress.Trim();
+            nm.NetworkConfig.ConnectionApproval = true;
+            nm.ConnectionApprovalCallback = ApprovalCheck;
+            utp.SetConnectionData(listenIp, cfg.port, listenIp);
+
+            bool ok = nm.StartServer();
+            if (ok)
+            {
+                SpawnServerWorldChannelIfNeeded();
+                statusText = $"Emberford Dedicated Server ({listenIp}:{cfg.port}, cap {RealmConfig.GetEffectiveMaxPlayers()})";
+                RealmServerBootstrap.LogServer($"StartServer succeeded: realmId={cfg.realmId}, listen={listenIp}:{cfg.port}, cap={RealmConfig.GetEffectiveMaxPlayers()}, channel={(RealmWorldChannel.Instance != null)}, hostAvatar={(RiftboundCoopPlayer.LocalOwner != null)}");
+            }
+            else
+            {
+                statusText = $"Failed to StartServer on {listenIp}:{cfg.port}";
+                RealmServerBootstrap.LogServer($"ERROR: {statusText}");
+            }
+        }
+
+        void StartRealmClientFlow()
+        {
+            EnsureNetworkManagerPrepared();
+            if (nm == null) return;
+
+            var cfg = RealmConfig.Current;
+            string endpoint = string.IsNullOrWhiteSpace(cfg.endpoint) ? RealmConfig.DefaultLoopback : cfg.endpoint.Trim();
+            EmberfordRealmClient.MarkConnecting(endpoint, cfg.port);
+            nm.NetworkConfig.ConnectionData = BuildRealmConnectionPayload();
+            utp.SetConnectionData(endpoint, cfg.port);
+
+            bool ok = nm.StartClient();
+            statusText = ok ? $"Connecting to {cfg.displayName} ({endpoint}:{cfg.port})..." : $"Failed to start {cfg.displayName} client";
+            if (!ok) EmberfordRealmClient.MarkDisconnectedOrFailed(statusText, true);
+            Debug.Log($"[CoopWorldManager] {statusText}");
+        }
+
+        void SpawnServerWorldChannelIfNeeded()
+        {
+            if (nm == null || !nm.IsServer || (RealmWorldChannel.Instance && RealmWorldChannel.Instance.IsSpawned)) return;
+            GameObject channelPrefab = Resources.Load<GameObject>("EmberfordRealmChannel");
+            if (!channelPrefab)
+            {
+                Debug.LogWarning("[CoopWorldManager] Missing Resources/EmberfordRealmChannel prefab; using legacy LocalOwner channel.");
+                return;
+            }
+            var go = Instantiate(channelPrefab);
+            go.name = "EmberfordRealmChannel";
+            var netObj = go.GetComponent<NetworkObject>();
+            if (netObj) netObj.Spawn(false);
+        }
+
+        static byte[] BuildRealmConnectionPayload()
+        {
+            string race = string.IsNullOrWhiteSpace(RealmConfig.Runtime.clientRace) ? "Human" : RealmConfig.Runtime.clientRace;
+            string payload = $"{CoopSessionConfig.ProtocolVersion}|{RealmConfig.Current.realmId}|{race}";
+            return System.Text.Encoding.UTF8.GetBytes(payload);
+        }
+
+        public static bool ValidateRealmApprovalPayload(byte[] payload, string expectedRealmId, out string race, out string rejectReason)
+        {
+            race = "Human";
+            rejectReason = string.Empty;
+            if (payload == null || payload.Length == 0)
+            {
+                rejectReason = "Missing realm handshake payload.";
+                return false;
+            }
+            string decoded = System.Text.Encoding.UTF8.GetString(payload);
+            string[] parts = decoded.Split('|');
+            if (parts.Length < 2 || parts[0] != CoopSessionConfig.ProtocolVersion)
+            {
+                rejectReason = "Incompatible Emberford client protocol version.";
+                return false;
+            }
+            if (!string.Equals(parts[1], expectedRealmId, StringComparison.OrdinalIgnoreCase))
+            {
+                rejectReason = $"Realm mismatch (expected {expectedRealmId}).";
+                return false;
+            }
+            if (parts.Length >= 3 && !string.IsNullOrWhiteSpace(parts[2]))
+                race = parts[2].Trim();
+            return true;
+        }
+
         void ApprovalCheck(NetworkManager.ConnectionApprovalRequest request, NetworkManager.ConnectionApprovalResponse response)
         {
-            if (nm.ConnectedClientsIds.Count >= MaxPlayers)
+            int cap = RealmConfig.GetEffectiveMaxPlayers();
+            if (nm.ConnectedClientsIds.Count >= cap)
             {
                 response.Approved = false;
-                response.Reason = $"Server full ({MaxPlayers}/{MaxPlayers})";
+                response.Reason = $"Server full ({cap}/{cap})";
+                if (CoopSessionConfig.IsDedicatedServer)
+                    RealmServerBootstrap.LogServer($"Rejected clientId={request.ClientNetworkId}: {response.Reason}");
+                return;
+            }
+
+            string spawnRace = "Human";
+            if (CoopSessionConfig.IsRealmSession && !ValidateRealmApprovalPayload(request.Payload, RealmConfig.Current.realmId, out spawnRace, out string rejectReason))
+            {
+                response.Approved = false;
+                response.Reason = rejectReason;
+                if (CoopSessionConfig.IsDedicatedServer)
+                    RealmServerBootstrap.LogServer($"Rejected clientId={request.ClientNetworkId}: {rejectReason}");
                 return;
             }
 
             response.Approved = true;
             response.CreatePlayerObject = true;
-            int slot = nm.ConnectedClientsIds.Count;
-            Vector3 basePos = new Vector3(0f, 1.0f, 10f);
-            var pc = FindFirstObjectByType<PlayerController>();
-            if (pc) basePos = pc.transform.position;
+            int slot = AllocateSpawnSlot(null);
+            Vector3 basePos = GetRealmSpawnAnchor(spawnRace);
             response.Position = RiftboundCoopPlayer.ComputeSpawnPosition(basePos, slot);
             response.Rotation = Quaternion.identity;
             response.Pending = false;
@@ -356,14 +532,21 @@ namespace Riftbound.Network
 
         void OnClientConnected(ulong clientId)
         {
-            if (nm != null && nm.IsServer && clientId != nm.LocalClientId && RiftboundCoopPlayer.LocalOwner != null)
+            if (nm != null && nm.IsServer && clientId != nm.LocalClientId)
             {
-                RiftboundCoopPlayer.LocalOwner.SendWorldSnapshotToClient(clientId);
+                RealmWorldChannel.DispatchWorldSnapshotToClient(clientId);
+                if (CoopSessionConfig.IsDedicatedServer)
+                    RealmServerBootstrap.LogServer($"Client connected: clientId={clientId}, activePlayers={nm.ConnectedClientsIds.Count}/{RealmConfig.GetEffectiveMaxPlayers()}");
             }
-            if (nm != null && clientId == nm.LocalClientId)
+            if (nm != null && !CoopSessionConfig.IsDedicatedServer && clientId == nm.LocalClientId)
             {
                 if (CoopSessionConfig.IsOnlineMode)
                     statusText = nm.IsHost ? $"Online Host ({OnlineSessionService.ActiveJoinCode})" : $"Online Co-op ({OnlineSessionService.ActiveJoinCode})";
+                else if (CoopSessionConfig.IsRealmClient)
+                {
+                    statusText = $"Connected to {RealmConfig.Current.displayName} ({RealmConfig.Current.endpoint}:{RealmConfig.Current.port})";
+                    EmberfordRealmClient.MarkInWorld(CountSpawnedPeers());
+                }
                 else
                     statusText = nm.IsHost ? $"Dev LAN Host :{CoopSessionConfig.Port}" : $"Connected to {CoopSessionConfig.JoinIp}:{CoopSessionConfig.Port}";
             }
@@ -373,13 +556,23 @@ namespace Riftbound.Network
         {
             if (shuttingDown || nm == null) return;
 
+            if (nm.IsServer && CoopSessionConfig.IsDedicatedServer)
+            {
+                RealmServerBootstrap.LogServer($"Client disconnected: clientId={clientId}; world continues running with remaining={Mathf.Max(0, nm.ConnectedClientsIds.Count - 1)}");
+                return;
+            }
+
             if (clientId == nm.LocalClientId && !nm.IsServer)
             {
-                string reason = string.IsNullOrEmpty(nm.DisconnectReason) ? "Host closed the session" : nm.DisconnectReason;
+                string defaultMsg = CoopSessionConfig.IsRealmClient ? $"Lost connection to {RealmConfig.Current.displayName}" : "Host closed the session";
+                string reason = string.IsNullOrEmpty(nm.DisconnectReason) ? defaultMsg : nm.DisconnectReason;
                 CoopSessionConfig.LastDisconnectReason = reason;
                 statusText = $"Disconnected: {reason}";
                 hostDisconnected = true;
-                hostDisconnectMessage = $"{reason}. Host exit ends the session (no host migration).";
+                hostDisconnectMessage = CoopSessionConfig.IsRealmClient
+                    ? $"{reason}. Realm may still be running — return to menu to reconnect."
+                    : $"{reason}. Host exit ends the session (no host migration).";
+                if (CoopSessionConfig.IsRealmClient) EmberfordRealmClient.MarkDisconnectedOrFailed(reason, true);
                 readyCheckOpen = false;
                 groupMenuOpen = false;
                 revealJoinCode = false;
@@ -429,7 +622,7 @@ namespace Riftbound.Network
 
         void OnGUI()
         {
-            if (!CoopSessionConfig.IsMultiplayer || FrontendMenu.IsOpen) return;
+            if (CoopSessionConfig.IsDedicatedServer || !CoopSessionConfig.IsMultiplayer || FrontendMenu.IsOpen) return;
 
             if (CoopSessionConfig.IsOnlineMode && OnlineSessionService.IsBusy)
             {
@@ -445,7 +638,8 @@ namespace Riftbound.Network
 
             if (hostDisconnected)
             {
-                DrawCenteredStatusBox("SESSION ENDED", hostDisconnectMessage, showRetry: false, cancelLabel: "Back to Menu");
+                string title = CoopSessionConfig.IsRealmClient ? "REALM CONNECTION LOST" : "SESSION ENDED";
+                DrawCenteredStatusBox(title, hostDisconnectMessage, showRetry: false, cancelLabel: "Back to Menu");
                 return;
             }
 
@@ -465,6 +659,7 @@ namespace Riftbound.Network
             float uiH = Screen.height / scale;
 
             int count = CountSpawnedPeers();
+            int cap = RealmConfig.GetEffectiveMaxPlayers();
             // Compact group pill placed cleanly left of the Mail/minimap controls; join code stays tucked inside the Group Menu [O]
             float pillW = 144f, pillH = 24f;
             float pillX = Mathf.Max(480f, uiW - 436f), pillY = 20f;
@@ -473,7 +668,7 @@ namespace Riftbound.Network
             GUI.color = new Color(0.66f, 0.55f, 0.33f, 0.85f);
             GUI.DrawTexture(new Rect(pillX, pillY, pillW, 1.5f), Texture2D.whiteTexture);
             GUI.color = Color.white;
-            string pillText = groupMenuOpen ? $"Close Group [{count}/{MaxPlayers}]" : $"Group {count}/{MaxPlayers} [O]";
+            string pillText = groupMenuOpen ? $"Close Group [{count}/{cap}]" : $"Group {count}/{cap} [O]";
             if (GUI.Button(new Rect(pillX + 2f, pillY + 2f, pillW - 4f, pillH - 4f), pillText, rosterHeaderStyle))
             {
                 groupMenuOpen = !groupMenuOpen;
@@ -2193,6 +2388,278 @@ namespace Riftbound.Network
 
             yield return new WaitForSeconds(0.5f);
             Application.Quit(pass ? 0 : 1);
+        }
+
+        IEnumerator RunRealmSmokeRoutine(float timeoutSeconds)
+        {
+            string role = RealmConfig.Runtime.smokeRole;
+            string outPath = RealmConfig.Runtime.smokeOutPath;
+            float start = Time.realtimeSinceStartup;
+            float deadline = start + Mathf.Max(15f, timeoutSeconds);
+
+            void WriteResult(bool ok, string detail)
+            {
+                string line = $"{(ok ? "PASS" : "FAIL")} Realm_{role}: {detail}";
+                Debug.Log(line);
+                System.Console.WriteLine(line);
+                if (!string.IsNullOrEmpty(outPath))
+                {
+                    try
+                    {
+                        string dir = System.IO.Path.GetDirectoryName(outPath);
+                        if (!string.IsNullOrEmpty(dir)) System.IO.Directory.CreateDirectory(dir);
+                        System.IO.File.WriteAllText(outPath, line + "\n");
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.LogWarning($"[RunRealmSmokeRoutine] Failed writing '{outPath}': {ex.Message}");
+                    }
+                }
+            }
+
+            if (role == "server")
+            {
+                while (Time.realtimeSinceStartup < deadline && (nm == null || !nm.IsListening || RealmWorldChannel.Instance == null || !RealmWorldChannel.Instance.IsSpawned))
+                    yield return new WaitForSeconds(0.1f);
+
+                bool serverReady = nm != null && nm.IsServer && nm.IsListening && RealmWorldChannel.Instance != null && RealmWorldChannel.Instance.IsSpawned;
+                bool noHostAvatar = FindFirstObjectByType<PlayerController>() == null &&
+                                    RiftboundCoopPlayer.LocalOwner == null &&
+                                    RiftboundCoopPlayer.AllPlayers.Count == 0 &&
+                                    FindObjectsByType<Camera>(FindObjectsSortMode.None).Length == 0 &&
+                                    !FrontendMenu.IsOpen &&
+                                    RealmServerBootstrap.OfflineSavesSuppressed;
+
+                if (!serverReady || !noHostAvatar)
+                {
+                    WriteResult(false, $"ready={serverReady}, noHostAvatar={noHostAvatar}, localOwner={(RiftboundCoopPlayer.LocalOwner != null)}, frontendOpen={FrontendMenu.IsOpen}");
+                    if (nm != null && nm.IsListening) nm.Shutdown();
+                    Application.Quit(1);
+                    yield break;
+                }
+
+                bool phase1Teleported = false;
+                bool phase2Teleported = false;
+                float twoJoinedAt = -1f;
+                bool sawTwoFirst = false;
+                bool sawDropToOne = false;
+                bool stayedAliveWhenEmptyOrSingle = true;
+                bool sawRejoinTwo = false;
+                bool sawPostRejoinCleanExit = false;
+                uint capActionSeq = 0;
+
+                while (Time.realtimeSinceStartup < deadline)
+                {
+                    int activeCount = RiftboundCoopPlayer.AllPlayers.Count;
+                    var cap = EnemyController.FindByKey("ashwood-captain");
+                    if (cap && cap.LastRemoteActionSeq > capActionSeq) capActionSeq = cap.LastRemoteActionSeq;
+
+                    if (activeCount >= 2)
+                    {
+                        if (!sawTwoFirst)
+                        {
+                            sawTwoFirst = true;
+                            twoJoinedAt = Time.realtimeSinceStartup;
+                        }
+                        if (sawDropToOne) sawRejoinTwo = true;
+
+                        if (!phase1Teleported && cap && Time.realtimeSinceStartup - twoJoinedAt >= 0.75f)
+                        {
+                            phase1Teleported = true;
+                            var p0 = RiftboundCoopPlayer.AllPlayers[0];
+                            var p1 = RiftboundCoopPlayer.AllPlayers[1];
+                            if (p0) p0.AuthorizeHostTeleport(cap.transform.position + new Vector3(-2.6f, 0f, -2.4f));
+                            if (p1) p1.AuthorizeHostTeleport(cap.transform.position + new Vector3(2.6f, 0f, -2.4f));
+                        }
+                    }
+                    else if (sawTwoFirst && activeCount == 1 && !sawRejoinTwo)
+                    {
+                        sawDropToOne = true;
+                        if (!nm.IsListening || nm.ShutdownInProgress) stayedAliveWhenEmptyOrSingle = false;
+                        if (!phase2Teleported)
+                        {
+                            var phase2Raider = EnemyController.FindByKey("road-raider-1");
+                            var survivor = RiftboundCoopPlayer.AllPlayers[0];
+                            if (phase2Raider && survivor)
+                            {
+                                phase2Teleported = true;
+                                survivor.AuthorizeHostTeleport(phase2Raider.transform.position + new Vector3(16f, 0f, 0f));
+                            }
+                        }
+                    }
+                    else if (sawRejoinTwo && activeCount == 0)
+                    {
+                        sawPostRejoinCleanExit = true;
+                        break;
+                    }
+
+                    yield return new WaitForSeconds(0.15f);
+                }
+
+                bool pass = serverReady && noHostAvatar && sawTwoFirst && sawDropToOne && stayedAliveWhenEmptyOrSingle && sawRejoinTwo && sawPostRejoinCleanExit;
+                WriteResult(pass, $"noHostAvatar={noHostAvatar}, saw2={sawTwoFirst}, sawDrop1={sawDropToOne}, stayedAlive={stayedAliveWhenEmptyOrSingle}, sawRejoin2={sawRejoinTwo}, postExit={sawPostRejoinCleanExit}, channel={(RealmWorldChannel.Instance != null)}, offlineProtected={RealmServerBootstrap.OfflineSavesSuppressed}");
+                if (nm != null && nm.IsListening) nm.Shutdown();
+                yield return new WaitForSeconds(0.2f);
+                Application.Quit(pass ? 0 : 1);
+                yield break;
+            }
+
+            // Client smoke roles: c1, c2, c1_rejoin
+            while (Time.realtimeSinceStartup < deadline && (nm == null || !nm.IsConnectedClient || RiftboundCoopPlayer.LocalOwner == null || CountSpawnedPeers() < 2))
+                yield return new WaitForSeconds(0.15f);
+
+            var me = RiftboundCoopPlayer.LocalOwner;
+            var lp = FindFirstObjectByType<PlayerController>();
+            RiftboundCoopPlayer peer = null;
+            foreach (var p in RiftboundCoopPlayer.AllPlayers)
+            {
+                if (p && p.IsSpawned && !p.IsOwner) { peer = p; break; }
+            }
+
+            if (me == null || lp == null || peer == null)
+            {
+                WriteResult(false, $"missingEntities me={(me != null)} lp={(lp != null)} peer={(peer != null)} players={CountSpawnedPeers()}");
+                if (nm != null && nm.IsListening) nm.Shutdown();
+                Application.Quit(1);
+                yield break;
+            }
+
+            var boss = EnemyController.FindByKey("ashwood-captain");
+            var bossStats = boss ? boss.GetComponent<Combatant>() : null;
+            var raider = EnemyController.FindByKey("road-raider-1");
+            var raiderStats = raider ? raider.GetComponent<Combatant>() : null;
+            if (!boss || !bossStats || !raider || !raiderStats)
+            {
+                WriteResult(false, "missing ashwood-captain or road-raider-1");
+                if (nm != null && nm.IsListening) nm.Shutdown();
+                Application.Quit(1);
+                yield break;
+            }
+
+            IEnumerator MoveLocalStep(Vector3 dir, float durationSec, float speedMps)
+            {
+                var cc = lp.GetComponent<CharacterController>();
+                float endAt = Time.realtimeSinceStartup + durationSec;
+                Vector3 norm = dir.sqrMagnitude > 0.001f ? dir.normalized : Vector3.back;
+                while (Time.realtimeSinceStartup < endAt && lp != null)
+                {
+                    Vector3 step = norm * (speedMps * 0.05f);
+                    if (cc)
+                    {
+                        cc.enabled = false;
+                        Vector3 next = lp.transform.position + step;
+                        float gh = WorldRegions.GroundHeight(next);
+                        if (!float.IsNaN(gh) && !float.IsInfinity(gh)) next.y = gh + 0.05f;
+                        lp.transform.position = next;
+                        cc.enabled = true;
+                    }
+                    yield return new WaitForSeconds(0.05f);
+                }
+            }
+
+            if (role == "c1" || role == "c2")
+            {
+                // Wait for Phase-1 server placement near ashwood-captain
+                while (Time.realtimeSinceStartup < deadline && Vector3.Distance(lp.transform.position, boss.transform.position) > 10f)
+                    yield return new WaitForSeconds(0.1f);
+                yield return new WaitForSeconds(0.25f);
+
+                Vector3 peerStart = peer.transform.position;
+                bool peerGroundingOk = HasValidObserverGrounding(peer);
+                Vector3 moveDir = role == "c1" ? new Vector3(-0.35f, 0f, -1f) : new Vector3(0.35f, 0f, -1f);
+                StartCoroutine(MoveLocalStep(moveDir, 0.8f, 4.4f));
+
+                bool sawPeerMove = false;
+                bool sawEnemyAction = false;
+                uint observedSeq = 0;
+                byte observedKind = 0;
+                float phase1End = Mathf.Min(deadline, Time.realtimeSinceStartup + 14f);
+                while (Time.realtimeSinceStartup < phase1End)
+                {
+                    if (!sawPeerMove && peer && Vector3.Distance(peer.transform.position, peerStart) >= 1.8f)
+                        sawPeerMove = true;
+                    if (boss.LastRemoteActionSeq > 0 || boss.ActiveRemoteActionKind != 0)
+                    {
+                        sawEnemyAction = true;
+                        if (boss.LastRemoteActionSeq > observedSeq) observedSeq = boss.LastRemoteActionSeq;
+                        if (boss.ActiveRemoteActionKind != 0) observedKind = boss.ActiveRemoteActionKind;
+                    }
+                    if (sawPeerMove && sawEnemyAction) break;
+                    yield return new WaitForSeconds(0.05f);
+                }
+
+                if (role == "c1")
+                {
+                    yield return new WaitForSeconds(0.9f); // let c2 also finish observing c1 movement & enemy action
+                    bool pass = peerGroundingOk && sawPeerMove && sawEnemyAction;
+                    WriteResult(pass, $"peerGv={peerGroundingOk}, sawPeerMove={sawPeerMove}, sawEnemyAction={sawEnemyAction}(seq={observedSeq},kind={observedKind})");
+                    if (nm != null && nm.IsListening) nm.Shutdown();
+                    yield return new WaitForSeconds(0.2f);
+                    Application.Quit(pass ? 0 : 1);
+                    yield break;
+                }
+                else
+                {
+                    // c2 waits for c1 to disconnect and server to relocate c2 near idle road-raider-1 (16m), keeps playing alone, damages raider, moves, then observes c1_rejoin
+                    while (Time.realtimeSinceStartup < deadline && (CountSpawnedPeers() > 1 || Vector3.Distance(lp.transform.position, raider.transform.position) > 25f))
+                        yield return new WaitForSeconds(0.15f);
+                    yield return new WaitForSeconds(0.25f);
+                    bool sawDropToOne = CountSpawnedPeers() == 1 && nm != null && nm.IsConnectedClient;
+
+                    float hpBeforeSoloHit = raiderStats.Health;
+                    string ab = me.ClassName.Value.ToString() == "Mage" ? "fireball" : "melee";
+                    me.RequestAbilityAttack(raiderStats, ab);
+                    float waitHit = Time.realtimeSinceStartup;
+                    while (Time.realtimeSinceStartup - waitHit < 3.5f && raiderStats.Health >= hpBeforeSoloHit)
+                        yield return new WaitForSeconds(0.05f);
+                    bool soloCombatOk = raiderStats.Health < hpBeforeSoloHit;
+
+                    Vector3 soloPosBefore = lp.transform.position;
+                    yield return StartCoroutine(MoveLocalStep(new Vector3(0f, 0f, 1f), 0.7f, 4.4f));
+                    bool soloMoveOk = Vector3.Distance(lp.transform.position, soloPosBefore) >= 1.8f;
+
+                    while (Time.realtimeSinceStartup < deadline && CountSpawnedPeers() < 2)
+                        yield return new WaitForSeconds(0.15f);
+                    yield return new WaitForSeconds(0.4f);
+
+                    RiftboundCoopPlayer rejoinPeer = null;
+                    foreach (var p in RiftboundCoopPlayer.AllPlayers)
+                        if (p && p.IsSpawned && !p.IsOwner) { rejoinPeer = p; break; }
+                    bool sawRejoin = CountSpawnedPeers() >= 2 && rejoinPeer != null && HasValidObserverGrounding(rejoinPeer);
+
+                    yield return new WaitForSeconds(0.8f); // allow c1_rejoin to confirm snapshot + peer presence before exiting
+                    bool pass = peerGroundingOk && sawPeerMove && sawEnemyAction && sawDropToOne && soloCombatOk && soloMoveOk && sawRejoin;
+                    WriteResult(pass, $"peerGv={peerGroundingOk}, sawPeerMove={sawPeerMove}, sawEnemyAction={sawEnemyAction}(seq={observedSeq},kind={observedKind}), drop1={sawDropToOne}, soloCombat={soloCombatOk}(raiderHp={raiderStats.Health:F0}/{raiderStats.maxHealth:F0}), soloMove={soloMoveOk}, sawRejoin={sawRejoin}");
+                    if (nm != null && nm.IsListening) nm.Shutdown();
+                    yield return new WaitForSeconds(0.2f);
+                    Application.Quit(pass ? 0 : 1);
+                    yield break;
+                }
+            }
+            else if (role == "c1_rejoin")
+            {
+                bool peerGroundingOk = false;
+                bool worldSnapshotOk = false;
+                float waitSnap = Time.realtimeSinceStartup;
+                while (Time.realtimeSinceStartup - waitSnap < 10f)
+                {
+                    peerGroundingOk = HasValidObserverGrounding(peer);
+                    if (raiderStats.Health < raiderStats.maxHealth) worldSnapshotOk = true;
+                    if (peerGroundingOk && worldSnapshotOk) break;
+                    yield return new WaitForSeconds(0.15f);
+                }
+
+                bool pass = CountSpawnedPeers() >= 2 && peerGroundingOk && worldSnapshotOk;
+                WriteResult(pass, $"players={CountSpawnedPeers()}, peerGv={peerGroundingOk}, snapshotDamagedRaider={worldSnapshotOk}(raiderHp={raiderStats.Health:F0}/{raiderStats.maxHealth:F0})");
+                if (nm != null && nm.IsListening) nm.Shutdown();
+                yield return new WaitForSeconds(0.2f);
+                Application.Quit(pass ? 0 : 1);
+                yield break;
+            }
+
+            WriteResult(false, $"Unknown smokeRole '{role}'");
+            if (nm != null && nm.IsListening) nm.Shutdown();
+            Application.Quit(1);
         }
 
         static bool HasValidObserverGrounding(RiftboundCoopPlayer p) =>

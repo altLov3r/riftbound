@@ -33,6 +33,7 @@ namespace Riftbound
 
         public static void Spawn(Vector3 worldPos, string text, Color color, bool isCrit = false)
         {
+            if (Network.CoopSessionConfig.IsDedicatedServer) return;
             if (!Instance)
             {
                 var go = new GameObject("CombatTextManager");

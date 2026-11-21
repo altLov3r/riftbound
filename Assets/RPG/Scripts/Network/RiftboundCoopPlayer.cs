@@ -134,15 +134,14 @@ namespace Riftbound.Network
 
             if (IsServer)
             {
-                SpawnSlot.Value = OwnerClientId == NetworkManager.ServerClientId ? 0 : AllPlayers.Count - 1;
-                IsLeader.Value = OwnerClientId == NetworkManager.ServerClientId;
+                SpawnSlot.Value = CoopWorldManager.AllocateSpawnSlot(this);
+                IsLeader.Value = !CoopSessionConfig.IsDedicatedServer && OwnerClientId == NetworkManager.ServerClientId;
                 MaxHealth.Value = 100;
                 Health.Value = 100;
                 Level.Value = 1;
-                if (OwnerClientId != NetworkManager.ServerClientId && transform.position.sqrMagnitude < 0.1f)
+                if ((CoopSessionConfig.IsDedicatedServer || OwnerClientId != NetworkManager.ServerClientId) && transform.position.sqrMagnitude < 0.1f)
                 {
-                    var lp = FindFirstObjectByType<PlayerController>();
-                    Vector3 basePos = lp ? lp.transform.position : new Vector3(0f, 1f, 10f);
+                    Vector3 basePos = CoopWorldManager.GetRealmSpawnAnchor("Human");
                     Vector3 slotPos = ComputeSpawnPosition(basePos, SpawnSlot.Value);
                     AuthorizeHostTeleport(slotPos);
                 }
@@ -228,13 +227,27 @@ namespace Riftbound.Network
 
         void BindToLocalPlayer()
         {
+            if (CoopSessionConfig.IsDedicatedServer) return;
             localPlayer = FindFirstObjectByType<PlayerController>();
             if (!localPlayer) return;
+
+            if (CoopSessionConfig.IsRealmClient)
+            {
+                var rt = RealmConfig.Runtime;
+                if (!string.IsNullOrWhiteSpace(rt.clientCharName))
+                {
+                    localPlayer.CharacterName = rt.clientCharName;
+                    if (localPlayer.Stats) localPlayer.Stats.displayName = rt.clientCharName;
+                }
+                if (!string.IsNullOrWhiteSpace(rt.clientRace)) localPlayer.CharacterRace = rt.clientRace;
+                if (!string.IsNullOrWhiteSpace(rt.clientClass)) localPlayer.CharacterClass = rt.clientClass;
+                if (!string.IsNullOrWhiteSpace(rt.clientFaction)) localPlayer.CharacterFaction = rt.clientFaction;
+            }
 
             if (!spawnPositioned)
             {
                 spawnPositioned = true;
-                if (OwnerClientId != NetworkManager.ServerClientId)
+                if (CoopSessionConfig.IsRealmClient || OwnerClientId != NetworkManager.ServerClientId)
                 {
                     var cc = localPlayer.GetComponent<CharacterController>();
                     if (cc) cc.enabled = false;
@@ -1042,6 +1055,11 @@ namespace Riftbound.Network
 
         public void BroadcastVisualEnemyProjectile(Vector3 origin, Vector3 direction)
         {
+            if (RealmWorldChannel.Instance && RealmWorldChannel.Instance.IsSpawned && RealmWorldChannel.Instance.IsServer)
+            {
+                RealmWorldChannel.DispatchVisualEnemyProjectile(origin, direction);
+                return;
+            }
             var hostChannel = ResolveCanonicalHostChannel(this);
             if (!hostChannel) return;
             hostChannel.BroadcastVisualEnemyProjectileClientRpc(origin, direction);
@@ -1058,6 +1076,11 @@ namespace Riftbound.Network
         public void BroadcastEnemyState(EnemyController enemy)
         {
             if (!enemy) return;
+            if (RealmWorldChannel.Instance && RealmWorldChannel.Instance.IsSpawned && RealmWorldChannel.Instance.IsServer)
+            {
+                RealmWorldChannel.DispatchEnemyState(enemy);
+                return;
+            }
             var hostChannel = ResolveCanonicalHostChannel(this);
             if (!hostChannel) return;
             var c = enemy.GetComponent<Combatant>();
@@ -1068,6 +1091,11 @@ namespace Riftbound.Network
         public void BroadcastEnemyAction(EnemyController enemy, byte actionKind, float duration, Vector3 origin, string spellName, string icon, uint actionSeq, float castDuration = -1f)
         {
             if (!enemy) return;
+            if (RealmWorldChannel.Instance && RealmWorldChannel.Instance.IsSpawned && RealmWorldChannel.Instance.IsServer)
+            {
+                RealmWorldChannel.DispatchEnemyAction(enemy, actionKind, duration, origin, spellName, icon, actionSeq, castDuration);
+                return;
+            }
             var hostChannel = ResolveCanonicalHostChannel(this);
             if (!hostChannel) return;
             hostChannel.BroadcastEnemyActionClientRpc(enemy.NetworkKey ?? "", actionKind, Mathf.Clamp(duration, 0f, 3.5f), origin, spellName ?? "", icon ?? "", actionSeq, castDuration);
@@ -1161,9 +1189,7 @@ namespace Riftbound.Network
             lastServerRespawnTime = Time.time;
             if (Health.Value <= 0)
                 Health.Value = MaxHealth.Value;
-            Vector3 baseSpawn = new Vector3(0f, 1f, 10f);
-            var lp = FindFirstObjectByType<PlayerController>();
-            if (lp) baseSpawn = lp.GetRacialSpawnPosition();
+            Vector3 baseSpawn = CoopWorldManager.GetRealmSpawnAnchor(Race.Value.ToString());
             Vector3 slotSpawn = ComputeSpawnPosition(baseSpawn, SpawnSlot.Value);
             AuthorizeHostTeleport(slotSpawn);
             if (IsOwner && localPlayer)
@@ -1571,8 +1597,16 @@ namespace Riftbound.Network
 
         // ── O-01 Shared World Events & Late-Join Snapshot ───────────────────────────────
 
+        internal static uint ActiveReadyCheckSeq => activeGlobalReadyCheckSeq;
+        internal void SetServerReadyCheckSeqForChannel(uint checkId) => serverReadyCheckSeq = checkId;
+
         public void SendWorldSnapshotToClient(ulong clientId)
         {
+            if (RealmWorldChannel.Instance && RealmWorldChannel.Instance.IsSpawned && RealmWorldChannel.Instance.IsServer)
+            {
+                RealmWorldChannel.DispatchWorldSnapshotToClient(clientId);
+                return;
+            }
             var hostChannel = ResolveCanonicalHostChannel(this);
             if (!hostChannel) return;
             var rpcParams = hostChannel.RpcTarget.Single(clientId, RpcTargetUse.Temp);
@@ -1820,7 +1854,7 @@ namespace Riftbound.Network
 
         void OnGUI()
         {
-            if (!IsSpawned || IsOwner || FrontendMenu.IsOpen) return;
+            if (CoopSessionConfig.IsDedicatedServer || !IsSpawned || IsOwner || FrontendMenu.IsOpen) return;
             var cam = Camera.main;
             if (!cam) return;
 

@@ -10,7 +10,9 @@ namespace Riftbound.Network
         JoinOnline = 2,
         // Dev-only localhost/LAN fallback (hidden from release UI)
         HostLan = 3,
-        JoinLan = 4
+        JoinLan = 4,
+        DedicatedServer = 5,
+        RealmClient = 6
     }
 
     public static class CoopSessionConfig
@@ -42,6 +44,35 @@ namespace Riftbound.Network
         public static bool IsMultiplayer => Mode != CoopSessionMode.Offline;
         public static bool IsOnlineMode => Mode == CoopSessionMode.HostOnline || Mode == CoopSessionMode.JoinOnline;
         public static bool IsLanDevMode => Mode == CoopSessionMode.HostLan || Mode == CoopSessionMode.JoinLan;
+        public static bool IsDedicatedServer => Mode == CoopSessionMode.DedicatedServer;
+        public static bool IsRealmClient => Mode == CoopSessionMode.RealmClient;
+        public static bool IsRealmSession => Mode == CoopSessionMode.DedicatedServer || Mode == CoopSessionMode.RealmClient;
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        static void ResetStatics()
+        {
+            Mode = CoopSessionMode.Offline;
+            JoinCode = string.Empty;
+            JoinIp = "127.0.0.1";
+            Port = 7777;
+            UgsProfile = string.Empty;
+            LastDisconnectReason = string.Empty;
+            AutoSmokeExitSeconds = 0f;
+            CombatSmoke = false;
+            InvalidCodeSmoke = false;
+            ProgressionSmoke = false;
+            LateJoinSmoke = false;
+            ResilienceSmoke = false;
+            ClientLeaveSmoke = false;
+            FullAcceptanceSmoke = false;
+            UiSmoke = false;
+            AuthoritySmoke = false;
+            VisualSmoke = false;
+            CombatVisualSmoke = false;
+            CaptureDir = string.Empty;
+            ExpectedMinPlayers = 2;
+            CliParsed = false;
+        }
 
         public static void ResetToOffline()
         {
@@ -53,11 +84,24 @@ namespace Riftbound.Network
         {
             if (CliParsed) return;
             CliParsed = true;
+            RealmConfig.LoadOnce();
+
+#if UNITY_SERVER
+            Mode = CoopSessionMode.DedicatedServer;
+#endif
 
             string[] args = Environment.GetCommandLineArgs();
             for (int i = 0; i < args.Length; i++)
             {
-                if (args[i] == "-coopOnlineHost")
+                if (args[i] == "-dedicatedServer")
+                {
+                    Mode = CoopSessionMode.DedicatedServer;
+                }
+                else if (args[i] == "-realmClient")
+                {
+                    Mode = CoopSessionMode.RealmClient;
+                }
+                else if (args[i] == "-coopOnlineHost")
                 {
                     Mode = CoopSessionMode.HostOnline;
                 }
@@ -153,6 +197,11 @@ namespace Riftbound.Network
                     ExpectedMinPlayers = Mathf.Clamp(mp, 1, 4);
                     i++;
                 }
+            }
+
+            if (RealmConfig.Runtime.smokeSeconds > 0f && AutoSmokeExitSeconds <= 0f)
+            {
+                AutoSmokeExitSeconds = RealmConfig.Runtime.smokeSeconds;
             }
         }
     }

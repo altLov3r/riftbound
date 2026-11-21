@@ -30,8 +30,8 @@ namespace Riftbound
             bolt.remoteClientId = targetClientId;
             bolt.sourceEnemyKey = enemyKey;
             bolt.authoritativeRemote = true;
-            if (Network.RiftboundCoopPlayer.LocalOwner != null && Unity.Netcode.NetworkManager.Singleton && Unity.Netcode.NetworkManager.Singleton.IsServer)
-                Network.RiftboundCoopPlayer.LocalOwner.BroadcastVisualEnemyProjectile(origin, aim.normalized);
+            if (Unity.Netcode.NetworkManager.Singleton && Unity.Netcode.NetworkManager.Singleton.IsServer)
+                Network.RealmWorldChannel.DispatchVisualEnemyProjectile(origin, aim.normalized);
         }
 
         public static void LaunchVisualOnly(Vector3 origin, Vector3 normalizedDirection)
@@ -53,23 +53,34 @@ namespace Riftbound
             go.transform.position = origin + bolt.direction * .8f;
             go.transform.localScale = Vector3.one * .3f;
             bolt.expires = Time.time + 3;
-            bolt.material = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
-            bolt.material.SetColor("_BaseColor", new Color(.8f, .25f, 1));
-            go.GetComponent<Renderer>().sharedMaterial = bolt.material;
+            if (!Network.CoopSessionConfig.IsDedicatedServer)
+            {
+                var unlit = Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Unlit/Color");
+                if (unlit)
+                {
+                    bolt.material = new Material(unlit);
+                    bolt.material.SetColor("_BaseColor", new Color(.8f, .25f, 1));
+                    go.GetComponent<Renderer>().sharedMaterial = bolt.material;
+                }
 
-            var trail = go.AddComponent<TrailRenderer>();
-            trail.time = 0.24f;
-            trail.startWidth = 0.22f;
-            trail.endWidth = 0.02f;
-            trail.sharedMaterial = new Material(Shader.Find("Sprites/Default"));
-            trail.startColor = new Color(0.85f, 0.3f, 1f, 0.9f);
-            trail.endColor = new Color(0.4f, 0.08f, 0.65f, 0f);
+                var trailShader = Shader.Find("Sprites/Default");
+                if (trailShader)
+                {
+                    var trail = go.AddComponent<TrailRenderer>();
+                    trail.time = 0.24f;
+                    trail.startWidth = 0.22f;
+                    trail.endWidth = 0.02f;
+                    trail.sharedMaterial = new Material(trailShader);
+                    trail.startColor = new Color(0.85f, 0.3f, 1f, 0.9f);
+                    trail.endColor = new Color(0.4f, 0.08f, 0.65f, 0f);
+                }
 
-            var light = go.AddComponent<Light>();
-            light.type = LightType.Point;
-            light.color = new Color(0.75f, 0.25f, 1f);
-            light.range = 4f;
-            light.intensity = 1.8f;
+                var light = go.AddComponent<Light>();
+                light.type = LightType.Point;
+                light.color = new Color(0.75f, 0.25f, 1f);
+                light.range = 4f;
+                light.intensity = 1.8f;
+            }
             return bolt;
         }
 
