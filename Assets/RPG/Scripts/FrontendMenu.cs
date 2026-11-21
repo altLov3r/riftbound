@@ -1140,7 +1140,7 @@ namespace Riftbound
             GUI.Label(new Rect(60, 155, 540, 340),
                 "MOVEMENT & CAMERA:\n" +
                 (SettingsSystem.ClassicMovement
-                    ? "  W / S                Move with character facing\n  A / D                 Turn (RMB + A/D/Q Strafe)\n"
+                    ? "  W / S                Move with character facing\n  A / D                 Turn with camera (RMB + A/D/Q Strafe)\n"
                     : "  W / A / S / D       Move with camera facing (A/D strafe)\n") +
                 "  /  (Numpad /)      Toggle slow RP walk (Default: Run)\n" +
                 "  SPACE               Jump (or Ascend while on Flying Mount)\n" +

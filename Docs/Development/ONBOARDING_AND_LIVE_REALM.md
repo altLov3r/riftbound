@@ -7,7 +7,7 @@ Base is `development/emberford` at `3b95c4f`. Keep the existing offline campaign
 | Input | Modern (default) | Classic |
 | --- | --- | --- |
 | W / S on foot | Move relative to the camera, with backpedaling on S | Move forward or back relative to the character |
-| A / D on foot | Strafe relative to the camera | Turn the character |
+| A / D on foot | Strafe relative to the camera | Turn the character and camera during keyboard steering |
 | Hold RMB | Steer with the camera and strafe with A / D | Steer with the camera and strafe with A / D |
 | Hold LMB | Orbit the camera | Orbit without changing movement heading |
 | Hold both mouse buttons | Move forward while steering | Move forward while steering |

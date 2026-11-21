@@ -12,7 +12,7 @@ New offline characters can choose **Learn the basics** when they enter the world
 
 ## Travel
 
-Running is the normal movement mode. Slash or numpad divide toggles slow walking. In **Modern**, W/A/S/D move with the camera and A/D strafe on foot. In **Classic**, W/S move with the character's heading and A/D turn. Choose a preset in title Settings or **Esc → Interface Options**. In both presets, hold right mouse to steer and strafe, both mouse buttons to move forward, or left mouse alone to orbit. A/D turn while mounted unless steering with right mouse. C opens the character sheet.
+Running is the normal movement mode. Slash or numpad divide toggles slow walking. In **Modern**, W/A/S/D move with the camera and A/D strafe on foot. In **Classic**, W/S move with the character's heading, and A/D turn both the character and camera on foot. Hold left mouse to orbit independently. Choose a preset in title Settings or **Esc → Interface Options**. In both presets, hold right mouse to steer and strafe or both mouse buttons to move forward. A/D turn while mounted unless steering with right mouse. C opens the character sheet.
 
 Space jumps, with a short grace period at ledges and a brief input buffer just before landing. Holding Space does not repeatedly jump. Menus and interrupted actions clear pending jump input. Ground travel stays level after dismounting a flying mount.
 

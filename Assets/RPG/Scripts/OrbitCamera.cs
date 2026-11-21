@@ -13,10 +13,16 @@ namespace Riftbound
         public bool Paused { get; private set; }
         public float Yaw => yaw;
         public float Pitch => pitch;
+        internal Quaternion ViewRotation => Quaternion.Euler(pitch, yaw, 0f);
         public void FaceTravel(float heading) { yaw = heading; pitch = 18f; }
         public bool IsSteering { get; private set; }
         public bool IsFreeLooking { get; private set; }
         public bool BothMouseButtonsPressed { get; private set; }
+        internal void FollowKeyboardTurn(float degrees)
+        {
+            if (!IsFreeLooking && !IsSteering && !Paused)
+                yaw += degrees;
+        }
         PlayerController player;
         static OrbitCamera activeInstance;
         float shakeIntensity, shakeRemaining, shakeDuration;
@@ -121,7 +127,7 @@ namespace Riftbound
         {
             RefreshInput();
             if (!target || FrontendMenu.IsOpen) return;
-            var rotation = Quaternion.Euler(pitch, yaw, 0);
+            var rotation = ViewRotation;
             float targetHeight = player ? (player.Mounted ? 2.4f : player.EyeHeight) : 1.6f;
             viewHeight = Mathf.Lerp(viewHeight, targetHeight, 1 - Mathf.Exp(-6 * Time.deltaTime));
             var pivot = target.position + Vector3.up * viewHeight;

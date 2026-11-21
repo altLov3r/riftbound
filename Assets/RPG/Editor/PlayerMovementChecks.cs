@@ -205,39 +205,90 @@ namespace Riftbound.Editor
             var preset = typeof(SettingsSystem).GetProperty(nameof(SettingsSystem.ClassicMovement));
             bool originalPreset = SettingsSystem.ClassicMovement;
             float originalYaw = camera.Yaw;
+            float originalPitch = camera.Pitch;
             try
             {
                 preset.SetValue(null, false);
                 Check("modern_a_strafes", MoveWithPreset(UnityEngine.InputSystem.Key.A, 0).x < -.005f);
                 Check("modern_w_follows_camera_heading", MoveWithPreset(UnityEngine.InputSystem.Key.W, 90).x > .005f);
+                MoveWithPreset(UnityEngine.InputSystem.Key.A, 0, extraKey: UnityEngine.InputSystem.Key.RightArrow);
+                Check("modern_explicit_turn_wins_over_strafe_facing", Mathf.DeltaAngle(0, player.transform.eulerAngles.y) > 2f);
+                var steered = MoveWithPreset(UnityEngine.InputSystem.Key.W, 0, 2, new Vector2(410f, 0));
+                Check("ground_rmb_uses_current_input_before_camera_render", steered.x > .005f &&
+                    Mathf.Abs(steered.z) < .001f && camera.transform.forward.z > .99f);
 
                 preset.SetValue(null, true);
                 var turn = MoveWithPreset(UnityEngine.InputSystem.Key.A, 0);
                 Check("classic_a_turns_without_strafing", turn.sqrMagnitude < .0001f &&
                     Mathf.DeltaAngle(0, player.transform.eulerAngles.y) < -2f);
+                Check("classic_keyboard_turn_carries_camera_yaw",
+                    Mathf.Abs(Mathf.DeltaAngle(camera.Yaw, player.transform.eulerAngles.y)) < .01f &&
+                    Mathf.Approximately(camera.Pitch, originalPitch));
                 var forward = MoveWithPreset(UnityEngine.InputSystem.Key.W, 90);
                 Check("classic_w_keeps_character_heading", forward.z > .005f && Mathf.Abs(forward.x) < .001f);
-                Check("classic_rmb_a_strafes", MoveWithPreset(UnityEngine.InputSystem.Key.A, 0, true).x < -.005f);
+                Check("classic_rmb_a_strafes", MoveWithPreset(UnityEngine.InputSystem.Key.A, 0, 2).x < -.005f);
+                MoveWithPreset(UnityEngine.InputSystem.Key.D, 90, 1);
+                Check("classic_free_look_keeps_independent_heading", Mathf.Approximately(camera.Yaw, 90f) &&
+                    Mathf.DeltaAngle(0, player.transform.eulerAngles.y) > 2f);
+                player.MapOpen = true;
+                MoveWithPreset(UnityEngine.InputSystem.Key.D, 45);
+                player.MapOpen = false;
+                Check("classic_modal_does_not_turn_camera_or_actor", Mathf.Approximately(camera.Yaw, 45f) &&
+                    Quaternion.Angle(Quaternion.identity, player.transform.rotation) < .01f);
+
+                CheckFlightSteering();
             }
             finally
             {
                 preset.SetValue(null, originalPreset);
                 Set(camera, "yaw", originalYaw);
+                Set(camera, "pitch", originalPitch);
                 camera.transform.rotation = Quaternion.identity;
                 Set(camera, "inputFrame", -1);
                 Set(player, "moveVelocity", Vector3.zero);
             }
         }
 
-        static Vector3 MoveWithPreset(UnityEngine.InputSystem.Key key, float yaw, bool steering = false)
+        static void CheckFlightSteering()
+        {
+            var originalMounts = player.mounts;
+            var definition = ScriptableObject.CreateInstance<MountDefinition>();
+            definition.mountId = "horse";
+            definition.isFlying = true;
+            var mount = new GameObject("Disposable flight fixture").AddComponent<MountVisual>();
+            mount.transform.SetParent(player.transform, false);
+            try
+            {
+                player.mounts = new[] { definition };
+                Set(player, "mountInstance", mount);
+                MoveWithPreset(UnityEngine.InputSystem.Key.W, 0, 2, new Vector2(410f, 300f));
+                var velocity = Get<Vector3>(player, "moveVelocity");
+                var expected = (Quaternion.Euler(camera.Pitch, camera.Yaw, 0f) * Vector3.forward) * definition.flySpeed;
+                Check("flight_rmb_uses_current_yaw_and_pitch_before_camera_render",
+                    velocity.x > 9f && velocity.y > 3f && Vector3.Distance(velocity, expected) < .02f &&
+                    camera.transform.forward.z > .99f);
+                Check("flight_keeps_separate_mount_banking", player.transform.forward.y < -.1f);
+            }
+            finally
+            {
+                Set(player, "mountInstance", null);
+                player.mounts = originalMounts;
+                Object.Destroy(mount.gameObject);
+                Object.Destroy(definition);
+            }
+        }
+
+        static Vector3 MoveWithPreset(UnityEngine.InputSystem.Key key, float yaw, ushort mouseButtons = 0,
+            Vector2 mouseDelta = default, UnityEngine.InputSystem.Key extraKey = UnityEngine.InputSystem.Key.None)
         {
             Settle();
             Set(player, "moveVelocity", Vector3.zero);
             Set(camera, "yaw", yaw);
             camera.transform.rotation = Quaternion.Euler(0, yaw, 0);
             Set(camera, "inputFrame", -1);
-            InputSystem.QueueStateEvent(mouse, new MouseState { buttons = (ushort)(steering ? 2 : 0) });
-            InputSystem.QueueStateEvent(keyboard, new KeyboardState(key));
+            InputSystem.QueueStateEvent(mouse, new MouseState { buttons = mouseButtons, delta = mouseDelta });
+            InputSystem.QueueStateEvent(keyboard, extraKey == UnityEngine.InputSystem.Key.None
+                ? new KeyboardState(key) : new KeyboardState(key, extraKey));
             InputSystem.Update();
             var start = player.transform.position;
             Invoke(player, "Update");

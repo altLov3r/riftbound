@@ -329,13 +329,13 @@ namespace Riftbound
             bool leftInput = keys.aKey.isPressed || keys.leftArrowKey.isPressed || (rightMouseSteering && qPressed);
             bool rightInput = keys.dKey.isPressed || keys.rightArrowKey.isPressed;
 
-            bool modernOnFoot = !Mounted && !SettingsSystem.ClassicMovement;
+            bool classicOnFoot = !Mounted && SettingsSystem.ClassicMovement;
+            bool modernOnFoot = !Mounted && !classicOnFoot;
             bool turnLeft = keys.leftArrowKey.isPressed || (!modernOnFoot && leftInput);
             bool turnRight = keys.rightArrowKey.isPressed || (!modernOnFoot && rightInput);
             bool strafeLeft = (modernOnFoot && keys.aKey.isPressed) || (rightMouseSteering && leftInput);
             bool strafeRight = (modernOnFoot && keys.dKey.isPressed) || (rightMouseSteering && rightInput);
 
-            // In WoW: Right-mouse turns the character directly to camera heading
             if (rightMouseSteering)
             {
                 if (isFlyingMount)
@@ -346,14 +346,18 @@ namespace Riftbound
                 }
                 else
                 {
-                    var camForward = orbit.transform.forward; camForward.y = 0;
-                    if (camForward.sqrMagnitude > .001f) transform.rotation = Quaternion.LookRotation(camForward);
+                    // Use the input yaw. The camera transform is still at its previous frame's pose.
+                    transform.rotation = Quaternion.Euler(0f, orbit.Yaw, 0f);
                 }
             }
             else
             {
-                if (turnLeft && !turnRight) transform.Rotate(0, -220f * Time.deltaTime, 0);
-                else if (turnRight && !turnLeft) transform.Rotate(0, 220f * Time.deltaTime, 0);
+                if (turnLeft != turnRight)
+                {
+                    float turn = (turnLeft ? -220f : 220f) * Time.deltaTime;
+                    transform.Rotate(0f, turn, 0f);
+                    if (classicOnFoot && orbit && !AnyBlockingWindowOpen()) orbit.FollowKeyboardTurn(turn);
+                }
                 if (isFlyingMount && transform.eulerAngles.x != 0)
                 {
                     // Level out pitch smoothly when not right-mouse steering
@@ -366,11 +370,13 @@ namespace Riftbound
             Vector3 moveDirection = Vector3.zero;
             if (isFlyingMount && rightMouseSteering)
             {
-                // Full 3D Flight Vector in direction of camera gaze
-                if (forwardInput) moveDirection += orbit.transform.forward;
-                if (backInput) moveDirection -= orbit.transform.forward;
-                if (leftInput) moveDirection -= orbit.transform.right;
-                if (rightInput) moveDirection += orbit.transform.right;
+                var view = orbit.ViewRotation;
+                Vector3 forward = view * Vector3.forward;
+                Vector3 right = view * Vector3.right;
+                if (forwardInput) moveDirection += forward;
+                if (backInput) moveDirection -= forward;
+                if (leftInput) moveDirection -= right;
+                if (rightInput) moveDirection += right;
             }
             else
             {
@@ -427,7 +433,8 @@ namespace Riftbound
             bool dodging = Time.time < dodgeEnds;
             // Combat recovery gates the next ability, while guard still holds the player in place.
             var desiredVelocity = Blocking ? Vector3.zero : moveDirection * speed;
-            if (modernOnFoot && !actionInProgress && !Blocking && !dodging && !rightMouseSteering && moveDirection.sqrMagnitude > .01f)
+            if (modernOnFoot && !actionInProgress && !Blocking && !dodging && !rightMouseSteering &&
+                !turnLeft && !turnRight && moveDirection.sqrMagnitude > .01f)
             {
                 var facing = isBackpedaling ? -moveDirection : moveDirection;
                 transform.rotation = Quaternion.RotateTowards(transform.rotation, Quaternion.LookRotation(facing), 680f * Time.deltaTime);
