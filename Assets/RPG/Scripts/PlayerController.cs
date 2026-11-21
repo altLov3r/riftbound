@@ -329,8 +329,11 @@ namespace Riftbound
             bool leftInput = keys.aKey.isPressed || keys.leftArrowKey.isPressed || (rightMouseSteering && qPressed);
             bool rightInput = keys.dKey.isPressed || keys.rightArrowKey.isPressed;
 
-            bool turnLeft = keys.leftArrowKey.isPressed || (Mounted && leftInput);
-            bool turnRight = keys.rightArrowKey.isPressed || (Mounted && rightInput);
+            bool modernOnFoot = !Mounted && !SettingsSystem.ClassicMovement;
+            bool turnLeft = keys.leftArrowKey.isPressed || (!modernOnFoot && leftInput);
+            bool turnRight = keys.rightArrowKey.isPressed || (!modernOnFoot && rightInput);
+            bool strafeLeft = (modernOnFoot && keys.aKey.isPressed) || (rightMouseSteering && leftInput);
+            bool strafeRight = (modernOnFoot && keys.dKey.isPressed) || (rightMouseSteering && rightInput);
 
             // In WoW: Right-mouse turns the character directly to camera heading
             if (rightMouseSteering)
@@ -373,22 +376,21 @@ namespace Riftbound
             {
                 Vector3 forward = Vector3.ProjectOnPlane(transform.forward, Vector3.up).normalized;
                 Vector3 right = Vector3.Cross(Vector3.up, forward);
-                if (!Mounted && orbit && !rightMouseSteering && !turnLeft && !turnRight)
+                if (modernOnFoot && orbit && !rightMouseSteering && !turnLeft && !turnRight)
                 {
                     forward = Quaternion.Euler(0f, orbit.Yaw, 0f) * Vector3.forward;
                     right = Vector3.Cross(Vector3.up, forward);
                 }
                 if (forwardInput) moveDirection += forward;
                 if (backInput) moveDirection -= forward;
-                if ((!Mounted && keys.aKey.isPressed) || (rightMouseSteering && leftInput)) moveDirection -= right;
-                if ((!Mounted && keys.dKey.isPressed) || (rightMouseSteering && rightInput)) moveDirection += right;
+                if (strafeLeft) moveDirection -= right;
+                if (strafeRight) moveDirection += right;
             }
 
             if (moveDirection.sqrMagnitude > 1f) moveDirection.Normalize();
 
             bool isBackpedaling = backInput && !forwardInput;
-            bool diagonalBackpedal = isBackpedaling && (keys.aKey.isPressed || keys.dKey.isPressed ||
-                (rightMouseSteering && (leftInput || rightInput)));
+            bool diagonalBackpedal = isBackpedaling && (strafeLeft || strafeRight);
             float speed = Mounted && SelectedMount ? (running ? SelectedMount.runSpeed : SelectedMount.walkSpeed) : running ? runSpeed : walkSpeed;
             if (CharacterRace == "Human") speed *= 1.10f;
             if (Time.time < sprintUntil) speed *= 1.65f;
@@ -425,7 +427,7 @@ namespace Riftbound
             bool dodging = Time.time < dodgeEnds;
             // Combat recovery gates the next ability, while guard still holds the player in place.
             var desiredVelocity = Blocking ? Vector3.zero : moveDirection * speed;
-            if (!Mounted && !actionInProgress && !Blocking && !dodging && !rightMouseSteering && moveDirection.sqrMagnitude > .01f)
+            if (modernOnFoot && !actionInProgress && !Blocking && !dodging && !rightMouseSteering && moveDirection.sqrMagnitude > .01f)
             {
                 var facing = isBackpedaling ? -moveDirection : moveDirection;
                 transform.rotation = Quaternion.RotateTowards(transform.rotation, Quaternion.LookRotation(facing), 680f * Time.deltaTime);

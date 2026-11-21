@@ -8,6 +8,26 @@ namespace Riftbound
     {
         public static SettingsSystem Instance { get; private set; }
         const string FullscreenPreference = "Riftbound.Fullscreen";
+        const string ClassicMovementPreference = "Riftbound.ClassicMovement";
+        static readonly string[] MovementPresets = { "Modern", "Classic" };
+        public static bool ClassicMovement { get; private set; }
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        static void LoadMovementPreset()
+        {
+            ClassicMovement = PlayerPrefs.GetInt(ClassicMovementPreference, 0) != 0;
+        }
+
+        public static void DrawMovementPreset(Rect rect, GUIStyle style = null)
+        {
+            int active = ClassicMovement ? 1 : 0;
+            int choice = style == null ? GUI.Toolbar(rect, active, MovementPresets)
+                : GUI.Toolbar(rect, active, MovementPresets, style);
+            if (choice == active) return;
+            ClassicMovement = choice == 1;
+            PlayerPrefs.SetInt(ClassicMovementPreference, choice);
+            PlayerPrefs.Save();
+        }
 
         static bool SavedFullscreen => PlayerPrefs.GetInt(FullscreenPreference, 1) != 0;
         public static bool IsFullscreen => Application.isEditor ? SavedFullscreen : Screen.fullScreen;
@@ -405,6 +425,8 @@ namespace Riftbound
 
             if (GUI.changed) SaveSettings();
 
+            GUI.Label(new Rect(cx, cy + 130, w - 60, 24), "Movement preset");
+            DrawMovementPreset(new Rect(cx, cy + 156, w - 60, 30));
             DrawBackButton(x, y, w, h);
         }
 

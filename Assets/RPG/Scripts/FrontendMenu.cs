@@ -1120,6 +1120,9 @@ namespace Riftbound
             bool selectedFullscreen = GUI.Toggle(new Rect(60, 335, 450, 30), fullscreen, " Borderless fullscreen");
             if (selectedFullscreen != fullscreen) SettingsSystem.SetFullscreen(selectedFullscreen);
 
+            GUI.Label(new Rect(60, 374, 175, 30), "MOVEMENT PRESET", body);
+            SettingsSystem.DrawMovementPreset(new Rect(245, 374, 265, 30), button);
+
             GUI.Label(new Rect(580, 160, 500, 160), "All settings are saved locally to your device.\n\nCamera sensitivity controls RMB orbit rotation speed while exploring the open world.\n\nUse [V] to swap between Ground and Flying mounts.", body);
 
             if (GUI.Button(new Rect(60, 420, 220, 44), "SAVE & RETURN", button))
@@ -1135,7 +1138,9 @@ namespace Riftbound
 
             GUI.Label(new Rect(60, 155, 540, 340),
                 "MOVEMENT & CAMERA:\n" +
-                "  W / A / S / D       Run / Turn (RMB + A/D/Q Strafe)\n" +
+                (SettingsSystem.ClassicMovement
+                    ? "  W / S                Move with character facing\n  A / D                 Turn (RMB + A/D/Q Strafe)\n"
+                    : "  W / A / S / D       Move with camera facing (A/D strafe)\n") +
                 "  /  (Numpad /)      Toggle slow RP walk (Default: Run)\n" +
                 "  SPACE               Jump (or Ascend while on Flying Mount)\n" +
                 "  X / LEFT SHIFT      Descend / Flight Sprint Boost (24 m/s)\n" +

@@ -129,6 +129,7 @@ namespace Riftbound.Editor
                 }
                 if (stage == 2)
                 {
+                    MovementPresetChecks();
                     InputSystem.QueueStateEvent(mouse, new MouseState());
                     InputSystem.QueueStateEvent(keyboard, new KeyboardState(UnityEngine.InputSystem.Key.Space)); InputSystem.Update();
                     Settle(); Invoke(player, "Update");
@@ -197,6 +198,50 @@ namespace Riftbound.Editor
                 }
             }
             catch (Exception e) { Finish(e); }
+        }
+
+        static void MovementPresetChecks()
+        {
+            var preset = typeof(SettingsSystem).GetProperty(nameof(SettingsSystem.ClassicMovement));
+            bool originalPreset = SettingsSystem.ClassicMovement;
+            float originalYaw = camera.Yaw;
+            try
+            {
+                preset.SetValue(null, false);
+                Check("modern_a_strafes", MoveWithPreset(UnityEngine.InputSystem.Key.A, 0).x < -.005f);
+                Check("modern_w_follows_camera_heading", MoveWithPreset(UnityEngine.InputSystem.Key.W, 90).x > .005f);
+
+                preset.SetValue(null, true);
+                var turn = MoveWithPreset(UnityEngine.InputSystem.Key.A, 0);
+                Check("classic_a_turns_without_strafing", turn.sqrMagnitude < .0001f &&
+                    Mathf.DeltaAngle(0, player.transform.eulerAngles.y) < -2f);
+                var forward = MoveWithPreset(UnityEngine.InputSystem.Key.W, 90);
+                Check("classic_w_keeps_character_heading", forward.z > .005f && Mathf.Abs(forward.x) < .001f);
+                Check("classic_rmb_a_strafes", MoveWithPreset(UnityEngine.InputSystem.Key.A, 0, true).x < -.005f);
+            }
+            finally
+            {
+                preset.SetValue(null, originalPreset);
+                Set(camera, "yaw", originalYaw);
+                camera.transform.rotation = Quaternion.identity;
+                Set(camera, "inputFrame", -1);
+                Set(player, "moveVelocity", Vector3.zero);
+            }
+        }
+
+        static Vector3 MoveWithPreset(UnityEngine.InputSystem.Key key, float yaw, bool steering = false)
+        {
+            Settle();
+            Set(player, "moveVelocity", Vector3.zero);
+            Set(camera, "yaw", yaw);
+            camera.transform.rotation = Quaternion.Euler(0, yaw, 0);
+            Set(camera, "inputFrame", -1);
+            InputSystem.QueueStateEvent(mouse, new MouseState { buttons = (ushort)(steering ? 2 : 0) });
+            InputSystem.QueueStateEvent(keyboard, new KeyboardState(key));
+            InputSystem.Update();
+            var start = player.transform.position;
+            Invoke(player, "Update");
+            return Vector3.ProjectOnPlane(player.transform.position - start, Vector3.up);
         }
 
         static void JumpChecks()
