@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using Riftbound.Narrative;
 using UnityEngine;
 
 namespace Riftbound
@@ -8,9 +10,47 @@ namespace Riftbound
         Vector2 atlasRegionScroll;
         bool atlasPaperLoaded;
         Vector3[] atlasRiverBanks;
+        Merchant conversationMerchant;
+        List<(string topicId, string label)> merchantTopics;
+        string merchantTopic;
+
+        void RefreshMerchantConversation(Merchant merchant)
+        {
+            if (merchant == conversationMerchant) return;
+            conversationMerchant = merchant;
+            merchantTopic = null;
+            merchantTopics = merchant ? NarrativeCatalog.GetPublicTopics(NarrativeCatalog.ResolveMerchant(merchant), player) : null;
+        }
+
+        bool SelectMerchantTopic(string topicId)
+        {
+            if (conversationMerchant != player.ActiveMerchant || merchantTopics == null ||
+                !merchantTopics.Exists(topic => topic.topicId == topicId))
+                return false;
+
+            merchantTopic = topicId;
+            return true;
+        }
+
+        void DrawMerchantConversation(float x, float y, NarrativeProfileDto profile)
+        {
+            GUI.Label(new Rect(x + 24, y + 65, 610, 26), "Ask about the road", label);
+            for (int i = 0; i < merchantTopics.Count; i++)
+            {
+                var topic = merchantTopics[i];
+                bool selected = merchantTopic == topic.topicId;
+                if (GUI.Toggle(new Rect(x + 24, y + 108 + i * 48, 252, 40), selected, topic.label, questButton) && !selected)
+                    SelectMerchantTopic(topic.topicId);
+            }
+
+            var reply = NarrativeCatalog.SelectText(profile, "public_topic", merchantTopic, player);
+            Panel(new Rect(x + 294, y + 108, 341, 150));
+            GUI.Label(new Rect(x + 310, y + 123, 309, 118), reply.text ?? "", label);
+        }
 
         void DrawAdventurePanels(float width, float height)
         {
+            RefreshMerchantConversation(player.ActiveMerchant);
             if (!player.MapOpen && !player.InventoryOpen && !player.DialogueOpen && !player.ShopOpen && !player.JournalOpen)
             {
                 bool nearCrypt = Vector3.Distance(player.transform.position, new Vector3(-34, player.transform.position.y, 70)) < 55f;
@@ -43,12 +83,31 @@ namespace Riftbound
             {
                 bool westernQuest = player.CanUseWesternRoadQuest && player.ActiveMerchant.npcName == WesternRoadCamps.Rowan &&
                     player.QuestIndex >= 2;
-                float shopHeight = westernQuest ? 570f : 500f;
+                float shopHeight = merchantTopic != null ? 330f : westernQuest ? 570f : 500f;
                 float x = width / 2 - 330, y = height / 2 - shopHeight / 2;
                 Panel(new Rect(x, y, 660, shopHeight));
-                GUI.Label(new Rect(x + 24, y + 20, 600, 36), player.ActiveMerchant.npcName.ToUpperInvariant(), title);
-                var merchantProfile = Narrative.NarrativeCatalog.ResolveMerchant(player.ActiveMerchant);
-                var merchantGreeting = Narrative.NarrativeCatalog.SelectText(merchantProfile, "greeting", "", player);
+                bool hasTopics = merchantTopics != null && merchantTopics.Count > 0;
+                GUI.Label(new Rect(x + 24, y + 20, hasTopics ? 420 : 600, 36), player.ActiveMerchant.npcName.ToUpperInvariant(), title);
+                var merchantProfile = NarrativeCatalog.ResolveMerchant(player.ActiveMerchant);
+                if (hasTopics && GUI.Button(new Rect(x + 462, y + 20, 173, 36),
+                        merchantTopic == null ? "Conversation" : "Return to trade", questButton))
+                {
+                    if (merchantTopic == null) SelectMerchantTopic(merchantTopics[0].topicId);
+                    else merchantTopic = null;
+                }
+                if (GUI.Button(new Rect(x + 24, y + shopHeight - 55, 610, 38), "FAREWELL  /  E OR ESC", questButton))
+                {
+                    player.CloseShop();
+                    RefreshMerchantConversation(null);
+                    return;
+                }
+                if (merchantTopic != null)
+                {
+                    DrawMerchantConversation(x, y, merchantProfile);
+                    return;
+                }
+
+                var merchantGreeting = NarrativeCatalog.SelectText(merchantProfile, "greeting", "", player);
                 string headerCopy = !string.IsNullOrEmpty(merchantGreeting.text) ? merchantGreeting.text : "Supplies for the forest road.";
                 GUI.Label(new Rect(x + 24, y + 65, 600, 55), $"{headerCopy}\nYour purse: {player.Gold} gold.   Potions: {player.Potions}/10   /   Weapon bonus: +{player.WeaponBonus}", label);
                 GUI.Label(new Rect(x + 24, y + 143, 400, 30), "Health potion / restores 70 HP", label);
@@ -85,7 +144,6 @@ namespace Riftbound
                         GUI.Button(new Rect(x + 452, y + 453, 183, 38), player.WesternRoadStage == 0 ? "Accept quest" : "Turn in quest", questButton))
                         player.HandleWesternRoadAtRowan();
                 }
-                if (GUI.Button(new Rect(x + 24, y + shopHeight - 55, 610, 38), "FAREWELL  /  E OR ESC", questButton)) player.CloseShop();
             }
             if (player.JournalOpen) { DrawQuestJournal(width, height); return; }
             if (!player.MapOpen) return;

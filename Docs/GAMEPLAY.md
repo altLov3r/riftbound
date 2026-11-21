@@ -6,7 +6,7 @@ Choose a faction, race and one of the current classes: Warrior, Paladin, Mage or
 
 Abe introduces the road-raider, stolen-supply and Ashwood Captain quest chain. Quartermaster Rowan and Provisioner Mira provide supplies. Cartographer Elara at Greenhollow offers frontier surveys followed by the River Reaver bounty. Captain Selvek remains a hostile enemy; defeating him and claiming linked rewards follow the existing quest/chest rules.
 
-The first-five narrative catalog supplies Abe's quest text, Rowan and Mira's shop greetings, Elara's survey dialogue, and Selvek's encounter bark. The game selects those lines from the existing quest and encounter state.
+The first-five narrative catalog supplies Abe's quest text, Rowan and Mira's shop greetings, Elara's survey dialogue, and Selvek's encounter bark. The game selects those lines from the existing quest and encounter state. Choose **Conversation** in Rowan or Mira's shop to ask about supplies, receipts, road crews, or fair trade. Choose **Return to trade** to browse supplies again.
 
 New offline Human characters in Emberwatch can choose **Learn the basics** when they enter the world. The First Adventure card guides movement, camera controls, Abe's first quest and the Adventure Guide. Checkpoints are saved with that character. **Skip tutorial** dismisses it. Open **Esc → Help & Unstuck → Replay First Adventure** to revisit the lessons while keeping quest progress and earned rewards.
 

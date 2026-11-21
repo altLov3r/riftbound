@@ -30,6 +30,7 @@ namespace Riftbound.Editor
         static Keyboard tutorialKeyboard;
         static Mouse tutorialMouse;
         static double tutorialDeadline;
+        static int merchantVisitGold, merchantVisitPotions, merchantVisitQuestStage;
 
         static AdventureGuideChecks()
         {
@@ -162,6 +163,19 @@ namespace Riftbound.Editor
                 !NarrativeCatalog.SelectText(captainProfile, "greeting", "", player, captain).matched,
                 "Selvek has no out-of-encounter bark or selectable friendly greeting");
         }
+
+        static void OpenMerchant(Merchant merchant)
+        {
+            Assert(merchant, "Expected campaign merchant is available");
+            Teleport(merchant.transform.position + Vector3.forward * .4f);
+            typeof(PlayerController).GetMethod("Interact", Hidden).Invoke(player, null);
+            Assert(player.ActiveMerchant == merchant && player.CanTrade(), "Opened existing shop for " + merchant.npcName);
+        }
+
+        static bool SelectMerchantTopic(string topicId)
+            => (bool)typeof(PrototypeHUD).GetMethod("SelectMerchantTopic", Hidden).Invoke(hud, new object[] { topicId });
+
+        static string ActiveMerchantTopic => (string)typeof(PrototypeHUD).GetField("merchantTopic", Hidden).GetValue(hud);
 
         static void Tick()
         {
@@ -470,6 +484,70 @@ namespace Riftbound.Editor
                     Assert(player.EncounterJournalOpen && !player.JournalOpen, "Encounter Journal reachable from Adventure Guide");
                     player.EncounterJournalOpen = false;
 
+                    merchantVisitGold = player.Gold;
+                    merchantVisitPotions = player.Potions;
+                    merchantVisitQuestStage = player.WesternRoadStage;
+                    OpenMerchant(WesternRoadCamps.FindRowan());
+                    stage = 7;
+                    due = now + .35;
+                }
+                else if (stage == 7)
+                {
+                    var profile = NarrativeCatalog.ResolveMerchant(player.ActiveMerchant);
+                    Assert(SelectMerchantTopic("supplies"), "Rowan's shop can select his supplies topic");
+                    CheckNarrativeLine(profile, "public_topic", ActiveMerchantTopic, "rowan.topic.supplies");
+                    Assert(SelectMerchantTopic("receipts") && !SelectMerchantTopic("fair-trade"),
+                        "Rowan's shop accepts receipts and rejects Mira's topic");
+                    CheckNarrativeLine(profile, "public_topic", ActiveMerchantTopic, "rowan.topic.receipts");
+                    stage = 8;
+                    due = now + .35;
+                }
+                else if (stage == 8)
+                {
+                    if (SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Null)
+                        ScreenCapture.CaptureScreenshot(".code-check/adventure-guide/rowan-conversation.png");
+                    stage = 9;
+                    due = now + .25;
+                }
+                else if (stage == 9)
+                {
+                    player.CloseShop();
+                    var mira = Object.FindObjectsByType<Merchant>().Single(m => m.npcName == "Provisioner Mira");
+                    OpenMerchant(mira);
+                    stage = 10;
+                    due = now + .35;
+                }
+                else if (stage == 10)
+                {
+                    Assert(ActiveMerchantTopic == null, "Switching merchants opens the trade view with no previous topic");
+                    var profile = NarrativeCatalog.ResolveMerchant(player.ActiveMerchant);
+                    Assert(SelectMerchantTopic("road-crews"), "Mira's shop can select her road crews topic");
+                    CheckNarrativeLine(profile, "public_topic", ActiveMerchantTopic, "mira.topic.workers");
+                    Assert(SelectMerchantTopic("fair-trade") && !SelectMerchantTopic("receipts"),
+                        "Mira's shop accepts fair trade and rejects Rowan's topic");
+                    CheckNarrativeLine(profile, "public_topic", ActiveMerchantTopic, "mira.topic.trust");
+                    Assert(player.Gold == merchantVisitGold && player.Potions == merchantVisitPotions &&
+                        player.WesternRoadStage == merchantVisitQuestStage,
+                        "Merchant conversations preserve gold, potions and Rowan's quest progress");
+                    stage = 11;
+                    due = now + .35;
+                }
+                else if (stage == 11)
+                {
+                    if (SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Null)
+                        ScreenCapture.CaptureScreenshot(".code-check/adventure-guide/mira-conversation.png");
+                    stage = 12;
+                    due = now + .25;
+                }
+                else if (stage == 12)
+                {
+                    player.CloseShop();
+                    stage = 13;
+                    due = now + .35;
+                }
+                else if (stage == 13)
+                {
+                    Assert(ActiveMerchantTopic == null && !player.ShopOpen, "Closing the shop clears the conversation");
                     Assert(Errors.Count == 0, "Zero Riftbound/AdventureGuide runtime errors", $"errors={Errors.Count}");
                     Lines.Add($"TOTAL PASS={passed} ERRORS={Errors.Count} RESULT=PASS");
                     File.WriteAllLines(Output, Lines);
