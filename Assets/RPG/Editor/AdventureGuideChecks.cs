@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using Riftbound.Narrative;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -126,6 +127,42 @@ namespace Riftbound.Editor
         static void TutorialAction(string method) => typeof(FirstAdventureGuide).GetMethod(method, Hidden).Invoke(tutorial, null);
         static string TutorialStage => typeof(PlayerController).GetProperty("TutorialStep", Hidden).GetValue(player).ToString();
 
+        static void CheckNarrativeLine(NarrativeProfileDto profile, string channel, string topic, string expected)
+        {
+            var selected = NarrativeCatalog.SelectText(profile, channel, topic, player);
+            Assert(selected.matched && selected.lineId == expected && !string.IsNullOrWhiteSpace(selected.text),
+                "Authored narrative selects " + expected, selected.lineId);
+        }
+
+        static void CheckCampaignNarrative()
+        {
+            Assert(NarrativeCatalog.LoadedFromResource, "Campaign loads the authored v1 catalog from Unity Resources");
+
+            var rowan = NarrativeCatalog.ResolveMerchant(WesternRoadCamps.FindRowan());
+            var mira = Object.FindObjectsByType<Merchant>(FindObjectsInactive.Include)
+                .Single(m => m.npcName == "Provisioner Mira");
+            CheckNarrativeLine(rowan, "greeting", "", "rowan.greeting.public");
+            CheckNarrativeLine(NarrativeCatalog.ResolveMerchant(mira), "greeting", "", "mira.greeting.public");
+
+            var elara = Object.FindObjectsByType<TownNPC>().Single(n => n.npcName == ExplorationSites.CartographerName);
+            var elaraProfile = NarrativeCatalog.ResolveTownNPC(elara);
+            CheckNarrativeLine(elaraProfile, "greeting", "", "elara.greeting.public");
+            CheckNarrativeLine(elaraProfile, "public_topic", "cartography", "elara.topic.method");
+            CheckNarrativeLine(elaraProfile, "quest_offer", "frontier_cartography", "elara.survey.offer");
+            Assert(!NarrativeCatalog.SelectText(elaraProfile, "quest_offer", "river_reaver_bounty", player).matched,
+                "Elara withholds the Reaver bounty before the existing survey gate");
+
+            var captain = Object.FindObjectsByType<EnemyController>()
+                .Single(enemy => enemy.enemyId == RiverReaverCamp.CaptainId);
+            var captainProfile = NarrativeCatalog.ResolveHostileEnemy(captain);
+            var bark = NarrativeCatalog.SelectText(captainProfile, "encounter_bark", "aggro", player, captain);
+            Assert(bark.matched && bark.lineId == "selvek.encounter.toll",
+                "Living Selvek selects the authored hostile encounter bark");
+            Assert(!NarrativeCatalog.SelectText(captainProfile, "encounter_bark", "aggro", player).matched &&
+                !NarrativeCatalog.SelectText(captainProfile, "greeting", "", player, captain).matched,
+                "Selvek has no out-of-encounter bark or selectable friendly greeting");
+        }
+
         static void Tick()
         {
             try
@@ -198,6 +235,7 @@ namespace Riftbound.Editor
                     Assert(player && player.Stats && hud && MinimapRadar.Instance, "Player, HUD, and MinimapRadar initialized");
                     WesternRoadCamps.Ensure(player);
                     BrassHollows.Ensure();
+                    CheckCampaignNarrative();
 
                     // 1. Fresh character checks
                     var entries = AdventureGuideCatalog.BuildJournalEntries(player);
@@ -222,8 +260,14 @@ namespace Riftbound.Editor
 
                     // 2. Abe Ch.1 Active -> ReadyToTurnIn -> Completed & Ch.2 Available
                     OpenAbe();
+                    var abe = NarrativeCatalog.ResolveMainQuestGiver(player.ActiveQuestGiver);
+                    CheckNarrativeLine(abe, "main_title", "", "abe.main0.title");
+                    CheckNarrativeLine(abe, "main_body", "", "abe.main0.offer");
+                    Assert(!NarrativeCatalog.SelectText(abe, "main_body", "", null).matched,
+                        "No viewer context leaves Abe's operational quest body available");
                     player.AcceptQuest();
                     player.CloseDialogue();
+                    CheckNarrativeLine(abe, "main_body", "", "abe.main0.progress");
                     TutorialAction("LateUpdate");
                     Assert(TutorialStage == "Fight", "Accepting The Forest Road advances the tutorial to combat");
                     entries = AdventureGuideCatalog.BuildJournalEntries(player);
@@ -234,6 +278,7 @@ namespace Riftbound.Editor
                         .Where(e => e.IsRoadRaider && e.GetComponent<Combatant>().Alive).Take(3).ToList();
                     Assert(raiders.Count == 3, "Found 3 live road raiders for Ch.1 progression");
                     foreach (var r in raiders) r.GetComponent<Combatant>().Damage(100000f);
+                    CheckNarrativeLine(abe, "main_body", "", "abe.main0.ready");
                     TutorialAction("LateUpdate");
                     Assert(TutorialStage == "Journal", "Road-raider quest progress unlocks map and journal guidance");
                     player.JournalOpen = true;
@@ -253,6 +298,7 @@ namespace Riftbound.Editor
                     int tutorialGold = player.Gold;
                     player.LoadAdventure();
                     Assert(TutorialStage == "Complete" && player.Gold == tutorialGold, "Completion reload keeps rewards unchanged");
+                    CheckNarrativeLine(abe, "main_body", "", "abe.main1.offer");
                     entries = AdventureGuideCatalog.BuildJournalEntries(player);
                     Assert(entries[0].status == JournalEntryStatus.Completed && entries[1].status == JournalEntryStatus.Available &&
                            AdventureGuideCatalog.GetCurrentGoalChapterIndex(player, entries) == 1,
