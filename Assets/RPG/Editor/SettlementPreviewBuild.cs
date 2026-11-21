@@ -13,7 +13,7 @@ namespace Riftbound.Editor
         const string Product = "Riftbound Settlement Preview";
         static bool buildingPreview;
 
-        public int callbackOrder => 0;
+        public int callbackOrder => 10;
 
         public static void Run()
         {
@@ -31,44 +31,52 @@ namespace Riftbound.Editor
 
         public void OnProcessScene(Scene scene, BuildReport report)
         {
-            if (!buildingPreview || report == null || scene.path != WorldRegions.ScenePath) return;
+            if (report == null || scene.path != WorldRegions.ScenePath) return;
+            bool campaign = !buildingPreview &&
+                (report.summary.platform == BuildTarget.StandaloneWindows ||
+                 report.summary.platform == BuildTarget.StandaloneWindows64);
+            if (!buildingPreview && !campaign) return;
 
             var previous = SceneManager.GetActiveScene();
             if (scene != previous) SceneManager.SetActiveScene(scene);
             try
             {
-                bool threeChimes = Array.IndexOf(Environment.GetCommandLineArgs(), "-includeThreeChimes") >= 0;
-                var placement = SettlementPlacementPreview.Create(new StringBuilder(), threeChimes);
+                var placementReport = new StringBuilder();
+                bool threeChimes = campaign || Array.IndexOf(Environment.GetCommandLineArgs(), "-includeThreeChimes") >= 0;
+                var placement = SettlementPlacementPreview.Create(placementReport, threeChimes);
                 if (threeChimes)
                 {
-                    var relay = ThreeChimesPreview.Create(new StringBuilder());
+                    var relay = ThreeChimesPreview.Create(placementReport);
                     if (relay.Models.Length != 4 || relay.Roads.Length != 4)
                         throw new BuildFailedException("The Three-Chimes depot and approach were not fully staged.");
-                    Debug.Log("Settlement preview: Three-Chimes Relay staged at Lantern Rest.");
+                    Debug.Log("Settlement sites: Three-Chimes Relay staged at Lantern Rest.");
                 }
                 foreach (var model in placement.Models)
                 {
                     if (!model || model.gameObject.scene != scene || !model.sharedMesh)
                         throw new BuildFailedException("An expected settlement model was not included in the build scene.");
                 }
-                Debug.Log($"Settlement preview: staged {placement.Models.Length} models in {scene.name}.");
-                bool trailheads = Array.IndexOf(Environment.GetCommandLineArgs(), "-includeSettlementTrailheads") >= 0;
+                Debug.Log($"Settlement sites: staged {placement.Models.Length} court and roadside models in {scene.name}.");
+                bool trailheads = campaign || Array.IndexOf(Environment.GetCommandLineArgs(), "-includeSettlementTrailheads") >= 0;
                 if (trailheads || Array.IndexOf(Environment.GetCommandLineArgs(), "-includeCoilbreakYard") >= 0)
                 {
-                    var yard = CoilbreakYardPreview.Create(new StringBuilder());
+                    var yard = CoilbreakYardPreview.Create(placementReport);
                     foreach (var part in yard)
                         if (!part || part.gameObject.scene != scene)
                             throw new BuildFailedException("An expected Coilbreak Yard placement was missing from the build scene.");
-                    Debug.Log($"Settlement preview: staged {yard.Count} Coilbreak Yard placements in {scene.name}.");
+                    Debug.Log($"Settlement sites: staged {yard.Count} Coilbreak Yard placements in {scene.name}.");
                 }
                 if (trailheads)
                 {
-                    var shelter = WyrmcrestRefugePreview.Create(new StringBuilder());
+                    var shelter = WyrmcrestRefugePreview.Create(placementReport);
                     if (!shelter || shelter.gameObject.scene != scene || shelter.childCount != 9)
                         throw new BuildFailedException("The trailhead shelter was not fully staged in the build scene.");
-                    Debug.Log($"Settlement preview: staged the Gor'Kresh trailhead shelter in {scene.name}.");
-                    if (Array.IndexOf(Environment.GetCommandLineArgs(), "-includeSettlementActivity") >= 0)
-                        SettlementActivityPreview.Create(new StringBuilder(), threeChimes);
+                    Debug.Log($"Settlement sites: staged the Gor'Kresh trailhead shelter in {scene.name}.");
+                    if (campaign || Array.IndexOf(Environment.GetCommandLineArgs(), "-includeSettlementActivity") >= 0)
+                    {
+                        SettlementActivityPreview.Create(placementReport, threeChimes);
+                        Debug.Log(placementReport.ToString());
+                    }
                 }
             }
             finally

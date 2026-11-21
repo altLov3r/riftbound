@@ -24,8 +24,38 @@ namespace Riftbound.Editor
                 return;
             }
 
+            EditorApplication.Exit(Build());
+        }
+
+        public static void RunCampaign()
+        {
+            if (!Application.isBatchMode)
+            {
+                Debug.LogError("Run the campaign playtest build in batch mode.");
+                return;
+            }
+
+            string company = PlayerSettings.companyName;
+            string product = PlayerSettings.productName;
+            int result;
+            try
+            {
+                PlayerSettings.companyName = "Riftbound Campaign Review";
+                PlayerSettings.productName = VillageTourMenu.Product;
+                result = Build();
+            }
+            finally
+            {
+                PlayerSettings.companyName = company;
+                PlayerSettings.productName = product;
+            }
+            EditorApplication.Exit(result);
+        }
+
+        static int Build()
+        {
             buildingPreview = true;
-            try { GameplayCandidateBuild.Run(); }
+            try { return GameplayCandidateBuild.Build(); }
             finally { buildingPreview = false; }
         }
 

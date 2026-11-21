@@ -2,6 +2,18 @@
 
 The playable map is `Assets/RPG/Scenes/Outpost-Expanded.unity`. Use **Riftbound → World → View the remodeled campaign** to frame Emberwatch in the editor. Play Mode uses the main campaign scene and atlas.
 
+## Windows campaign playtest
+
+Windows builds of the expanded campaign add the Emberwatch Service Court and its walking porter, Three-Chimes Relay at Lantern Rest, Coilbreak Yard, and the Gor'Kresh Trailhead Shelter. The sites are placed when Unity packages the scene. Their notices appear on the map and can be read with **E** in the world. The Adventure Guide lists the stops along its Explore routes.
+
+For the Windows playtest with the existing campaign review saves and offline **F8** tour, run Unity from the project directory with a fresh output name:
+
+```powershell
+& 'C:/Program Files/Unity/Hub/Editor/6000.6.2f1/Editor/Unity.exe' -batchmode -projectPath (Get-Location).Path -executeMethod Riftbound.Editor.VillageRemodelPreviewBuild.RunCampaign -gameplayBuildName RiftboundEmberford01 -logFile 'emberford-build.log'
+```
+
+Open `Builds/RiftboundEmberford01/Riftbound.exe`. Enter the world offline and press **M** for settlement waypoints or **J** for the Adventure Guide. For scripted editor traversal of the four sites, use the batch entry point `Riftbound.Editor.WorldRoutePlayModeCheck.RunThreeChimesVerification`.
+
 The remodel fits the Blender assets to existing building and prop transforms. Each settlement has a timber, stone, roof, cloth, and metal palette. The old visual meshes are disabled at rebuilt anchors. Where a quest, support surface, or bridge joint relies on the original collision, that collider stays at the authored position. The original NPCs, quests, portals, spawn anchors, and route records retain their scene references.
 
 **Riftbound → World → Rebuild original locations with the Emberford kit** applies the layout to an original campaign scene. The separately authored showcase remains available through the Procedural Kit menu. The World Dressing Pass runs from its menu, so opening the campaign does not regenerate or save the scene.

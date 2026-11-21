@@ -12,6 +12,11 @@ namespace Riftbound.Editor
     {
         public static void Run()
         {
+            EditorApplication.Exit(Build());
+        }
+
+        internal static int Build()
+        {
             try
             {
                 if (!Application.isBatchMode || EditorApplication.isPlayingOrWillChangePlaymode)
@@ -43,9 +48,9 @@ namespace Riftbound.Editor
                     $"Unity={Application.unityVersion}\nPath={folder}\nResult={result.summary.result}\nErrors={result.summary.totalErrors}\nWarnings={result.summary.totalWarnings}\nSceneSHA256={sceneHash}\nTerrain={terrainPath}\nTerrainSHA256={terrainHash}\nDuration={result.summary.totalTime}\n");
                 if (Hash(WorldRegions.ScenePath) != sceneHash || Hash(terrainPath) != terrainHash)
                     throw new InvalidOperationException("Scene or protected terrain changed during build.");
-                EditorApplication.Exit(result.summary.result == BuildResult.Succeeded ? 0 : 1);
+                return result.summary.result == BuildResult.Succeeded ? 0 : 1;
             }
-            catch (Exception e) { Debug.LogException(e); EditorApplication.Exit(1); }
+            catch (Exception e) { Debug.LogException(e); return 1; }
         }
 
         static string Hash(string path)
