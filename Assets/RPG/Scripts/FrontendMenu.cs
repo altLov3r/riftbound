@@ -1116,6 +1116,10 @@ namespace Riftbound
             sensitivity = GUI.HorizontalSlider(new Rect(60, 280, 450, 25), sensitivity, 0.3f, 2.5f);
             ApplySettings();
 
+            bool fullscreen = SettingsSystem.IsFullscreen;
+            bool selectedFullscreen = GUI.Toggle(new Rect(60, 335, 450, 30), fullscreen, " Borderless fullscreen");
+            if (selectedFullscreen != fullscreen) SettingsSystem.SetFullscreen(selectedFullscreen);
+
             GUI.Label(new Rect(580, 160, 500, 160), "All settings are saved locally to your device.\n\nCamera sensitivity controls RMB orbit rotation speed while exploring the open world.\n\nUse [V] to swap between Ground and Flying mounts.", body);
 
             if (GUI.Button(new Rect(60, 420, 220, 44), "SAVE & RETURN", button))

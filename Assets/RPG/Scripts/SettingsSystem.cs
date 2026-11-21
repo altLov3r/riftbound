@@ -7,6 +7,40 @@ namespace Riftbound
     public class SettingsSystem : MonoBehaviour
     {
         public static SettingsSystem Instance { get; private set; }
+        const string FullscreenPreference = "Riftbound.Fullscreen";
+
+        static bool SavedFullscreen => PlayerPrefs.GetInt(FullscreenPreference, 1) != 0;
+        public static bool IsFullscreen => Application.isEditor ? SavedFullscreen : Screen.fullScreen;
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSplashScreen)]
+        static void ApplyStartupDisplayMode()
+        {
+            if (Array.IndexOf(Environment.GetCommandLineArgs(), "-screen-fullscreen") < 0)
+                ApplyDisplayMode(SavedFullscreen);
+        }
+
+        public static void SetFullscreen(bool fullscreen)
+        {
+            PlayerPrefs.SetInt(FullscreenPreference, fullscreen ? 1 : 0);
+            PlayerPrefs.Save();
+            ApplyDisplayMode(fullscreen);
+        }
+
+        static void ApplyDisplayMode(bool fullscreen)
+        {
+#if UNITY_STANDALONE && !UNITY_EDITOR
+            if (Application.isBatchMode) return;
+
+            var mode = fullscreen ? FullScreenMode.FullScreenWindow : FullScreenMode.Windowed;
+            if (Screen.fullScreenMode == mode) return;
+
+            var desktop = Screen.currentResolution;
+            float windowScale = Mathf.Min(1f, desktop.width * 0.9f / 1280f, desktop.height * 0.9f / 720f);
+            int width = fullscreen ? desktop.width : Mathf.RoundToInt(1280 * windowScale);
+            int height = fullscreen ? desktop.height : Mathf.RoundToInt(720 * windowScale);
+            Screen.SetResolution(width, height, mode);
+#endif
+        }
 
         public enum SettingsPage
         {
@@ -327,7 +361,10 @@ namespace Riftbound
             graphicsQualityIndex = GUI.SelectionGrid(new Rect(contentX, contentY + 28, w - 60, 30), graphicsQualityIndex, QualityLevels, 4);
 
             GUI.Label(new Rect(contentX, contentY + 70, 280, 24), $"Current Preset: <b>{QualityLevels[graphicsQualityIndex]}</b>");
-            GUI.Label(new Rect(contentX, contentY + 95, 280, 24), $"Screen Resolution: {Screen.width}x{Screen.height} (Windowed)");
+            GUI.Label(new Rect(contentX, contentY + 95, 280, 24), $"Screen Resolution: {Screen.width}x{Screen.height}");
+            bool fullscreen = IsFullscreen;
+            bool selectedFullscreen = GUI.Toggle(new Rect(contentX, contentY + 125, w - 60, 24), fullscreen, " Borderless fullscreen");
+            if (selectedFullscreen != fullscreen) SetFullscreen(selectedFullscreen);
 
             DrawBackButton(x, y, w, h);
         }
