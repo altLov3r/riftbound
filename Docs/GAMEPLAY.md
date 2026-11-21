@@ -6,6 +6,8 @@ Choose a faction, race and one of the current classes: Warrior, Paladin, Mage or
 
 Abe introduces the road-raider, stolen-supply and Ashwood Captain quest chain. Quartermaster Rowan and Provisioner Mira provide supplies. Cartographer Elara at Greenhollow offers frontier surveys followed by the River Reaver bounty. Captain Selvek remains a hostile enemy; defeating him and claiming linked rewards follow the existing quest/chest rules.
 
+New offline Human characters in Emberwatch can choose **Learn the basics** when they enter the world. The First Adventure card guides movement, camera controls, Abe's first quest and the Adventure Guide. Checkpoints are saved with that character. **Skip tutorial** dismisses it. Open **Esc → Help & Unstuck → Replay First Adventure** to revisit the lessons while keeping quest progress and earned rewards.
+
 ## Travel
 
 Running is the normal movement mode. Slash or numpad divide toggles slow walking. In **Modern**, W/A/S/D move with the camera and A/D strafe on foot. In **Classic**, W/S move with the character's heading and A/D turn. Choose a preset in title Settings or **Esc → Interface Options**. In both presets, hold right mouse to steer and strafe, both mouse buttons to move forward, or left mouse alone to orbit. A/D turn while mounted unless steering with right mouse. C opens the character sheet.

@@ -20,6 +20,7 @@ namespace Riftbound
         public string CharacterFaction { get; set; } = "Emberwatch";
         public string CharacterRace { get; set; } = "Brute";
         public string CharacterClass { get; set; } = "Warrior";
+        internal FirstAdventureStep TutorialStep { get; set; }
         public string SavePath => string.IsNullOrEmpty(SavePathOverride) ? Path.Combine(Application.persistentDataPath, string.IsNullOrEmpty(CharacterSaveId) ? "adventure-v1.json" : "adventure-" + CharacterSaveId + ".json") : SavePathOverride;
         readonly HashSet<string> defeatedEnemies = new HashSet<string>();
         readonly HashSet<string> collectedSupplies = new HashSet<string>();
@@ -164,6 +165,7 @@ namespace Riftbound
             public int version = 1, questIndex, kills, gold, experience, potions;
             public int westernRoadStage;
             public int brassHollowsStage;
+            public int firstAdventureV1;
             public bool accepted, bossDefeated, weaponUpgraded, temperedWeapon;
             public string[] enemies, supplies, chests;
             public string[] items;
@@ -197,6 +199,7 @@ namespace Riftbound
                 data.milestoneBindings = milestoneBindings;
                 data.westernRoadStage = WesternRoadStage;
                 data.brassHollowsStage = BrassHollowsStage;
+                data.firstAdventureV1 = (int)TutorialStep;
                 data.lootOnCorpses = true;
                 data.worldRevision = WorldRegions.Expanded ? 1 : 0;
                 data.corpses = LootDropSystem.Instance ? LootDropSystem.Instance.ExportCorpses() : null;
@@ -295,6 +298,7 @@ namespace Riftbound
         {
             WesternRoadStage = 0;
             BrassHollowsStage = 0;
+            TutorialStep = FirstAdventureStep.Unseen;
             RestoreMilestoneTalents(null, null);
             if (!File.Exists(SavePath))
             {
@@ -319,6 +323,8 @@ namespace Riftbound
                 if (data == null || data.version != 1) return;
                 WesternRoadStage = Mathf.Clamp(data.westernRoadStage, 0, 4);
                 BrassHollowsStage = Mathf.Clamp(data.brassHollowsStage, 0, 3);
+                if (Enum.IsDefined(typeof(FirstAdventureStep), data.firstAdventureV1))
+                    TutorialStep = (FirstAdventureStep)data.firstAdventureV1;
                 QuestIndex = Mathf.Clamp(data.questIndex, 0, 3); QuestComplete = QuestIndex >= 3; QuestAccepted = !QuestComplete && data.accepted;
                 Kills = Mathf.Max(0, data.kills); Gold = Mathf.Max(0, data.gold); Experience = Mathf.Max(0, data.experience); Potions = Mathf.Max(0, data.potions);
                 BossDefeated = data.bossDefeated; WeaponUpgraded = data.weaponUpgraded;

@@ -133,6 +133,7 @@ namespace Riftbound
                 player.LoadAdventure();
                 player.RefreshAdventureWorld();
                 if (player.orbit) player.orbit.SetPaused(false);
+                FirstAdventureGuide.Attach(player);
                 return;
             }
 

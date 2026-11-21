@@ -447,6 +447,13 @@ namespace Riftbound
             }
             GUI.color = Color.white;
 
+            if (player && player.GetComponent<FirstAdventureGuide>() is FirstAdventureGuide guide &&
+                GUI.Button(new Rect(cx, cy + 146, w - 60, 32), "Replay First Adventure"))
+            {
+                CloseMenu();
+                guide.Begin();
+            }
+
             DrawBackButton(x, y, w, h);
         }
 

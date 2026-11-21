@@ -6,6 +6,8 @@ using System.Reflection;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.LowLevel;
 using Object = UnityEngine.Object;
 
 namespace Riftbound.Editor
@@ -23,6 +25,10 @@ namespace Riftbound.Editor
         static double due, timeout;
         static PrototypeHUD hud;
         static PlayerController player;
+        static FirstAdventureGuide tutorial;
+        static Keyboard tutorialKeyboard;
+        static Mouse tutorialMouse;
+        static double tutorialDeadline;
 
         static AdventureGuideChecks()
         {
@@ -69,7 +75,7 @@ namespace Riftbound.Editor
                 Lines.Clear();
                 Errors.Clear();
                 Lines.Add("Adventure Guide PlayMode verification in Outpost-Expanded (isolated save fixture; NOT manual human play).");
-                stage = 0;
+                stage = -3;
                 passed = 0;
                 due = EditorApplication.timeSinceStartup + 1.0;
                 timeout = due + 60.0;
@@ -117,6 +123,9 @@ namespace Riftbound.Editor
             Assert(player.DialogueOpen && player.ActiveQuestGiver, "Abe dialogue opened via Interact");
         }
 
+        static void TutorialAction(string method) => typeof(FirstAdventureGuide).GetMethod(method, Hidden).Invoke(tutorial, null);
+        static string TutorialStage => typeof(PlayerController).GetProperty("TutorialStep", Hidden).GetValue(player).ToString();
+
         static void Tick()
         {
             try
@@ -127,7 +136,62 @@ namespace Riftbound.Editor
                 EditorApplication.QueuePlayerLoopUpdate();
                 if (!EditorApplication.isPlaying || now < due) return;
 
-                if (stage == 0)
+                if (stage == -3)
+                {
+                    player = Object.FindAnyObjectByType<PlayerController>();
+                    Assert(player && player.orbit, "First Adventure player and camera initialized");
+                    player.CharacterRace = "Human";
+                    player.CharacterClass = "Warrior";
+                    player.CharacterFaction = "Alliance";
+                    player.LoadAdventure();
+                    player.orbit.FaceTravel(0);
+                    tutorial = (FirstAdventureGuide)typeof(FirstAdventureGuide)
+                        .GetMethod("Attach", BindingFlags.Static | BindingFlags.NonPublic).Invoke(null, new object[] { player });
+                    Assert(tutorial && TutorialStage == "Unseen", "Fresh Emberwatch character receives First Adventure offer");
+                    TutorialAction("Skip");
+                    player.LoadAdventure();
+                    Assert(TutorialStage == "Skipped", "Skipping persists through save and reload");
+                    TutorialAction("Begin");
+                    Assert(TutorialStage == "Move", "Starting or replaying First Adventure opens the movement lesson");
+                    tutorialKeyboard = InputSystem.AddDevice<Keyboard>();
+                    tutorialMouse = InputSystem.AddDevice<Mouse>();
+                    tutorialDeadline = now + 5;
+                    stage = -2;
+                }
+                else if (stage == -2)
+                {
+                    if (TutorialStage == "Look")
+                    {
+                        Assert(true, "Grounded movement advances the tutorial to camera controls");
+                        InputSystem.QueueStateEvent(tutorialKeyboard, new KeyboardState());
+                        tutorialDeadline = now + 5;
+                        stage = -1;
+                    }
+                    else if (now > tutorialDeadline)
+                        Assert(false, "Grounded movement advances the tutorial to camera controls");
+                    else
+                        InputSystem.QueueStateEvent(tutorialKeyboard, new KeyboardState(UnityEngine.InputSystem.Key.W));
+                }
+                else if (stage == -1)
+                {
+                    if (TutorialStage == "Talk")
+                    {
+                        Assert(true, "Mouse orbit advances the tutorial to Abe");
+                        InputSystem.RemoveDevice(tutorialKeyboard);
+                        InputSystem.RemoveDevice(tutorialMouse);
+                        player.LoadAdventure();
+                        Assert(TutorialStage == "Talk", "In-progress tutorial resumes at the saved lesson");
+                        stage = 0;
+                    }
+                    else if (now > tutorialDeadline)
+                        Assert(false, "Mouse orbit advances the tutorial to Abe");
+                    else
+                        InputSystem.QueueStateEvent(tutorialMouse, new MouseState
+                        {
+                            buttons = 1, delta = new Vector2(22, 0), position = new Vector2(Screen.width / 2, Screen.height / 2)
+                        });
+                }
+                else if (stage == 0)
                 {
                     player = Object.FindAnyObjectByType<PlayerController>();
                     hud = Object.FindAnyObjectByType<PrototypeHUD>();
@@ -160,6 +224,8 @@ namespace Riftbound.Editor
                     OpenAbe();
                     player.AcceptQuest();
                     player.CloseDialogue();
+                    TutorialAction("LateUpdate");
+                    Assert(TutorialStage == "Fight", "Accepting The Forest Road advances the tutorial to combat");
                     entries = AdventureGuideCatalog.BuildJournalEntries(player);
                     Assert(entries[0].status == JournalEntryStatus.Active && entries[0].objective == player.QuestObjective,
                         "Accepting Ch.1 transitions entry to Active with live QuestObjective");
@@ -168,6 +234,12 @@ namespace Riftbound.Editor
                         .Where(e => e.IsRoadRaider && e.GetComponent<Combatant>().Alive).Take(3).ToList();
                     Assert(raiders.Count == 3, "Found 3 live road raiders for Ch.1 progression");
                     foreach (var r in raiders) r.GetComponent<Combatant>().Damage(100000f);
+                    TutorialAction("LateUpdate");
+                    Assert(TutorialStage == "Journal", "Road-raider quest progress unlocks map and journal guidance");
+                    player.JournalOpen = true;
+                    TutorialAction("LateUpdate");
+                    player.JournalOpen = false;
+                    Assert(TutorialStage == "Return", "Opening the guide with three kills points back to Abe");
 
                     entries = AdventureGuideCatalog.BuildJournalEntries(player);
                     Assert(entries[0].status == JournalEntryStatus.ReadyToTurnIn,
@@ -176,6 +248,11 @@ namespace Riftbound.Editor
                     OpenAbe();
                     player.CompleteQuest();
                     player.CloseDialogue();
+                    TutorialAction("LateUpdate");
+                    Assert(TutorialStage == "Complete" && player.QuestIndex == 1, "Turning in Abe's real quest completes the tutorial");
+                    int tutorialGold = player.Gold;
+                    player.LoadAdventure();
+                    Assert(TutorialStage == "Complete" && player.Gold == tutorialGold, "Completion reload keeps rewards unchanged");
                     entries = AdventureGuideCatalog.BuildJournalEntries(player);
                     Assert(entries[0].status == JournalEntryStatus.Completed && entries[1].status == JournalEntryStatus.Available &&
                            AdventureGuideCatalog.GetCurrentGoalChapterIndex(player, entries) == 1,
