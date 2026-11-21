@@ -384,7 +384,7 @@ namespace Riftbound
                 Vector3 right = Vector3.Cross(Vector3.up, forward);
                 if (modernOnFoot && orbit && !rightMouseSteering && !turnLeft && !turnRight)
                 {
-                    forward = Quaternion.Euler(0f, orbit.Yaw, 0f) * Vector3.forward;
+                    forward = Quaternion.Euler(0f, orbit.TravelYaw, 0f) * Vector3.forward;
                     right = Vector3.Cross(Vector3.up, forward);
                 }
                 if (forwardInput) moveDirection += forward;

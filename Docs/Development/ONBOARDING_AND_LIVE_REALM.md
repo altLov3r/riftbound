@@ -9,8 +9,9 @@ Base is `development/emberford` at `3b95c4f`. Keep the existing offline campaign
 | W / S on foot | Move relative to the camera, with backpedaling on S | Move forward or back relative to the character |
 | A / D on foot | Strafe relative to the camera | Turn the character and camera during keyboard steering |
 | Hold RMB | Steer with the camera and strafe with A / D | Steer with the camera and strafe with A / D |
-| Hold LMB | Orbit the camera | Orbit without changing movement heading |
+| Hold LMB | Orbit while keeping the travel heading from when free-look began | Orbit without changing movement heading |
 | Hold both mouse buttons | Move forward while steering | Move forward while steering |
+| Home | Recenter camera yaw with mouse buttons released | Recenter camera yaw with mouse buttons released |
 | Mounted | Existing keyboard and mouse steering | Same mounted controls |
 
 Keep Q guard and the existing RMB + Q strafe behavior. Both presets use the existing motor, collision, movement speeds, jumps, and dodge rules. Save the preset locally, share the setting between title and pause menus, and render the current controls in the Controls page and tutorial. Full custom remapping can follow the two presets. Test W/S, A/D, arrows, held mouse buttons, backpedal, diagonal speed, guard, camera orbit, ground and flying mounts, and disabled input under menus.

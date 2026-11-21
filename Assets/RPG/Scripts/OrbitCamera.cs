@@ -9,12 +9,14 @@ namespace Riftbound
         public float distance = 7;
         public float mouseSensitivity = 1;
         float yaw, pitch = 23;
+        float? freeLookTravelYaw;
         float viewHeight = 1.6f;
         public bool Paused { get; private set; }
         public float Yaw => yaw;
         public float Pitch => pitch;
+        internal float TravelYaw => freeLookTravelYaw ?? yaw;
         internal Quaternion ViewRotation => Quaternion.Euler(pitch, yaw, 0f);
-        public void FaceTravel(float heading) { yaw = heading; pitch = 18f; }
+        public void FaceTravel(float heading) { yaw = heading; pitch = 18f; freeLookTravelYaw = null; }
         public bool IsSteering { get; private set; }
         public bool IsFreeLooking { get; private set; }
         public bool BothMouseButtonsPressed { get; private set; }
@@ -93,6 +95,10 @@ namespace Riftbound
         public void RefreshInput()
         {
             var mouse = Mouse.current;
+            bool rightDown = mouse != null && mouse.rightButton.isPressed;
+            bool leftDown = mouse != null && mouse.leftButton.isPressed;
+            if (!leftDown || rightDown) freeLookTravelYaw = null;
+
             bool blocked = !target || FrontendMenu.IsOpen || Paused || FlightMaster.IsAnyTaxiMapOpen ||
                 (player && player.AnyBlockingWindowOpen()) || PrototypeHUD.MenuOpen ||
                 (MailboxSystem.Instance && MailboxSystem.Instance.IsOpen) ||
@@ -103,24 +109,33 @@ namespace Riftbound
                 blocked |= PrototypeHUD.QuestPointerTakesMouse(player, mouse.position.ReadValue(), mouse.leftButton.wasPressedThisFrame);
             if (!blocked && mouse != null && player)
                 blocked = MinimapRadar.TakesMouse(player, mouse.position.ReadValue());
-            if (blocked || mouse == null)
+            if (blocked)
             {
                 IsSteering = IsFreeLooking = BothMouseButtonsPressed = false;
                 return;
             }
             if (inputFrame == Time.frameCount) return;
             inputFrame = Time.frameCount;
-            bool rightDown = mouse.rightButton.isPressed, leftDown = mouse.leftButton.isPressed;
             IsSteering = rightDown;
             IsFreeLooking = leftDown && !rightDown;
             BothMouseButtonsPressed = rightDown && leftDown;
+            if (IsFreeLooking && !freeLookTravelYaw.HasValue)
+                freeLookTravelYaw = yaw;
+
             if (rightDown || leftDown)
             {
                 bool flying = player && player.Mounted && player.SelectedMount && player.SelectedMount.isFlying;
                 yaw += mouse.delta.ReadValue().x * .22f * mouseSensitivity;
                 pitch = Mathf.Clamp(pitch - mouse.delta.ReadValue().y * .16f * mouseSensitivity, flying ? -65f : -15f, 75f);
             }
-            distance = Mathf.Clamp(distance - mouse.scroll.ReadValue().y * .008f, 2.5f, 15f);
+            else if (!FlightMaster.IsAnyTaxiInFlight && Keyboard.current?.homeKey.wasPressedThisFrame == true)
+            {
+                var facing = Vector3.ProjectOnPlane(target.forward, Vector3.up);
+                if (facing.sqrMagnitude > .001f) yaw = Mathf.Atan2(facing.x, facing.z) * Mathf.Rad2Deg;
+            }
+
+            if (mouse != null)
+                distance = Mathf.Clamp(distance - mouse.scroll.ReadValue().y * .008f, 2.5f, 15f);
         }
 
         void LateUpdate()

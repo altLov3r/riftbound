@@ -216,6 +216,7 @@ namespace Riftbound.Editor
                 var steered = MoveWithPreset(UnityEngine.InputSystem.Key.W, 0, 2, new Vector2(410f, 0));
                 Check("ground_rmb_uses_current_input_before_camera_render", steered.x > .005f &&
                     Mathf.Abs(steered.z) < .001f && camera.transform.forward.z > .99f);
+                CheckFreeLookAndRecenter();
 
                 preset.SetValue(null, true);
                 var turn = MoveWithPreset(UnityEngine.InputSystem.Key.A, 0);
@@ -247,6 +248,42 @@ namespace Riftbound.Editor
                 Set(camera, "inputFrame", -1);
                 Set(player, "moveVelocity", Vector3.zero);
             }
+        }
+
+        static void CheckFreeLookAndRecenter()
+        {
+            var first = MoveWithPreset(UnityEngine.InputSystem.Key.W, 0, 1, new Vector2(410f, 0));
+            Check("modern_free_look_turns_camera_without_steering",
+                first.z > .005f && Mathf.Abs(first.x) < .001f && Mathf.Abs(camera.Yaw - 90.2f) < .01f);
+
+            var start = player.transform.position;
+            DriveInput(new MouseState { buttons = 1, delta = new Vector2(205f, 0f) },
+                new KeyboardState(UnityEngine.InputSystem.Key.W));
+            var held = player.transform.position - start;
+            Check("modern_free_look_preserves_original_travel_heading",
+                held.z > .005f && Mathf.Abs(held.x) < .001f && camera.Yaw > 130f);
+
+            Set(player, "moveVelocity", Vector3.zero);
+            start = player.transform.position;
+            DriveInput(new MouseState(), new KeyboardState(UnityEngine.InputSystem.Key.W));
+            var released = player.transform.position - start;
+            Check("modern_free_look_release_restores_camera_relative_heading", released.x > .005f && released.z < -.005f);
+
+            player.transform.rotation = Quaternion.Euler(0, 35f, 0);
+            float pitch = camera.Pitch;
+            float distance = camera.distance;
+            DriveInput(new MouseState(), new KeyboardState(UnityEngine.InputSystem.Key.Home));
+            Check("home_recenters_yaw_without_changing_avatar_pitch_or_zoom",
+                Mathf.Abs(Mathf.DeltaAngle(camera.Yaw, 35f)) < .01f &&
+                Mathf.Abs(Mathf.DeltaAngle(player.transform.eulerAngles.y, 35f)) < .01f &&
+                Mathf.Approximately(camera.Pitch, pitch) && Mathf.Approximately(camera.distance, distance));
+
+            player.MapOpen = true;
+            Set(camera, "yaw", 110f);
+            DriveInput(new MouseState(), new KeyboardState());
+            DriveInput(new MouseState(), new KeyboardState(UnityEngine.InputSystem.Key.Home));
+            player.MapOpen = false;
+            Check("home_does_not_recenter_through_map", Mathf.Approximately(camera.Yaw, 110f));
         }
 
         static void CheckFlightSteering()
@@ -285,14 +322,19 @@ namespace Riftbound.Editor
             Set(player, "moveVelocity", Vector3.zero);
             Set(camera, "yaw", yaw);
             camera.transform.rotation = Quaternion.Euler(0, yaw, 0);
-            Set(camera, "inputFrame", -1);
-            InputSystem.QueueStateEvent(mouse, new MouseState { buttons = mouseButtons, delta = mouseDelta });
-            InputSystem.QueueStateEvent(keyboard, extraKey == UnityEngine.InputSystem.Key.None
-                ? new KeyboardState(key) : new KeyboardState(key, extraKey));
-            InputSystem.Update();
             var start = player.transform.position;
-            Invoke(player, "Update");
+            DriveInput(new MouseState { buttons = mouseButtons, delta = mouseDelta },
+                extraKey == UnityEngine.InputSystem.Key.None ? new KeyboardState(key) : new KeyboardState(key, extraKey));
             return Vector3.ProjectOnPlane(player.transform.position - start, Vector3.up);
+        }
+
+        static void DriveInput(MouseState mouseState, KeyboardState keyboardState)
+        {
+            Set(camera, "inputFrame", -1);
+            InputSystem.QueueStateEvent(mouse, mouseState);
+            InputSystem.QueueStateEvent(keyboard, keyboardState);
+            InputSystem.Update();
+            Invoke(player, "Update");
         }
 
         static void JumpChecks()

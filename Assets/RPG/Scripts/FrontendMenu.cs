@@ -1146,7 +1146,8 @@ namespace Riftbound
                 "  SPACE               Jump (or Ascend while on Flying Mount)\n" +
                 "  X / LEFT SHIFT      Descend / Flight Sprint Boost (24 m/s)\n" +
                 "  LEFT ALT            Dodge Roll\n" +
-                "  RMB / LMB + Mouse   Steer character / Free-orbit camera\n" +
+                "  RMB / LMB + Mouse   Steer character / Look without turning\n" +
+                "  HOME                   Recenter camera\n" +
                 "  Mouse Wheel         Zoom camera in / out\n\n" +
                 "INTERACTION & MOUNTS:\n" +
                 "  TAB                 Target nearest enemy\n" +
