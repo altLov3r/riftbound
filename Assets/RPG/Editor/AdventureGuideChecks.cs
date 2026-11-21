@@ -128,6 +128,96 @@ namespace Riftbound.Editor
         static void TutorialAction(string method) => typeof(FirstAdventureGuide).GetMethod(method, Hidden).Invoke(tutorial, null);
         static string TutorialStage => typeof(PlayerController).GetProperty("TutorialStep", Hidden).GetValue(player).ToString();
 
+        static void CheckLocalStarterTutorials()
+        {
+            var questSystem = player.GetComponent<FactionQuestSystem>();
+            var originalSave = PlayerController.SavePathOverride;
+            var tutorialStep = typeof(PlayerController).GetProperty("TutorialStep", Hidden);
+            var races = new[]
+            {
+                ("Dwarf", "Alliance", "frostpeak_troggs"),
+                ("Elf", "Alliance", "silverglen_sprites"),
+                ("Brute", "Horde", "bloodrock_cull"),
+                ("Undead", "Horde", "deathknell_ghouls"),
+                ("Goblin", "Horde", "rustwater_scavengers")
+            };
+            try
+            {
+                foreach (var (race, faction, questId) in races)
+                {
+                    PlayerController.SavePathOverride = Path.Combine(Path.GetDirectoryName(SavePath),
+                        "starter-" + race + "-" + Guid.NewGuid().ToString("N") + ".json");
+                    player.CharacterRace = race;
+                    player.CharacterFaction = faction;
+                    player.LoadAdventure();
+                    questSystem.LoadData();
+                    tutorial = (FirstAdventureGuide)typeof(FirstAdventureGuide)
+                        .GetMethod("Attach", BindingFlags.Static | BindingFlags.NonPublic).Invoke(null, new object[] { player });
+                    bool offer = tutorial && (bool)typeof(FirstAdventureGuide).GetProperty("Offer", Hidden).GetValue(tutorial);
+                    Assert(offer, race + " gets First Adventure at the local spawn");
+                    TutorialAction("Begin");
+                    tutorialStep.SetValue(player, Enum.Parse(tutorialStep.PropertyType, "Talk"));
+
+                    var definition = FactionQuestSystem.GetQuest(questId);
+                    var npc = Object.FindObjectsByType<TownNPC>().Single(item => item.npcName == definition.giverNpc);
+                    Assert(Vector3.Distance(player.transform.position, npc.transform.position) < 20f,
+                        race + " spawns near the existing local quest giver");
+
+                    var manualPin = npc.transform.position + Vector3.right * 5f;
+                    MinimapRadar.SetWaypoint(manualPin, "Manual tester pin");
+                    TutorialAction("PinGuide");
+                    Assert(MinimapRadar.Instance.customWaypoint == manualPin, race + " tutorial preserves the manual map pin");
+                    MinimapRadar.ClearWaypoint();
+                    TutorialAction("PinGuide");
+                    Assert(MinimapRadar.Instance.customWaypoint == npc.transform.position, race + " tutorial pins its actual local quest giver");
+
+                    Teleport(npc.transform.position + Vector3.forward * .4f);
+                    typeof(PlayerController).GetMethod("Interact", Hidden).Invoke(player, null);
+                    var available = questSystem.GetAvailableQuestForNPC(npc.npcName, player);
+                    Assert(player.ActiveTownNPC == npc && available?.id == questId, race + " can open and accept the configured local quest");
+                    questSystem.AcceptQuest(available, player);
+                    player.CloseDialogue();
+                    TutorialAction("LateUpdate");
+                    Assert(TutorialStage == "Fight" && !MinimapRadar.Instance.customWaypoint.HasValue,
+                        race + " accepting the quest clears only the tutorial waypoint and advances to combat");
+
+                    var enemies = Object.FindObjectsByType<EnemyController>()
+                        .Where(enemy => enemy.GetComponent<Combatant>().Alive &&
+                            enemy.enemyId?.IndexOf(definition.targetId, StringComparison.OrdinalIgnoreCase) >= 0)
+                        .Take(definition.requiredCount).ToArray();
+                    Assert(enemies.Length == definition.requiredCount, race + " has the required live starter enemies");
+                    foreach (var enemy in enemies) enemy.GetComponent<Combatant>().Damage(100000f);
+                    TutorialAction("LateUpdate");
+                    Assert(TutorialStage == "Journal" && questSystem.IsActiveQuestReady(), race + " objective advances to map guidance");
+                    player.MapOpen = true;
+                    TutorialAction("LateUpdate");
+                    player.MapOpen = false;
+                    Assert(TutorialStage == "Return", race + " opening the map advances to the local turn-in");
+                    questSystem.CompleteQuest(player);
+                    TutorialAction("LateUpdate");
+                    Assert(TutorialStage == "Complete" && questSystem.IsQuestCompleted(questId),
+                        race + " existing quest turn-in completes First Adventure");
+                    int gold = player.Gold;
+                    player.LoadAdventure();
+                    questSystem.LoadData();
+                    Assert(TutorialStage == "Complete" && questSystem.IsQuestCompleted(questId) && player.Gold == gold,
+                        race + " tutorial and quest resume completed without a duplicated reward");
+                }
+
+                var otherQuest = FactionQuestSystem.GetQuest("frontier_cartography");
+                questSystem.AcceptQuest(otherQuest, player);
+                TutorialAction("Begin");
+                tutorialStep.SetValue(player, Enum.Parse(tutorialStep.PropertyType, "Talk"));
+                TutorialAction("LateUpdate");
+                Assert(TutorialStage == "Journal" && questSystem.ActiveQuestId == otherQuest.id,
+                    "Replay hands off to an existing unrelated quest without replacing it");
+            }
+            finally
+            {
+                PlayerController.SavePathOverride = originalSave;
+            }
+        }
+
         static void CheckNarrativeLine(NarrativeProfileDto profile, string channel, string topic, string expected)
         {
             var selected = NarrativeCatalog.SelectText(profile, channel, topic, player);
@@ -548,6 +638,7 @@ namespace Riftbound.Editor
                 else if (stage == 13)
                 {
                     Assert(ActiveMerchantTopic == null && !player.ShopOpen, "Closing the shop clears the conversation");
+                    CheckLocalStarterTutorials();
                     Assert(Errors.Count == 0, "Zero Riftbound/AdventureGuide runtime errors", $"errors={Errors.Count}");
                     Lines.Add($"TOTAL PASS={passed} ERRORS={Errors.Count} RESULT=PASS");
                     File.WriteAllLines(Output, Lines);

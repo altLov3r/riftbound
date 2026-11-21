@@ -8,7 +8,7 @@ Abe introduces the road-raider, stolen-supply and Ashwood Captain quest chain. Q
 
 The first-five narrative catalog supplies Abe's quest text, Rowan and Mira's shop greetings, Elara's survey dialogue, and Selvek's encounter bark. The game selects those lines from the existing quest and encounter state. Choose **Conversation** in Rowan or Mira's shop to ask about supplies, receipts, road crews, or fair trade. Choose **Return to trade** to browse supplies again.
 
-New offline Human characters in Emberwatch can choose **Learn the basics** when they enter the world. The First Adventure card guides movement, camera controls, Abe's first quest and the Adventure Guide. Checkpoints are saved with that character. **Skip tutorial** dismisses it. Open **Esc → Help & Unstuck → Replay First Adventure** to revisit the lessons while keeping quest progress and earned rewards.
+New offline characters can choose **Learn the basics** when they enter the world. First Adventure teaches movement and camera controls before guiding you through your starter area's existing quest. Humans meet Abe in Emberwatch. Dwarves, Elves, Orcs, Undead, and Goblins meet their local quest givers. **Pin quest giver** adds a temporary waypoint when your map has no manual pin. Checkpoints are saved with that character. Use **Skip tutorial** to dismiss it or **Esc → Help & Unstuck → Replay First Adventure** to revisit the lessons while keeping quest progress and earned rewards.
 
 ## Travel
 

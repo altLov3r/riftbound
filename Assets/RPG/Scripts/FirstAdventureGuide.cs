@@ -1,3 +1,4 @@
+using System;
 using Riftbound.Network;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -15,19 +16,38 @@ namespace Riftbound
     {
         PlayerController player;
         CharacterController motor;
+        FactionQuestSystem factionQuests;
+        FactionQuestSystem.QuestDef starterQuest;
+        TownNPC starterGiver;
+        Vector3? guidePin;
         float walked, turned, previousYaw, previousPitch;
         GUIStyle heading, copy;
 
         internal static FirstAdventureGuide Attach(PlayerController player)
         {
-            if (!player || CoopSessionConfig.IsMultiplayer || !WorldRegions.Expanded ||
-                player.CharacterFaction != "Alliance" || player.CharacterRace != "Human")
+            if (!player || CoopSessionConfig.IsMultiplayer || !WorldRegions.Expanded)
+                return null;
+
+            var questId = player.CharacterRace switch
+            {
+                "Dwarf" => "frostpeak_troggs",
+                "Elf" or "High Elf" => "silverglen_sprites",
+                "Orc" or "Brute" => "bloodrock_cull",
+                "Undead" => "deathknell_ghouls",
+                "Goblin" => "rustwater_scavengers",
+                _ => null
+            };
+            var localQuest = questId != null ? FactionQuestSystem.GetQuest(questId) : null;
+            if (localQuest == null && !(player.CharacterRace == "Human" && player.CharacterFaction == "Alliance"))
                 return null;
 
             var guide = player.GetComponent<FirstAdventureGuide>();
             if (!guide) guide = player.gameObject.AddComponent<FirstAdventureGuide>();
             guide.player = player;
             guide.motor = player.GetComponent<CharacterController>();
+            guide.factionQuests = player.GetComponent<FactionQuestSystem>();
+            guide.starterQuest = localQuest;
+            guide.starterGiver = null;
             return guide;
         }
 
@@ -36,11 +56,19 @@ namespace Riftbound
         bool Engaged => Step > FirstAdventureStep.Unseen && Step < FirstAdventureStep.Complete;
         bool Suppressed => !player.Stats || !player.Stats.Alive || player.AnyBlockingWindowOpen() ||
             PrototypeHUD.MenuOpen || (player.orbit && player.orbit.Paused);
-        bool Offer => Step == FirstAdventureStep.Unseen && player.QuestIndex == 0 && !player.QuestAccepted;
+        bool LocalStarter => starterQuest != null;
+        bool StarterComplete => LocalStarter ? factionQuests && factionQuests.IsQuestCompleted(starterQuest.id) : player.QuestIndex > 0;
+        bool StarterAccepted => LocalStarter ? factionQuests && factionQuests.ActiveQuestId == starterQuest.id : player.QuestAccepted;
+        bool StarterReady => LocalStarter ? StarterAccepted && factionQuests.IsActiveQuestReady() : player.QuestReady;
+        int StarterProgress => LocalStarter ? StarterAccepted ? factionQuests.CurrentProgress : 0 : player.Kills;
+        bool HasDifferentQuest => LocalStarter && factionQuests &&
+            !string.IsNullOrEmpty(factionQuests.ActiveQuestId) && !StarterAccepted;
+        bool Offer => Step == FirstAdventureStep.Unseen && !StarterComplete && !StarterAccepted && !HasDifferentQuest;
 
         internal void Begin()
         {
             if (!Active) return;
+            ClearGuidePin();
             walked = turned = 0;
             ChangeStep(FirstAdventureStep.Move);
         }
@@ -50,6 +78,7 @@ namespace Riftbound
         void ChangeStep(FirstAdventureStep step)
         {
             if (Step == step) return;
+            ClearGuidePin();
             player.TutorialStep = step;
             player.SaveAdventure(false);
         }
@@ -65,27 +94,37 @@ namespace Riftbound
             previousYaw = yaw;
             previousPitch = pitch;
 
+            if (HasDifferentQuest && Step >= FirstAdventureStep.Talk && Step != FirstAdventureStep.Journal)
+                ChangeStep(FirstAdventureStep.Journal);
+            if (LocalStarter && !StarterAccepted && !StarterComplete && !HasDifferentQuest &&
+                (Step == FirstAdventureStep.Fight || Step == FirstAdventureStep.Raiders || Step == FirstAdventureStep.Return))
+                ChangeStep(FirstAdventureStep.Talk);
+
             // Dialogue and the journal are legitimate tutorial actions, including when they block movement.
             switch (Step)
             {
                 case FirstAdventureStep.Talk:
-                    if (player.QuestIndex > 0 || player.QuestReady) ChangeStep(FirstAdventureStep.Journal);
-                    else if (player.QuestAccepted) ChangeStep(FirstAdventureStep.Fight);
+                    if (StarterComplete || StarterReady) ChangeStep(FirstAdventureStep.Journal);
+                    else if (StarterAccepted) ChangeStep(FirstAdventureStep.Fight);
                     break;
                 case FirstAdventureStep.Fight:
-                    if (player.Kills > 0 || player.QuestIndex > 0) ChangeStep(FirstAdventureStep.Journal);
+                    if (StarterProgress > 0 || StarterComplete) ChangeStep(FirstAdventureStep.Journal);
                     break;
                 case FirstAdventureStep.Journal:
-                    if (player.JournalOpen || player.MapOpen)
-                        ChangeStep(player.QuestIndex > 0 ? FirstAdventureStep.Complete :
-                            player.QuestReady ? FirstAdventureStep.Return : FirstAdventureStep.Raiders);
+                    if (player.MapOpen || (!LocalStarter && player.JournalOpen))
+                    {
+                        if (StarterComplete || HasDifferentQuest) ChangeStep(FirstAdventureStep.Complete);
+                        else if (StarterReady) ChangeStep(FirstAdventureStep.Return);
+                        else if (StarterAccepted || !LocalStarter) ChangeStep(FirstAdventureStep.Raiders);
+                        else ChangeStep(FirstAdventureStep.Talk);
+                    }
                     break;
                 case FirstAdventureStep.Raiders:
-                    if (player.QuestIndex > 0) ChangeStep(FirstAdventureStep.Complete);
-                    else if (player.QuestReady) ChangeStep(FirstAdventureStep.Return);
+                    if (StarterComplete) ChangeStep(FirstAdventureStep.Complete);
+                    else if (StarterReady) ChangeStep(FirstAdventureStep.Return);
                     break;
                 case FirstAdventureStep.Return:
-                    if (player.QuestIndex > 0) ChangeStep(FirstAdventureStep.Complete);
+                    if (StarterComplete) ChangeStep(FirstAdventureStep.Complete);
                     break;
             }
 
@@ -112,6 +151,39 @@ namespace Riftbound
                 (mouse != null && mouse.leftButton.isPressed && mouse.rightButton.isPressed);
         }
 
+        TownNPC FindStarterGiver()
+        {
+            if (starterGiver && starterGiver.gameObject.activeInHierarchy) return starterGiver;
+            starterGiver = null;
+            foreach (var npc in FindObjectsByType<TownNPC>(FindObjectsSortMode.None))
+            {
+                if (!string.Equals(npc.npcName, starterQuest.giverNpc, StringComparison.Ordinal)) continue;
+                starterGiver = npc;
+                break;
+            }
+            return starterGiver;
+        }
+
+        bool CanPinGuide => LocalStarter && (Step == FirstAdventureStep.Talk || Step == FirstAdventureStep.Return) &&
+            MinimapRadar.Instance && !MinimapRadar.Instance.customWaypoint.HasValue && FindStarterGiver();
+
+        void PinGuide()
+        {
+            if (!CanPinGuide) return;
+            guidePin = starterGiver.transform.position;
+            MinimapRadar.SetWaypoint(guidePin.Value, "First Adventure: " + starterQuest.giverNpc);
+        }
+
+        void ClearGuidePin()
+        {
+            var radar = MinimapRadar.Instance;
+            if (guidePin.HasValue && radar && radar.customWaypoint == guidePin &&
+                radar.TryGetNavigationTarget(out _, out string caption) &&
+                caption == "First Adventure: " + starterQuest?.giverNpc)
+                MinimapRadar.ClearWaypoint();
+            guidePin = null;
+        }
+
         string Instruction()
         {
             switch (Step)
@@ -123,16 +195,28 @@ namespace Riftbound
                 case FirstAdventureStep.Look:
                     return "Hold the left mouse button and move the mouse to look around.";
                 case FirstAdventureStep.Talk:
+                    if (LocalStarter)
+                        return $"Find {starterQuest.giverNpc} in {starterQuest.zone}. Press E to accept {starterQuest.title}.";
                     return player.CanTalk()
                         ? "Press E to talk to Abe, then accept The Forest Road."
                         : "Follow the quest marker to Abe at the village gate.";
                 case FirstAdventureStep.Fight:
+                    if (LocalStarter)
+                        return $"Look for {starterQuest.targetName} outside the settlement. Press Tab to target and 1 to attack.";
                     return "Follow the north road. Press Tab to target a raider and 1 to use your first ability.";
                 case FirstAdventureStep.Journal:
+                    if (HasDifferentQuest)
+                        return $"Press M to find your current quest, {factionQuests.GetActiveQuest()?.title}, on the map.";
+                    if (LocalStarter)
+                        return "Press M to open the map and see your local quest objective.";
                     return "Press J to see your quest in the Adventure Guide. M opens the map.";
                 case FirstAdventureStep.Raiders:
+                    if (LocalStarter)
+                        return $"Defeat {starterQuest.targetName} ({StarterProgress}/{starterQuest.requiredCount}).";
                     return $"Defeat raiders along the north road ({Mathf.Min(player.Kills, 3)}/3).";
                 case FirstAdventureStep.Return:
+                    if (LocalStarter)
+                        return $"Return to {starterQuest.giverNpc} and press E to turn in {starterQuest.title}.";
                     return player.CanTalk() ? "Press E and turn in The Forest Road to Abe."
                         : "Follow the quest marker back to Abe to turn in The Forest Road.";
                 default:
@@ -148,13 +232,17 @@ namespace Riftbound
             copy ??= new GUIStyle(GUI.skin.label) { fontSize = 14, wordWrap = true };
             copy.normal.textColor = new Color(.95f, .94f, .90f);
 
-            float width = Mathf.Min(430f, Screen.width - 32f);
-            float x = (Screen.width - width) * .5f;
-            float y = 92f;
+            var previousMatrix = GUI.matrix;
+            float scale = Mathf.Min(Screen.width / 1280f, Screen.height / 720f);
+            GUI.matrix = Matrix4x4.Scale(new Vector3(scale, scale, 1f));
+            float width = 430f;
+            float x = (Screen.width / scale - width) * .5f;
+            float y = 195f;
             bool offer = Offer;
+            bool canPin = CanPinGuide;
             Color previous = GUI.color;
             GUI.color = new Color(.075f, .083f, .09f, .94f);
-            GUI.DrawTexture(new Rect(x, y, width, offer ? 112 : 86), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(x, y, width, offer || canPin ? 112 : 86), Texture2D.whiteTexture);
             GUI.color = previous;
             GUI.Label(new Rect(x + 12, y + 6, width - 96, 24), "First Adventure", heading);
             GUI.Label(new Rect(x + 12, y + 32, width - 24, 44), Instruction(), copy);
@@ -165,6 +253,9 @@ namespace Riftbound
             }
             else if (GUI.Button(new Rect(x + width - 64, y + 7, 52, 22), "Skip"))
                 Skip();
+            if (canPin && GUI.Button(new Rect(x + 12, y + 73, 132, 27), "Pin quest giver"))
+                PinGuide();
+            GUI.matrix = previousMatrix;
         }
     }
 }
