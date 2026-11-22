@@ -2634,15 +2634,24 @@ namespace Riftbound.Network
                     bool soloMoveOk = Vector3.Distance(lp.transform.position, soloPosBefore) >= 1.8f;
 
                     while (Time.realtimeSinceStartup < deadline && CountSpawnedPeers() < 2)
-                        yield return new WaitForSeconds(0.15f);
-                    yield return new WaitForSeconds(0.4f);
+                        yield return new WaitForSeconds(0.1f);
 
-                    RiftboundCoopPlayer rejoinPeer = null;
-                    foreach (var p in RiftboundCoopPlayer.AllPlayers)
-                        if (p && p.IsSpawned && !p.IsOwner) { rejoinPeer = p; break; }
-                    bool sawRejoin = CountSpawnedPeers() >= 2 && rejoinPeer != null && HasValidObserverGrounding(rejoinPeer);
+                    bool sawRejoin = false;
+                    float rejoinGrace = Mathf.Min(deadline, Time.realtimeSinceStartup + 2.5f);
+                    while (Time.realtimeSinceStartup < rejoinGrace)
+                    {
+                        RiftboundCoopPlayer rejoinPeer = null;
+                        foreach (var p in RiftboundCoopPlayer.AllPlayers)
+                            if (p && p.IsSpawned && !p.IsOwner) { rejoinPeer = p; break; }
+                        if (CountSpawnedPeers() >= 2 && rejoinPeer != null && HasValidObserverGrounding(rejoinPeer))
+                        {
+                            sawRejoin = true;
+                            break;
+                        }
+                        yield return new WaitForSeconds(0.05f);
+                    }
 
-                    yield return new WaitForSeconds(0.8f); // allow c1_rejoin to confirm snapshot + peer presence before exiting
+                    yield return new WaitForSeconds(0.4f); // allow c1_rejoin to finish snapshot checks cleanly
                     bool pass = peerGroundingOk && sawPeerMove && sawEnemyAction && sawDropToOne && soloCombatOk && soloMoveOk && sawRejoin;
                     WriteResult(pass, $"peerGv={peerGroundingOk}, sawPeerMove={sawPeerMove}, sawEnemyAction={sawEnemyAction}(seq={observedSeq},kind={observedKind}), drop1={sawDropToOne}, soloCombat={soloCombatOk}(raiderHp={raiderStats.Health:F0}/{raiderStats.maxHealth:F0}), soloMove={soloMoveOk}, sawRejoin={sawRejoin}");
                     if (nm != null && nm.IsListening) nm.Shutdown();
@@ -2653,19 +2662,22 @@ namespace Riftbound.Network
             }
             else if (role == "c1_rejoin")
             {
+                bool sawTwoPeers = false;
                 bool peerGroundingOk = false;
                 bool worldSnapshotOk = false;
                 float waitSnap = Time.realtimeSinceStartup;
                 while (Time.realtimeSinceStartup - waitSnap < 10f)
                 {
+                    if (CountSpawnedPeers() >= 2) sawTwoPeers = true;
                     peerGroundingOk = HasValidObserverGrounding(peer);
                     if (raiderStats.Health < raiderStats.maxHealth) worldSnapshotOk = true;
-                    if (peerGroundingOk && worldSnapshotOk) break;
+                    if (sawTwoPeers && peerGroundingOk && worldSnapshotOk) break;
                     yield return new WaitForSeconds(0.15f);
                 }
 
-                bool pass = CountSpawnedPeers() >= 2 && peerGroundingOk && worldSnapshotOk;
-                WriteResult(pass, $"players={CountSpawnedPeers()}, peerGv={peerGroundingOk}, snapshotDamagedRaider={worldSnapshotOk}(raiderHp={raiderStats.Health:F0}/{raiderStats.maxHealth:F0})");
+                yield return new WaitForSeconds(0.75f); // stay spawned briefly so c2 deterministically observes rejoin
+                bool pass = sawTwoPeers && peerGroundingOk && worldSnapshotOk;
+                WriteResult(pass, $"sawTwo={sawTwoPeers}, peerGv={peerGroundingOk}, snapshotDamagedRaider={worldSnapshotOk}(raiderHp={raiderStats.Health:F0}/{raiderStats.maxHealth:F0})");
                 if (nm != null && nm.IsListening) nm.Shutdown();
                 yield return new WaitForSeconds(0.2f);
                 Application.Quit(pass ? 0 : 1);
