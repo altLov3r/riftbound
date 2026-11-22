@@ -134,15 +134,14 @@ namespace Riftbound.Network
 
             if (IsServer)
             {
-                SpawnSlot.Value = OwnerClientId == NetworkManager.ServerClientId ? 0 : AllPlayers.Count - 1;
-                IsLeader.Value = OwnerClientId == NetworkManager.ServerClientId;
+                SpawnSlot.Value = CoopWorldManager.AllocateSpawnSlot(this);
+                IsLeader.Value = !CoopSessionConfig.IsDedicatedServer && OwnerClientId == NetworkManager.ServerClientId;
                 MaxHealth.Value = 100;
                 Health.Value = 100;
                 Level.Value = 1;
-                if (OwnerClientId != NetworkManager.ServerClientId && transform.position.sqrMagnitude < 0.1f)
+                if ((CoopSessionConfig.IsDedicatedServer || OwnerClientId != NetworkManager.ServerClientId) && transform.position.sqrMagnitude < 0.1f)
                 {
-                    var lp = FindFirstObjectByType<PlayerController>();
-                    Vector3 basePos = lp ? lp.transform.position : new Vector3(0f, 1f, 10f);
+                    Vector3 basePos = CoopWorldManager.GetRealmSpawnAnchor("Human");
                     Vector3 slotPos = ComputeSpawnPosition(basePos, SpawnSlot.Value);
                     AuthorizeHostTeleport(slotPos);
                 }
@@ -228,13 +227,27 @@ namespace Riftbound.Network
 
         void BindToLocalPlayer()
         {
+            if (CoopSessionConfig.IsDedicatedServer) return;
             localPlayer = FindFirstObjectByType<PlayerController>();
             if (!localPlayer) return;
+
+            if (CoopSessionConfig.IsRealmClient)
+            {
+                var rt = RealmConfig.Runtime;
+                if (!string.IsNullOrWhiteSpace(rt.clientCharName))
+                {
+                    localPlayer.CharacterName = rt.clientCharName;
+                    if (localPlayer.Stats) localPlayer.Stats.displayName = rt.clientCharName;
+                }
+                if (!string.IsNullOrWhiteSpace(rt.clientRace)) localPlayer.CharacterRace = rt.clientRace;
+                if (!string.IsNullOrWhiteSpace(rt.clientClass)) localPlayer.CharacterClass = rt.clientClass;
+                if (!string.IsNullOrWhiteSpace(rt.clientFaction)) localPlayer.CharacterFaction = rt.clientFaction;
+            }
 
             if (!spawnPositioned)
             {
                 spawnPositioned = true;
-                if (OwnerClientId != NetworkManager.ServerClientId)
+                if (CoopSessionConfig.IsRealmClient || OwnerClientId != NetworkManager.ServerClientId)
                 {
                     var cc = localPlayer.GetComponent<CharacterController>();
                     if (cc) cc.enabled = false;
@@ -842,6 +855,95 @@ namespace Riftbound.Network
 
         // ── O-01 Host-Authoritative Combat ──────────────────────────────────────────────
 
+        public const int Slot1UnlockLevel = 1;
+        public const int Slot2UnlockLevel = 3;
+        public const int Slot3UnlockLevel = 5;
+
+        public static event System.Action<string, int, int> OnAbilityRejectedLocked;
+
+        public string LastLockedAbilityRejection { get; private set; } = string.Empty;
+        public int LastLockedRequiredLevel { get; private set; }
+        public int LastLockedServerLevel { get; private set; }
+
+        public static bool TryGetAbilitySlotRequirement(string abilityId, out int slot, out int requiredLevel)
+        {
+            slot = 0;
+            requiredLevel = int.MaxValue;
+            if (string.IsNullOrWhiteSpace(abilityId)) return false;
+            switch (abilityId.Trim().ToLowerInvariant())
+            {
+                case "melee":
+                case "fireball":
+                case "interrupt":
+                    slot = 1;
+                    requiredLevel = Slot1UnlockLevel;
+                    return true;
+                case "frostnova":
+                case "eviscerate":
+                case "consecration":
+                case "whirlwind":
+                    slot = 2;
+                    requiredLevel = Slot2UnlockLevel;
+                    return true;
+                case "arcane_ward":
+                case "sprint":
+                case "holy_light":
+                case "second_wind":
+                    slot = 3;
+                    requiredLevel = Slot3UnlockLevel;
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        public static int GetRequiredLevelForAbility(string abilityId) =>
+            TryGetAbilitySlotRequirement(abilityId, out _, out int req) ? req : int.MaxValue;
+
+        public static bool IsAbilityUnlockedForLevel(string abilityId, int characterLevel) =>
+            TryGetAbilitySlotRequirement(abilityId, out _, out int req) && characterLevel >= req;
+
+        public float GetServerCooldownRemainingForTest(string cdKey)
+        {
+            if (string.IsNullOrEmpty(cdKey)) return 0f;
+            return serverAbilityCooldowns.TryGetValue(cdKey, out float readyAt) ? Mathf.Max(0f, readyAt - Time.time) : 0f;
+        }
+
+        public void SetServerLevelForTest(int level)
+        {
+            if (!IsServer) return;
+            Level.Value = Mathf.Max(1, level);
+        }
+
+        public void ClearLastLockedRejectionForTest()
+        {
+            LastLockedAbilityRejection = string.Empty;
+            LastLockedRequiredLevel = 0;
+            LastLockedServerLevel = 0;
+        }
+
+        void RejectLockedAbilityOnServer(string key, int requiredLevel, int serverLevel)
+        {
+            RecordLockedAbilityRejection(key, requiredLevel, serverLevel);
+            if (!IsOwner && NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening)
+                NotifyAbilityLockedClientRpc(key, requiredLevel, serverLevel, RpcTarget.Single(OwnerClientId, RpcTargetUse.Temp));
+        }
+
+        [Rpc(SendTo.SpecifiedInParams, InvokePermission = RpcInvokePermission.Server)]
+        void NotifyAbilityLockedClientRpc(string abilityId, int requiredLevel, int serverLevel, RpcParams rpcParams = default)
+        {
+            if (!IsOwner) return;
+            RecordLockedAbilityRejection(abilityId, requiredLevel, serverLevel);
+        }
+
+        void RecordLockedAbilityRejection(string abilityId, int requiredLevel, int serverLevel)
+        {
+            LastLockedAbilityRejection = abilityId ?? string.Empty;
+            LastLockedRequiredLevel = requiredLevel;
+            LastLockedServerLevel = serverLevel;
+            OnAbilityRejectedLocked?.Invoke(LastLockedAbilityRejection, requiredLevel, serverLevel);
+        }
+
         public void RequestAbilityAttack(Combatant targetCombatant, string abilityId = "melee")
         {
             if (!targetCombatant || !targetCombatant.Alive) return;
@@ -887,6 +989,13 @@ namespace Riftbound.Network
             if (key == "eviscerate" && cls != "Rogue") return;
             if (key == "consecration" && cls != "Paladin") return;
             if (key == "whirlwind" && cls != "Warrior") return;
+
+            int serverLevel = Mathf.Max(1, Level.Value);
+            if (!TryGetAbilitySlotRequirement(key, out _, out int requiredLevel) || serverLevel < requiredLevel)
+            {
+                RejectLockedAbilityOnServer(key, requiredLevel, serverLevel);
+                return;
+            }
 
             bool isAoe = key == "frostnova" || key == "consecration" || key == "whirlwind";
             string cdKey = isAoe ? $"{key}:{enemy.NetworkKey}" : key;
@@ -973,7 +1082,7 @@ namespace Riftbound.Network
 
         void ApplyServerAbilityHeal(int amount, string abilityId)
         {
-            if (!IsServer || Health.Value <= 0 || Health.Value >= MaxHealth.Value) return;
+            if (!IsServer || Health.Value <= 0) return;
             string key = string.IsNullOrEmpty(abilityId) ? "" : abilityId.ToLowerInvariant();
             string cls = ClassName.Value.ToString();
             int serverHeal = 0;
@@ -982,6 +1091,14 @@ namespace Riftbound.Network
             else if (key == "second_wind" && cls == "Warrior") serverHeal = 45;
             else return;
 
+            int serverLevel = Mathf.Max(1, Level.Value);
+            if (!TryGetAbilitySlotRequirement(key, out _, out int requiredLevel) || serverLevel < requiredLevel)
+            {
+                RejectLockedAbilityOnServer(key, requiredLevel, serverLevel);
+                return;
+            }
+
+            if (Health.Value >= MaxHealth.Value) return;
             if (serverAbilityCooldowns.TryGetValue("heal:" + key, out float readyAt) && Time.time < readyAt) return;
             serverAbilityCooldowns["heal:" + key] = Time.time + 8.0f;
             if (key == "arcane_ward") lastServerMoveTime -= 0.85f; // Allow 7.5m Blink displacement once per validated arcane_ward cast
@@ -1042,6 +1159,11 @@ namespace Riftbound.Network
 
         public void BroadcastVisualEnemyProjectile(Vector3 origin, Vector3 direction)
         {
+            if (RealmWorldChannel.Instance && RealmWorldChannel.Instance.IsSpawned && RealmWorldChannel.Instance.IsServer)
+            {
+                RealmWorldChannel.DispatchVisualEnemyProjectile(origin, direction);
+                return;
+            }
             var hostChannel = ResolveCanonicalHostChannel(this);
             if (!hostChannel) return;
             hostChannel.BroadcastVisualEnemyProjectileClientRpc(origin, direction);
@@ -1058,6 +1180,11 @@ namespace Riftbound.Network
         public void BroadcastEnemyState(EnemyController enemy)
         {
             if (!enemy) return;
+            if (RealmWorldChannel.Instance && RealmWorldChannel.Instance.IsSpawned && RealmWorldChannel.Instance.IsServer)
+            {
+                RealmWorldChannel.DispatchEnemyState(enemy);
+                return;
+            }
             var hostChannel = ResolveCanonicalHostChannel(this);
             if (!hostChannel) return;
             var c = enemy.GetComponent<Combatant>();
@@ -1068,6 +1195,11 @@ namespace Riftbound.Network
         public void BroadcastEnemyAction(EnemyController enemy, byte actionKind, float duration, Vector3 origin, string spellName, string icon, uint actionSeq, float castDuration = -1f)
         {
             if (!enemy) return;
+            if (RealmWorldChannel.Instance && RealmWorldChannel.Instance.IsSpawned && RealmWorldChannel.Instance.IsServer)
+            {
+                RealmWorldChannel.DispatchEnemyAction(enemy, actionKind, duration, origin, spellName, icon, actionSeq, castDuration);
+                return;
+            }
             var hostChannel = ResolveCanonicalHostChannel(this);
             if (!hostChannel) return;
             hostChannel.BroadcastEnemyActionClientRpc(enemy.NetworkKey ?? "", actionKind, Mathf.Clamp(duration, 0f, 3.5f), origin, spellName ?? "", icon ?? "", actionSeq, castDuration);
@@ -1161,9 +1293,7 @@ namespace Riftbound.Network
             lastServerRespawnTime = Time.time;
             if (Health.Value <= 0)
                 Health.Value = MaxHealth.Value;
-            Vector3 baseSpawn = new Vector3(0f, 1f, 10f);
-            var lp = FindFirstObjectByType<PlayerController>();
-            if (lp) baseSpawn = lp.GetRacialSpawnPosition();
+            Vector3 baseSpawn = CoopWorldManager.GetRealmSpawnAnchor(Race.Value.ToString());
             Vector3 slotSpawn = ComputeSpawnPosition(baseSpawn, SpawnSlot.Value);
             AuthorizeHostTeleport(slotSpawn);
             if (IsOwner && localPlayer)
@@ -1571,8 +1701,16 @@ namespace Riftbound.Network
 
         // ── O-01 Shared World Events & Late-Join Snapshot ───────────────────────────────
 
+        internal static uint ActiveReadyCheckSeq => activeGlobalReadyCheckSeq;
+        internal void SetServerReadyCheckSeqForChannel(uint checkId) => serverReadyCheckSeq = checkId;
+
         public void SendWorldSnapshotToClient(ulong clientId)
         {
+            if (RealmWorldChannel.Instance && RealmWorldChannel.Instance.IsSpawned && RealmWorldChannel.Instance.IsServer)
+            {
+                RealmWorldChannel.DispatchWorldSnapshotToClient(clientId);
+                return;
+            }
             var hostChannel = ResolveCanonicalHostChannel(this);
             if (!hostChannel) return;
             var rpcParams = hostChannel.RpcTarget.Single(clientId, RpcTargetUse.Temp);
@@ -1820,7 +1958,7 @@ namespace Riftbound.Network
 
         void OnGUI()
         {
-            if (!IsSpawned || IsOwner || FrontendMenu.IsOpen) return;
+            if (CoopSessionConfig.IsDedicatedServer || !IsSpawned || IsOwner || FrontendMenu.IsOpen) return;
             var cam = Camera.main;
             if (!cam) return;
 

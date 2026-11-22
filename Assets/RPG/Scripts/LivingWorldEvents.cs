@@ -75,7 +75,7 @@ namespace Riftbound
 
         void SpawnAmbientTraveller()
         {
-            if (travellerRoot) return;
+            if (travellerRoot || Network.CoopSessionConfig.IsDedicatedServer) return;
             travellerRoot = new GameObject("AmbientTraveller_RoadPorter");
             travellerRoot.transform.position = travellerRoute[0];
             var vis = CharacterVisualFactory.CreateVisualInstance("Human", "Warrior", travellerRoot.transform);
@@ -85,8 +85,9 @@ namespace Riftbound
         void Update()
         {
             if (!IsAuthoritative || FrontendMenu.IsOpen || Time.timeScale <= 0f) return;
+            bool isServerActive = Network.CoopSessionConfig.IsMultiplayer && NetworkManager.Singleton && NetworkManager.Singleton.IsServer;
             if (!player) player = FindFirstObjectByType<PlayerController>();
-            if (!player || !player.Stats || !player.Stats.Alive) return;
+            if (!isServerActive && (!player || !player.Stats || !player.Stats.Alive)) return;
 
             UpdateAmbientTraveller();
             UpdateCaravanEvent();
@@ -143,6 +144,15 @@ namespace Riftbound
                 targetPlayer.SendEventSnapshotRpc("supply_caravan_westbank", true, caravanCart.transform.position, rpcParams);
             if (AmbushState == EventState.Active)
                 targetPlayer.SendEventSnapshotRpc("roadside_ambush_greenhollow", true, GroundPos(AmbushSite), rpcParams);
+        }
+
+        public void SendEventSnapshotViaChannel(Network.RealmWorldChannel channel, RpcParams rpcParams)
+        {
+            if (!IsAuthoritative || !channel) return;
+            if (CaravanState == EventState.Active && caravanCart)
+                channel.SendEventSnapshotRpc("supply_caravan_westbank", true, caravanCart.transform.position, rpcParams);
+            if (AmbushState == EventState.Active)
+                channel.SendEventSnapshotRpc("roadside_ambush_greenhollow", true, GroundPos(AmbushSite), rpcParams);
         }
 
         public void ApplyClientEventState(string eventId, bool active, Vector3 pos)
@@ -206,14 +216,15 @@ namespace Riftbound
             caravanCart.transform.SetParent(caravanRoot.transform, false);
             caravanCart.transform.position = caravanRoute[0] + Vector3.up * 0.7f;
             caravanCart.transform.localScale = new Vector3(1.8f, 1.2f, 2.8f);
-            caravanCart.GetComponent<Renderer>().sharedMaterial = SpellFX.CreateUnlitMat(new Color(0.45f, 0.3f, 0.16f));
+            var cartMat = SpellFX.CreateUnlitMat(new Color(0.45f, 0.3f, 0.16f));
+            if (cartMat) caravanCart.GetComponent<Renderer>().sharedMaterial = cartMat;
 
             caravanStats = caravanCart.AddComponent<Combatant>();
             caravanStats.displayName = "Emberwatch Supply Caravan";
             caravanStats.ConfigureVitals(220f, 1f);
             caravanStats.Restore();
 
-            Network.RiftboundCoopPlayer.BroadcastWorldEventState("supply_caravan_westbank", true, caravanCart.transform.position);
+            Network.RealmWorldChannel.DispatchWorldEventState("supply_caravan_westbank", true, caravanCart.transform.position);
             ZoneBanner.Show("WORLD EVENT: SUPPLY CARAVAN", "Escort the Emberwatch wagon safely toward Westbank!");
             ChatSystem.LogSystem("World Event started: Escort the Supply Caravan!");
         }
@@ -269,7 +280,7 @@ namespace Riftbound
                 if (Time.time >= nextCaravanBroadcastAt)
                 {
                     nextCaravanBroadcastAt = Time.time + 0.45f;
-                    Network.RiftboundCoopPlayer.BroadcastWorldEventState("supply_caravan_westbank", true, caravanCart.transform.position);
+                    Network.RealmWorldChannel.DispatchWorldEventState("supply_caravan_westbank", true, caravanCart.transform.position);
                 }
             }
 
@@ -299,7 +310,7 @@ namespace Riftbound
             CleanupCaravan();
             CaravanState = EventState.Cooldown;
             caravanCooldownUntil = Time.time + 120f;
-            Network.RiftboundCoopPlayer.BroadcastWorldEventState("supply_caravan_westbank", false, Vector3.zero);
+            Network.RealmWorldChannel.DispatchWorldEventState("supply_caravan_westbank", false, Vector3.zero);
         }
 
         void CleanupCaravan()
@@ -333,7 +344,7 @@ namespace Riftbound
             SpawnEventRaider(ambushRoot.transform, site + new Vector3(4f, 0f, 3f), "ambush-raider-1", "Redridge Ambusher", ambushRaiders);
             SpawnEventRaider(ambushRoot.transform, site + new Vector3(-4f, 0f, 3f), "ambush-raider-2", "Redridge Stalker", ambushRaiders);
 
-            Network.RiftboundCoopPlayer.BroadcastWorldEventState("roadside_ambush_greenhollow", true, site);
+            Network.RealmWorldChannel.DispatchWorldEventState("roadside_ambush_greenhollow", true, site);
             CombatTextManager.Spawn(site + Vector3.up * 2.4f, "HELP! AMBUSH!", new Color(1f, 0.75f, 0.2f), true);
             ZoneBanner.Show("WORLD EVENT: ROADSIDE AMBUSH", "Defeat the raiders attacking the Frontier Scout!");
         }
@@ -389,7 +400,7 @@ namespace Riftbound
             CleanupAmbush();
             AmbushState = EventState.Cooldown;
             ambushCooldownUntil = Time.time + 120f;
-            Network.RiftboundCoopPlayer.BroadcastWorldEventState("roadside_ambush_greenhollow", false, Vector3.zero);
+            Network.RealmWorldChannel.DispatchWorldEventState("roadside_ambush_greenhollow", false, Vector3.zero);
         }
 
         void CleanupAmbush()

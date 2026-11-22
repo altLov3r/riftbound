@@ -236,7 +236,9 @@ namespace Riftbound
 
         public static Material CreateUnlitMat(Color color)
         {
-            var shader = Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Unlit/Color");
+            if (Network.CoopSessionConfig.IsDedicatedServer) return null;
+            var shader = Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Unlit/Color") ?? Shader.Find("Sprites/Default");
+            if (!shader) return null;
             var mat = new Material(shader);
             mat.SetColor("_BaseColor", color);
             return mat;
@@ -249,6 +251,7 @@ namespace Riftbound
                       ?? Shader.Find("Particles/Standard Unlit")
                       ?? Shader.Find("Sprites/Default")
                       ?? Shader.Find("Universal Render Pipeline/Unlit");
+            if (!shader) return null;
             cachedParticleMat = new Material(shader);
             cachedParticleMat.SetColor("_BaseColor", Color.white);
             cachedParticleMat.SetColor("_Color", Color.white);
@@ -290,6 +293,7 @@ namespace Riftbound
 
         public static void SpawnBurst(Vector3 pos, Color colA, Color colB, int count, float minSpeed, float maxSpeed, float minSize, float maxSize, float lifetime)
         {
+            if (Network.CoopSessionConfig.IsDedicatedServer) return;
             var go = new GameObject("VFXBurst");
             go.transform.position = pos;
             var ps = go.AddComponent<ParticleSystem>();
@@ -325,6 +329,7 @@ namespace Riftbound
 
         public static void CreateExpandingRing(Vector3 center, float startR, float endR, float duration, Color color, float width = 0.18f)
         {
+            if (Network.CoopSessionConfig.IsDedicatedServer) return;
             var go = new GameObject("ExpandingRingFX");
             go.transform.position = center + Vector3.up * 0.08f;
             go.AddComponent<ExpandingRingFX>().Init(startR, endR, duration, color, width);
@@ -387,6 +392,7 @@ namespace Riftbound
 
         public static void CreateLevelUpBurst(Vector3 pos)
         {
+            if (Network.CoopSessionConfig.IsDedicatedServer) return;
             OrbitCamera.Shake(0.15f, 0.25f);
             CreateExpandingRing(pos, 0.4f, 4.8f, 0.75f, new Color(1f, 0.9f, 0.35f, 1f), 0.26f);
             SpawnBurst(pos + Vector3.up * 0.5f, new Color(1f, 0.96f, 0.55f), new Color(1f, 0.75f, 0.15f), 42, 2.5f, 7f, 0.15f, 0.35f, 0.95f);
@@ -426,6 +432,7 @@ namespace Riftbound
 
         public static void CreateHeavySlam(Vector3 center, float radius)
         {
+            if (Network.CoopSessionConfig.IsDedicatedServer) return;
             OrbitCamera.Shake(0.24f, 0.25f);
             CreateExpandingRing(center, 0.4f, radius, 0.35f, new Color(1f, 0.25f, 0.1f, 0.95f), 0.28f);
             CreateExpandingRing(center + Vector3.up * 0.15f, 0.2f, radius * 0.65f, 0.28f, new Color(1f, 0.72f, 0.2f, 0.85f), 0.16f);
@@ -434,7 +441,7 @@ namespace Riftbound
 
         public static void CreateSoulOrb(Vector3 startPos, Transform target)
         {
-            if (!target) return;
+            if (!target || Network.CoopSessionConfig.IsDedicatedServer) return;
             var orb = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             orb.name = "SoulOrbFX";
             var col = orb.GetComponent<Collider>();
