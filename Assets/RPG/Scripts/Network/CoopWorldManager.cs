@@ -437,18 +437,39 @@ namespace Riftbound.Network
         void StartRealmClientFlow()
         {
             EnsureNetworkManagerPrepared();
-            if (nm == null) return;
+            if (nm == null)
+            {
+                EmberfordRealmClient.MarkDisconnectedOrFailed(statusText, true);
+                return;
+            }
 
             var cfg = RealmConfig.Current;
             string endpoint = string.IsNullOrWhiteSpace(cfg.endpoint) ? RealmConfig.DefaultLoopback : cfg.endpoint.Trim();
             EmberfordRealmClient.MarkConnecting(endpoint, cfg.port);
             nm.NetworkConfig.ConnectionData = BuildRealmConnectionPayload();
-            utp.SetConnectionData(endpoint, cfg.port);
-
-            bool ok = nm.StartClient();
+            bool ok = false;
+            try
+            {
+                utp.SetConnectionData(endpoint, cfg.port);
+                ok = nm.StartClient();
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning($"[CoopWorldManager] Could not start realm connection: {exception.Message}");
+            }
             statusText = ok ? $"Connecting to {cfg.displayName} ({endpoint}:{cfg.port})..." : $"Failed to start {cfg.displayName} client";
-            if (!ok) EmberfordRealmClient.MarkDisconnectedOrFailed(statusText, true);
+            if (ok) StartCoroutine(WaitForRealmConnection(cfg.displayName));
+            else EmberfordRealmClient.MarkDisconnectedOrFailed(statusText, true);
             Debug.Log($"[CoopWorldManager] {statusText}");
+        }
+
+        IEnumerator WaitForRealmConnection(string realmName)
+        {
+            yield return new WaitForSecondsRealtime(15f);
+            if (shuttingDown || EmberfordRealmClient.State != RealmConnectionState.Connecting) yield break;
+            statusText = $"Connection to {realmName} timed out. Check that the realm is running and reachable.";
+            EmberfordRealmClient.MarkDisconnectedOrFailed(statusText, true);
+            if (nm != null && nm.IsListening) nm.Shutdown();
         }
 
         void SpawnServerWorldChannelIfNeeded()
@@ -564,7 +585,15 @@ namespace Riftbound.Network
 
             if (clientId == nm.LocalClientId && !nm.IsServer)
             {
-                string defaultMsg = CoopSessionConfig.IsRealmClient ? $"Lost connection to {RealmConfig.Current.displayName}" : "Host closed the session";
+                string defaultMsg = "Host closed the session";
+                if (CoopSessionConfig.IsRealmClient)
+                {
+                    if (EmberfordRealmClient.State == RealmConnectionState.Failed) return;
+                    string realmName = RealmConfig.Current.displayName;
+                    defaultMsg = EmberfordRealmClient.State == RealmConnectionState.Connecting
+                        ? $"Could not connect to {realmName}. Check that the realm is running and reachable."
+                        : $"Lost connection to {realmName}.";
+                }
                 string reason = string.IsNullOrEmpty(nm.DisconnectReason) ? defaultMsg : nm.DisconnectReason;
                 CoopSessionConfig.LastDisconnectReason = reason;
                 statusText = $"Disconnected: {reason}";
@@ -602,7 +631,16 @@ namespace Riftbound.Network
                 nm = null;
             }
 
+            string disconnectReason = CoopSessionConfig.LastDisconnectReason;
+            if (CoopSessionConfig.IsRealmClient)
+            {
+                if (EmberfordRealmClient.State == RealmConnectionState.Failed)
+                    disconnectReason = EmberfordRealmClient.LastError;
+                EmberfordRealmClient.CancelRealmSelection();
+                RealmServerBootstrap.RestoreOfflineSaves();
+            }
             CoopSessionConfig.ResetToOffline();
+            CoopSessionConfig.LastDisconnectReason = disconnectReason;
             groupMenuOpen = false;
             revealJoinCode = false;
             selectedPeerClientId = ulong.MaxValue;
@@ -624,6 +662,19 @@ namespace Riftbound.Network
         {
             if (CoopSessionConfig.IsDedicatedServer || !CoopSessionConfig.IsMultiplayer || FrontendMenu.IsOpen) return;
 
+            if (CoopSessionConfig.IsRealmClient && EmberfordRealmClient.State == RealmConnectionState.Connecting)
+            {
+                DrawCenteredStatusBox("CONNECTING TO EMBERFORD", EmberfordRealmClient.StatusMessage, showRetry: false);
+                return;
+            }
+
+            if (CoopSessionConfig.IsRealmClient && EmberfordRealmClient.State == RealmConnectionState.Failed)
+            {
+                DrawCenteredStatusBox("EMBERFORD CONNECTION ERROR", EmberfordRealmClient.LastError,
+                    showRetry: false, cancelLabel: "Back to title");
+                return;
+            }
+
             if (CoopSessionConfig.IsOnlineMode && OnlineSessionService.IsBusy)
             {
                 DrawCenteredStatusBox("CONNECTING TO ONLINE CO-OP", OnlineSessionService.StatusMessage, showRetry: false);
@@ -638,8 +689,7 @@ namespace Riftbound.Network
 
             if (hostDisconnected)
             {
-                string title = CoopSessionConfig.IsRealmClient ? "REALM CONNECTION LOST" : "SESSION ENDED";
-                DrawCenteredStatusBox(title, hostDisconnectMessage, showRetry: false, cancelLabel: "Back to Menu");
+                DrawCenteredStatusBox("SESSION ENDED", hostDisconnectMessage, showRetry: false, cancelLabel: "Back to Menu");
                 return;
             }
 

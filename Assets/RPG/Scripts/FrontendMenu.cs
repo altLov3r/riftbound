@@ -26,7 +26,7 @@ namespace Riftbound
             public int selected;
         }
 
-        enum Page { Title, Characters, Create, Settings, Controls }
+        enum Page { Title, Realms, Characters, Create, Settings, Controls }
         public static bool IsOpen { get; private set; }
         static Character enteringCharacter;
 
@@ -34,6 +34,7 @@ namespace Riftbound
         Roster roster;
         Page page = Page.Title;
         Page returnPage = Page.Title;
+        Page characterBackPage = Page.Title;
         public bool TitleScreenOpen => IsOpen && page == Page.Title;
         Texture2D buttonNormal, buttonHover, buttonPressed, primaryNormal, primaryHover;
 
@@ -66,6 +67,7 @@ namespace Riftbound
         GameObject preview, previewLight;
         float previewYaw = 180f;
         bool isDraggingPreview;
+        bool realmEntryPending;
         Vector2 lastMousePos;
 
         float volume = 0.8f;
@@ -132,7 +134,9 @@ namespace Riftbound
                 player.Stats.displayName = character.name;
                 player.LoadAdventure();
                 player.RefreshAdventureWorld();
-                if (player.orbit) player.orbit.SetPaused(false);
+                realmEntryPending = Network.EmberfordRealmClient.IsRealmSelected;
+                if (player.orbit) player.orbit.SetPaused(realmEntryPending);
+                if (realmEntryPending) Time.timeScale = 1f;
                 FirstAdventureGuide.Attach(player);
                 return;
             }
@@ -234,6 +238,9 @@ namespace Riftbound
         public void EnterWorld()
         {
             if (Selected == null || enteringWorld || Network.OnlineSessionService.IsBusy) return;
+            if (Network.EmberfordRealmClient.IsRealmSelected &&
+                !Network.EmberfordRealmClient.CanEnterRealm(out error)) return;
+
             if (Network.CoopSessionConfig.Mode == Network.CoopSessionMode.JoinOnline)
             {
                 string norm = Network.OnlineSessionService.NormalizeJoinCode(Network.CoopSessionConfig.JoinCode);
@@ -245,6 +252,19 @@ namespace Riftbound
                 Network.CoopSessionConfig.JoinCode = norm;
             }
             if (!Network.CoopSessionConfig.UiSmoke && !SaveRoster()) return;
+
+            if (Network.EmberfordRealmClient.IsRealmSelected)
+            {
+                var realm = Network.RealmConfig.Runtime;
+                if (!realm.autoEnterRealm)
+                {
+                    realm.clientCharName = Selected.name;
+                    realm.clientRace = Selected.race;
+                    realm.clientClass = Selected.characterClass;
+                    realm.clientFaction = Selected.faction;
+                }
+                Network.RealmServerBootstrap.IsolateOfflineSaves();
+            }
 
             enteringWorld = true;
             enteringCharacter = Selected;
@@ -265,11 +285,37 @@ namespace Riftbound
         public void ReturnToMenu()
         {
             player.CloseDialogue();
+            if (Network.EmberfordRealmClient.IsRealmSelected)
+            {
+                Network.EmberfordRealmClient.DisconnectToTitleMenu();
+                return;
+            }
+            if (Network.CoopSessionConfig.IsMultiplayer && Network.CoopWorldManager.Instance != null)
+            {
+                Network.CoopWorldManager.Instance.DisconnectAndReturnToMenu();
+                return;
+            }
             if (!player.SaveAdventure(false)) return;
             enteringCharacter = null;
             IsOpen = false;
             Time.timeScale = 1;
             SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+        }
+
+        void BackFromCharacters()
+        {
+            if (Network.EmberfordRealmClient.IsRealmSelected)
+                Network.EmberfordRealmClient.CancelRealmSelection();
+            error = "";
+            page = characterBackPage;
+        }
+
+        void OpenOfflineCharacterSelect()
+        {
+            Network.EmberfordRealmClient.CancelRealmSelection();
+            Network.CoopSessionConfig.Mode = Network.CoopSessionMode.Offline;
+            characterBackPage = Page.Title;
+            OpenCharacterSelect();
         }
 
         string GetCurrentRace()
@@ -379,6 +425,13 @@ namespace Riftbound
             }
             catch { }
             return 1;
+        }
+
+        string GetCharacterDetails(Character character, string levelLabel)
+        {
+            if (Network.EmberfordRealmClient.IsRealmSelected)
+                return $"{character.race} {character.characterClass} / {character.faction}";
+            return $"{levelLabel} {GetCharacterLevel(character)} {character.race} {character.characterClass} / {GetCharacterZone(character)}";
         }
 
         string GetCharacterZone(Character c)
@@ -531,6 +584,11 @@ namespace Riftbound
 
         void Update()
         {
+            if (realmEntryPending && Network.EmberfordRealmClient.State == Network.RealmConnectionState.InWorld)
+            {
+                realmEntryPending = false;
+                if (player.orbit) player.orbit.SetPaused(false);
+            }
             if (!IsOpen || Keyboard.current == null) return;
 
             if (Keyboard.current.escapeKey.wasPressedThisFrame)
@@ -538,10 +596,11 @@ namespace Riftbound
                 if (showDeleteConfirm) { showDeleteConfirm = false; return; }
                 if (page == Page.Create) { page = Page.Characters; error = ""; RefreshPreview(); return; }
                 if (page == Page.Settings || page == Page.Controls) { page = returnPage; SaveSettings(); return; }
-                if (page == Page.Characters) { page = Page.Title; return; }
+                if (page == Page.Characters) { BackFromCharacters(); return; }
+                if (page == Page.Realms) { page = Page.Title; return; }
             }
 
-            if (page == Page.Title && Keyboard.current.enterKey.wasPressedThisFrame) OpenCharacterSelect();
+            if (page == Page.Title && Keyboard.current.enterKey.wasPressedThisFrame) OpenOfflineCharacterSelect();
             if (page != Page.Characters && page != Page.Create) return;
 
             if (Mouse.current != null)
@@ -658,6 +717,7 @@ namespace Riftbound
             bool previousEnabled = GUI.enabled;
             if (showDeleteConfirm) GUI.enabled = false;
             if (page == Page.Title) DrawTitlePage();
+            else if (page == Page.Realms) DrawRealmPage();
             else if (page == Page.Characters) DrawCharacterSelectPage();
             else if (page == Page.Create) DrawCharacterCreatePage();
             else if (page == Page.Settings) DrawSettingsPage();
@@ -700,11 +760,48 @@ namespace Riftbound
             GUI.Label(new Rect(96, 179, 530, 82), "RIFTBOUND", new GUIStyle(brand) { fontSize = 56 });
             Fill(new Rect(100, 276, 50, 2), gold);
             GUI.Label(new Rect(100, 302, 410, 65), "Beyond the outpost, a frontier awaits.", new GUIStyle(body) { fontSize = 20 });
-            if (GUI.Button(new Rect(100, 404, 290, 54), "Play", enterButton)) OpenCharacterSelect();
+            if (GUI.Button(new Rect(100, 404, 178, 54), "Play Offline", button))
+                OpenOfflineCharacterSelect();
+            if (GUI.Button(new Rect(292, 404, 178, 54), "Play Online", enterButton))
+            {
+                error = "";
+                page = Page.Realms;
+            }
             if (GUI.Button(new Rect(100, 472, 138, 38), "Settings", button)) { returnPage = Page.Title; page = Page.Settings; }
             if (GUI.Button(new Rect(252, 472, 138, 38), "Controls", button)) { returnPage = Page.Title; page = Page.Controls; }
             if (GUI.Button(new Rect(100, 526, 138, 36), "Quit", button)) QuitGame();
-            GUI.Label(new Rect(100, 650, 600, 24), "A local adventure  /  " + Application.version, small);
+            var disconnect = Network.CoopSessionConfig.LastDisconnectReason;
+            if (!string.IsNullOrEmpty(disconnect))
+                GUI.Label(new Rect(100, 576, 430, 58), disconnect, small);
+            GUI.Label(new Rect(100, 650, 600, 24), "Riftbound  /  " + Application.version, small);
+        }
+
+        void DrawRealmPage()
+        {
+            var realm = Network.EmberfordRealmClient.GetEmberfordRealm();
+            GUI.Label(new Rect(390, 152, 500, 42), "Play Online", heading);
+            Fill(new Rect(390, 214, 500, 208), new Color(.05f, .06f, .08f, .9f));
+            Fill(new Rect(390, 214, 500, 2), gold);
+            GUI.Label(new Rect(414, 232, 452, 36), realm.DisplayName, subHeading);
+            GUI.Label(new Rect(414, 275, 452, 72),
+                $"Dedicated realm  /  {realm.MaxPlayers} players\n{realm.Endpoint}:{realm.Port}\nAvailability checked on connection", body);
+            if (GUI.Button(new Rect(414, 354, 452, 46), "Select Emberford", enterButton))
+            {
+                Network.EmberfordRealmClient.SelectEmberfordRealm();
+                characterBackPage = Page.Realms;
+                OpenCharacterSelect();
+            }
+            if (GUI.Button(new Rect(390, 448, 252, 40), "Invite-code co-op", button))
+            {
+                Network.EmberfordRealmClient.CancelRealmSelection();
+                Network.CoopSessionConfig.Mode = Network.CoopSessionMode.JoinOnline;
+                characterBackPage = Page.Realms;
+                OpenCharacterSelect();
+            }
+            if (GUI.Button(new Rect(658, 448, 232, 40), "Back to title", button)) page = Page.Title;
+
+            if (!string.IsNullOrEmpty(realm.LastError))
+                GUI.Label(new Rect(390, 500, 500, 64), realm.LastError, body);
         }
 
         static void QuitGame()
@@ -737,6 +834,14 @@ namespace Riftbound
         void DrawSessionModePanel(Rect rect)
         {
             Fill(rect, new Color(0.05f, 0.06f, 0.08f, 0.78f));
+            if (Network.EmberfordRealmClient.IsRealmSelected)
+            {
+                var realm = Network.EmberfordRealmClient.GetEmberfordRealm();
+                GUI.Label(new Rect(rect.x + 10, rect.y + 8, rect.width - 20, 28), realm.DisplayName, subHeading);
+                GUI.Label(new Rect(rect.x + 10, rect.y + 44, rect.width - 20, 90),
+                    $"Realm selected\n{realm.Endpoint}:{realm.Port}\nEnter World to connect.", small);
+                return;
+            }
             GUI.Label(new Rect(rect.x + 10, rect.y + 8, rect.width - 20, 22), "SESSION MODE", subHeading);
 
             float bw = (rect.width - 28f) / 3f;
@@ -819,9 +924,6 @@ namespace Riftbound
             // Character Pedestal Info under model
             if (Selected != null && page != Page.Create)
             {
-                int lvl = GetCharacterLevel(Selected);
-                string zone = GetCharacterZone(Selected);
-
                 Fill(new Rect(rect.x + 60, rect.yMax + 6, rect.width - 120, 46), new Color(0.04f, 0.07f, 0.09f, 0.90f));
                 Fill(new Rect(rect.x + 60, rect.yMax + 6, rect.width - 120, 1), gold * 0.6f);
 
@@ -830,7 +932,7 @@ namespace Riftbound
                 GUI.Label(new Rect(rect.x + 60, rect.yMax + 9, rect.width - 120, 24), Selected.name, nameStyle);
 
                 var detailsStyle = new GUIStyle(small) { alignment = TextAnchor.MiddleCenter };
-                GUI.Label(new Rect(rect.x + 60, rect.yMax + 29, rect.width - 120, 20), $"Level {lvl} {Selected.race} {Selected.characterClass} / {zone}", detailsStyle);
+                GUI.Label(new Rect(rect.x + 60, rect.yMax + 29, rect.width - 120, 20), GetCharacterDetails(Selected, "Level"), detailsStyle);
             }
         }
 
@@ -873,12 +975,9 @@ namespace Riftbound
                     }
                 }
 
-                int lvl = GetCharacterLevel(character);
-                string zone = GetCharacterZone(character);
-
                 cardTitle.normal.textColor = isSelected ? new Color(.96f, .93f, .85f) : new Color(.78f, .8f, .81f);
                 GUI.Label(new Rect(cardRect.x + 14, cardRect.y + 6, cardRect.width - 28, 20), character.name, cardTitle);
-                GUI.Label(new Rect(cardRect.x + 14, cardRect.y + 26, cardRect.width - 28, 18), $"Lv {lvl} {character.race} {character.characterClass} / {zone}", cardSub);
+                GUI.Label(new Rect(cardRect.x + 14, cardRect.y + 26, cardRect.width - 28, 18), GetCharacterDetails(character, "Lv"), cardSub);
             }
         }
 
@@ -933,9 +1032,10 @@ namespace Riftbound
                 page = Page.Controls;
             }
 
-            if (GUI.Button(new Rect(rect.x, rect.y + 86, 180, 34), "Back to title", button))
+            string backLabel = characterBackPage == Page.Realms ? "Back to online" : "Back to title";
+            if (GUI.Button(new Rect(rect.x, rect.y + 86, 180, 34), backLabel, button))
             {
-                page = Page.Title;
+                BackFromCharacters();
             }
         }
 

@@ -20,6 +20,8 @@ namespace Riftbound.Network
         static bool logInitialized;
         static bool autoEnterCompleted;
         static string activeLogPath = "";
+        static string previousSavePath;
+        static string isolatedSavePath;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         static void ResetStatics()
@@ -31,6 +33,8 @@ namespace Riftbound.Network
             logInitialized = false;
             autoEnterCompleted = false;
             activeLogPath = "";
+            previousSavePath = null;
+            isolatedSavePath = null;
         }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
@@ -70,12 +74,23 @@ namespace Riftbound.Network
             OnSceneReady();
         }
 
-        static void IsolateOfflineSaves()
+        internal static void IsolateOfflineSaves()
         {
-            // Protect offline character saves from Dedicated Server or Realm Client test sessions.
-            string realmTempSave = Path.Combine(Path.GetTempPath(), $"rb_realm_isolated_{Guid.NewGuid():N}.json");
-            PlayerController.SavePathOverride = realmTempSave;
+            if (OfflineSavesSuppressed) return;
+            previousSavePath = PlayerController.SavePathOverride;
+            isolatedSavePath = Path.Combine(Path.GetTempPath(), $"rb_realm_isolated_{Guid.NewGuid():N}.json");
+            PlayerController.SavePathOverride = isolatedSavePath;
             OfflineSavesSuppressed = true;
+        }
+
+        internal static void RestoreOfflineSaves()
+        {
+            if (!OfflineSavesSuppressed) return;
+            if (PlayerController.SavePathOverride == isolatedSavePath)
+                PlayerController.SavePathOverride = previousSavePath;
+            previousSavePath = null;
+            isolatedSavePath = null;
+            OfflineSavesSuppressed = false;
         }
 
         static void OnSceneReady()
