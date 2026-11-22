@@ -1658,7 +1658,9 @@ namespace Riftbound.Network
 
                         yield return new WaitForSeconds(2.2f);
                         RiftboundCoopPlayer.DispatchEnemyHitToPlayer(remoteCid, 30f, enemies[0].NetworkKey);
-                        yield return new WaitForSeconds(1.2f);
+                        yield return new WaitForSeconds(0.7f);
+                        if (clientAvatar != null) clientAvatar.SetServerLevelForTest(5);
+                        yield return new WaitForSeconds(0.9f);
 
                         float wait3Kills = Time.realtimeSinceStartup;
                         float lastFollowSync = wait3Kills;
@@ -1788,10 +1790,16 @@ namespace Riftbound.Network
                             yield return new WaitForSeconds(0.15f);
                         int hpDamaged = me.Health.Value;
                         me.RequestAbilityHeal(40, healAb);
+                        yield return new WaitForSeconds(0.35f);
+                        bool lockedHealRej = me.Health.Value == hpDamaged;
+                        float waitUnlock = Time.realtimeSinceStartup;
+                        while (Time.realtimeSinceStartup - waitUnlock < 4f && me.Level.Value < 5)
+                            yield return new WaitForSeconds(0.1f);
+                        me.RequestAbilityHeal(40, healAb);
                         float waitHeal = Time.realtimeSinceStartup;
                         while (Time.realtimeSinceStartup - waitHeal < 3f && me.Health.Value <= hpDamaged)
                             yield return new WaitForSeconds(0.15f);
-                        bool abHealOk = me.Health.Value > hpDamaged;
+                        bool abHealOk = lockedHealRej && me.Health.Value > hpDamaged;
 
                         me.RequestSetMount(true, "horse");
                         float waitMnt = Time.realtimeSinceStartup;
@@ -2608,11 +2616,18 @@ namespace Riftbound.Network
 
                     float hpBeforeSoloHit = raiderStats.Health;
                     string ab = me.ClassName.Value.ToString() == "Mage" ? "fireball" : "melee";
+                    string lockedSlot2 = me.ClassName.Value.ToString() == "Mage" ? "frostnova" : "whirlwind";
+                    me.ClearLastLockedRejectionForTest();
+                    me.RequestAbilityAttack(raiderStats, lockedSlot2);
+                    yield return new WaitForSeconds(0.25f);
+                    bool lockedSlot2Rejected = Mathf.Approximately(raiderStats.Health, hpBeforeSoloHit) &&
+                                               me.LastLockedRequiredLevel == RiftboundCoopPlayer.Slot2UnlockLevel;
+
                     me.RequestAbilityAttack(raiderStats, ab);
                     float waitHit = Time.realtimeSinceStartup;
                     while (Time.realtimeSinceStartup - waitHit < 3.5f && raiderStats.Health >= hpBeforeSoloHit)
                         yield return new WaitForSeconds(0.05f);
-                    bool soloCombatOk = raiderStats.Health < hpBeforeSoloHit;
+                    bool soloCombatOk = lockedSlot2Rejected && raiderStats.Health < hpBeforeSoloHit;
 
                     Vector3 soloPosBefore = lp.transform.position;
                     yield return StartCoroutine(MoveLocalStep(new Vector3(0f, 0f, 1f), 0.7f, 4.4f));

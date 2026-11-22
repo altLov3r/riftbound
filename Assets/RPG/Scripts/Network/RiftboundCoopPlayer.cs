@@ -855,6 +855,95 @@ namespace Riftbound.Network
 
         // ── O-01 Host-Authoritative Combat ──────────────────────────────────────────────
 
+        public const int Slot1UnlockLevel = 1;
+        public const int Slot2UnlockLevel = 3;
+        public const int Slot3UnlockLevel = 5;
+
+        public static event System.Action<string, int, int> OnAbilityRejectedLocked;
+
+        public string LastLockedAbilityRejection { get; private set; } = string.Empty;
+        public int LastLockedRequiredLevel { get; private set; }
+        public int LastLockedServerLevel { get; private set; }
+
+        public static bool TryGetAbilitySlotRequirement(string abilityId, out int slot, out int requiredLevel)
+        {
+            slot = 0;
+            requiredLevel = int.MaxValue;
+            if (string.IsNullOrWhiteSpace(abilityId)) return false;
+            switch (abilityId.Trim().ToLowerInvariant())
+            {
+                case "melee":
+                case "fireball":
+                case "interrupt":
+                    slot = 1;
+                    requiredLevel = Slot1UnlockLevel;
+                    return true;
+                case "frostnova":
+                case "eviscerate":
+                case "consecration":
+                case "whirlwind":
+                    slot = 2;
+                    requiredLevel = Slot2UnlockLevel;
+                    return true;
+                case "arcane_ward":
+                case "sprint":
+                case "holy_light":
+                case "second_wind":
+                    slot = 3;
+                    requiredLevel = Slot3UnlockLevel;
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        public static int GetRequiredLevelForAbility(string abilityId) =>
+            TryGetAbilitySlotRequirement(abilityId, out _, out int req) ? req : int.MaxValue;
+
+        public static bool IsAbilityUnlockedForLevel(string abilityId, int characterLevel) =>
+            TryGetAbilitySlotRequirement(abilityId, out _, out int req) && characterLevel >= req;
+
+        public float GetServerCooldownRemainingForTest(string cdKey)
+        {
+            if (string.IsNullOrEmpty(cdKey)) return 0f;
+            return serverAbilityCooldowns.TryGetValue(cdKey, out float readyAt) ? Mathf.Max(0f, readyAt - Time.time) : 0f;
+        }
+
+        public void SetServerLevelForTest(int level)
+        {
+            if (!IsServer) return;
+            Level.Value = Mathf.Max(1, level);
+        }
+
+        public void ClearLastLockedRejectionForTest()
+        {
+            LastLockedAbilityRejection = string.Empty;
+            LastLockedRequiredLevel = 0;
+            LastLockedServerLevel = 0;
+        }
+
+        void RejectLockedAbilityOnServer(string key, int requiredLevel, int serverLevel)
+        {
+            RecordLockedAbilityRejection(key, requiredLevel, serverLevel);
+            if (!IsOwner && NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening)
+                NotifyAbilityLockedClientRpc(key, requiredLevel, serverLevel, RpcTarget.Single(OwnerClientId, RpcTargetUse.Temp));
+        }
+
+        [Rpc(SendTo.SpecifiedInParams, InvokePermission = RpcInvokePermission.Server)]
+        void NotifyAbilityLockedClientRpc(string abilityId, int requiredLevel, int serverLevel, RpcParams rpcParams = default)
+        {
+            if (!IsOwner) return;
+            RecordLockedAbilityRejection(abilityId, requiredLevel, serverLevel);
+        }
+
+        void RecordLockedAbilityRejection(string abilityId, int requiredLevel, int serverLevel)
+        {
+            LastLockedAbilityRejection = abilityId ?? string.Empty;
+            LastLockedRequiredLevel = requiredLevel;
+            LastLockedServerLevel = serverLevel;
+            OnAbilityRejectedLocked?.Invoke(LastLockedAbilityRejection, requiredLevel, serverLevel);
+        }
+
         public void RequestAbilityAttack(Combatant targetCombatant, string abilityId = "melee")
         {
             if (!targetCombatant || !targetCombatant.Alive) return;
@@ -900,6 +989,13 @@ namespace Riftbound.Network
             if (key == "eviscerate" && cls != "Rogue") return;
             if (key == "consecration" && cls != "Paladin") return;
             if (key == "whirlwind" && cls != "Warrior") return;
+
+            int serverLevel = Mathf.Max(1, Level.Value);
+            if (!TryGetAbilitySlotRequirement(key, out _, out int requiredLevel) || serverLevel < requiredLevel)
+            {
+                RejectLockedAbilityOnServer(key, requiredLevel, serverLevel);
+                return;
+            }
 
             bool isAoe = key == "frostnova" || key == "consecration" || key == "whirlwind";
             string cdKey = isAoe ? $"{key}:{enemy.NetworkKey}" : key;
@@ -986,7 +1082,7 @@ namespace Riftbound.Network
 
         void ApplyServerAbilityHeal(int amount, string abilityId)
         {
-            if (!IsServer || Health.Value <= 0 || Health.Value >= MaxHealth.Value) return;
+            if (!IsServer || Health.Value <= 0) return;
             string key = string.IsNullOrEmpty(abilityId) ? "" : abilityId.ToLowerInvariant();
             string cls = ClassName.Value.ToString();
             int serverHeal = 0;
@@ -995,6 +1091,14 @@ namespace Riftbound.Network
             else if (key == "second_wind" && cls == "Warrior") serverHeal = 45;
             else return;
 
+            int serverLevel = Mathf.Max(1, Level.Value);
+            if (!TryGetAbilitySlotRequirement(key, out _, out int requiredLevel) || serverLevel < requiredLevel)
+            {
+                RejectLockedAbilityOnServer(key, requiredLevel, serverLevel);
+                return;
+            }
+
+            if (Health.Value >= MaxHealth.Value) return;
             if (serverAbilityCooldowns.TryGetValue("heal:" + key, out float readyAt) && Time.time < readyAt) return;
             serverAbilityCooldowns["heal:" + key] = Time.time + 8.0f;
             if (key == "arcane_ward") lastServerMoveTime -= 0.85f; // Allow 7.5m Blink displacement once per validated arcane_ward cast
