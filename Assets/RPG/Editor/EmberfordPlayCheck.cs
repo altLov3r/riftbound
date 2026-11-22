@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -24,6 +25,10 @@ namespace Riftbound.Editor
         static int stage, samples;
         static bool preparedPlayer;
         static double due, timeout;
+        static Combatant castingTarget;
+        static Quaternion castArmBefore;
+        static Transform castArm;
+        static float beforeCastHealth, beforeCastResource;
 
         static EmberfordPlayCheck() => EditorApplication.playModeStateChanged += OnPlayMode;
 
@@ -124,6 +129,13 @@ namespace Riftbound.Editor
                     var ferry = GameObject.Find("Westbank Ferry Landing");
                     Require(ferry && ferry.GetComponentsInChildren<MeshCollider>().Length == 5,
                         "The remodeled Westbank ferry instantiates one new bank connector on load.");
+                    var houseMaterials = Object.FindObjectsByType<MeshRenderer>(FindObjectsInactive.Include)
+                        .SelectMany(renderer => renderer.sharedMaterials)
+                        .Where(material => material && material.name.EndsWith(" House Detail", StringComparison.Ordinal))
+                        .Distinct().ToArray();
+                    Require(houseMaterials.Length >= 4 && houseMaterials.All(material =>
+                            material.GetTexture("_BaseMap").width == 1024 && material.GetTexture("_BumpMap").width == 1024),
+                        $"Campaign buildings use {houseMaterials.Length} tiled 1024px albedo and normal material variants.");
                     MovePlayer(0f, 13f);
                     InputSystem.settings.editorInputBehaviorInPlayMode = InputSettings.EditorInputBehaviorInPlayMode.AllDeviceInputAlwaysGoesToGameView;
                     InputSystem.settings.backgroundBehavior = InputSettings.BackgroundBehavior.IgnoreFocus;
@@ -180,6 +192,84 @@ namespace Riftbound.Editor
                     }
                     Require(handTravel > .05f, $"The right-hand grip follows the attack ({handTravel:F2} m).");
                     Require(wristTravel > 3f, $"The weapon inherits the animated wrist rotation ({wristTravel:F1}°).");
+                    MovePlayer(0, 13);
+                    player.CharacterClass = "Mage";
+                    CharacterVisualFactory.ApplyToPlayer(player, "Human", "Mage");
+                    castArm = player.animator.GetBoneTransform(HumanBodyBones.RightUpperArm);
+                    castingTarget = new GameObject("Disposable casting target").AddComponent<Combatant>();
+                    castingTarget.transform.position = player.transform.position + Vector3.forward * 4f;
+                    castingTarget.ConfigureVitals(400, 0);
+                    castingTarget.Restore();
+                    player.SetTarget(castingTarget);
+                    ResetCastFixture();
+                    due = now + .35;
+                    stage = 4;
+                    return;
+                }
+                if (stage == 4)
+                {
+                    castArmBefore = castArm.localRotation;
+                    beforeCastResource = player.ClassResource;
+                    beforeCastHealth = castingTarget.Health;
+                    player.RequestPrimaryAttackInput();
+                    Require(CastBarSystem.Instance.IsCasting && CastBarSystem.Instance.SpellName == "Fireball" &&
+                        Mathf.Approximately(player.ClassResource, beforeCastResource),
+                        "Fireball begins a timed cast without spending mana.");
+                    stage = 5;
+                    due = now + .46;
+                    return;
+                }
+                if (stage == 5)
+                {
+                    Require(CastBarSystem.Instance.IsCasting && Quaternion.Angle(castArmBefore, castArm.localRotation) > 12f &&
+                        Mathf.Approximately(castingTarget.Health, beforeCastHealth),
+                        "Fireball animates the humanoid arm during windup and withholds impact.");
+                    MovePlayer(1, 13);
+                    stage = 6;
+                    due = now + .26;
+                    return;
+                }
+                if (stage == 6)
+                {
+                    Require(!CastBarSystem.Instance.IsCasting && Mathf.Approximately(player.ClassResource, beforeCastResource) &&
+                        Mathf.Approximately(castingTarget.Health, beforeCastHealth),
+                        "Movement cancels Fireball without spending mana or dealing damage.");
+                    player.RequestPrimaryAttackInput();
+                    Require(CastBarSystem.Instance.IsCasting, "An interrupted Fireball can be retried.");
+                    stage = 7;
+                    due = now + 1.75;
+                    return;
+                }
+                if (stage == 7)
+                {
+                    Require(!CastBarSystem.Instance.IsCasting && castingTarget.Health < beforeCastHealth &&
+                        player.ClassResource < beforeCastResource,
+                        "Finishing Fireball launches a projectile, spends mana and hits the target.");
+                    player.CharacterClass = "Paladin";
+                    CharacterVisualFactory.ApplyToPlayer(player, "Human", "Paladin");
+                    typeof(PlayerController).GetProperty("Experience").SetValue(player, 650);
+                    ResetCastFixture();
+                    player.Stats.SetReplicatedHealth(player.Stats.maxHealth - 80f, player.Stats.maxHealth);
+                    stage = 8;
+                    due = now + .35;
+                    return;
+                }
+                if (stage == 8)
+                {
+                    beforeCastHealth = player.Stats.Health;
+                    beforeCastResource = player.ClassResource;
+                    player.CastAbility3Public();
+                    Require(CastBarSystem.Instance.IsCasting && CastBarSystem.Instance.SpellName == "Holy Light" &&
+                        Mathf.Approximately(player.Stats.Health, beforeCastHealth),
+                        $"Level 5 Holy Light begins casting before healing. Level {player.Level}, {player.Message}");
+                    stage = 9;
+                    due = now + 1.4;
+                    return;
+                }
+                if (stage == 9)
+                {
+                    Require(!CastBarSystem.Instance.IsCasting && player.Stats.Health >= beforeCastHealth + 45f &&
+                        player.ClassResource < beforeCastResource, "Holy Light spends Holy Power and heals on cast completion.");
                     Log("PASS Emberford campaign Play Mode smoke check completed.");
                     Finish(true);
                 }
@@ -190,6 +280,14 @@ namespace Riftbound.Editor
                 Debug.LogException(e);
                 Finish(false);
             }
+        }
+
+        static void ResetCastFixture()
+        {
+            const BindingFlags fields = BindingFlags.NonPublic | BindingFlags.Instance;
+            typeof(PlayerController).GetField("attackReady", fields).SetValue(player, 0f);
+            typeof(PlayerController).GetField("busyUntil", fields).SetValue(player, 0f);
+            typeof(PlayerController).GetProperty("ClassResource").SetValue(player, player.MaxClassResource);
         }
 
         static void MovePlayer(float x, float z, float yaw = 0)

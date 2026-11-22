@@ -14,7 +14,7 @@ namespace Riftbound
             Panel(window);
             GUI.Label(new Rect(window.x + 22f, window.y + 12f, 370f, 36f), "SPELLBOOK", title);
             GUI.Label(new Rect(window.x + 24f, window.y + 49f, 520f, 23f),
-                $"Level {player.Level}  ·  {player.CharacterRace} {player.CharacterClass}", small);
+                $"Level {player.CombatAbilityLevel}  ·  {player.CharacterRace} {player.CharacterClass}", small);
             if (GUI.Button(new Rect(window.xMax - 114f, window.y + 20f, 90f, 28f), "Close [P]", microBtnStyle))
                 player.SpellbookOpen = false;
 
@@ -36,7 +36,12 @@ namespace Riftbound
                 for (int slot = 1; slot <= 3; slot++)
                 {
                     var ability = ClassSystem.GetAbilityInfo(player.CharacterClass, slot);
-                    DrawBookCard(ability.name, ability.desc, $"Key {slot}", RiftboundAbilityArt.ForAction(player.CharacterClass, slot.ToString()));
+                    bool learned = player.HasCombatAbility(slot);
+                    string timing = ClassSystem.GetAbilityCastLabel(player.CharacterClass, slot);
+                    string availability = learned ? $"Learned  ·  Key {slot}" : $"Unlocks at level {PlayerController.CombatAbilityUnlockLevel(slot)}";
+                    string detail = $"{availability}  ·  {timing}";
+                    DrawBookCard(ability.name, ability.desc, detail, RiftboundAbilityArt.ForAction(player.CharacterClass, slot.ToString()),
+                        learned: learned);
                 }
                 DrawBookCard(player.InterruptSpellName, "Interrupt a visible enemy casting a spell.", "Key F", 14);
             }
@@ -86,13 +91,13 @@ namespace Riftbound
         }
 
         void DrawBookCard(string name, string description, string detail, int artwork,
-            MilestoneTalents.Talent talent = null, bool canBind = false)
+            MilestoneTalents.Talent talent = null, bool canBind = false, bool learned = true)
         {
             var card = GUILayoutUtility.GetRect(1, 85f, GUILayout.ExpandWidth(true));
             Fill(card, new Color(.061f, .088f, .117f, .98f));
             var image = new Rect(card.x + 10f, card.y + 10f, 62f, 62f);
             Fill(image, new Color(.095f, .127f, .165f));
-            RiftboundAbilityArt.Draw(image, artwork);
+            RiftboundAbilityArt.Draw(image, artwork, learned ? 1f : .42f);
             var bookHeading = new GUIStyle(label) { fontStyle = FontStyle.Bold, fontSize = 16 };
             bookHeading.normal.textColor = new Color(1f, .91f, .72f);
             var bookDetail = new GUIStyle(small) { fontSize = 12 };

@@ -11,6 +11,13 @@ namespace Riftbound
         string state;
         Animator boundAnimator;
         RuntimeAnimatorController boundController;
+        GryphonPresentation gryphon;
+
+        void Awake()
+        {
+            gryphon = GryphonPresentation.TryAttach(transform, saddle);
+        }
+
         public void Animate(float speed, bool airborne, bool walking = false)
         {
             if (!animator || !animator.runtimeAnimatorController)
@@ -28,6 +35,7 @@ namespace Riftbound
             }
             if (float.IsNaN(speed) || float.IsInfinity(speed)) speed = 0;
             speed = Mathf.Max(0, speed);
+            gryphon?.Animate(speed, airborne, Time.deltaTime);
             string next = airborne ? "Jump" : speed < .15f ? "Idle" : walking ? "Walk" : "Run";
             if (!animator.HasState(0, Animator.StringToHash(next))) next = "Idle";
             if (!animator.HasState(0, Animator.StringToHash(next))) { state = null; animator.speed = 1; return; }

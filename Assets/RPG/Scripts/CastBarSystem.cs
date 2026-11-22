@@ -38,6 +38,8 @@ namespace Riftbound
 
         Vector3 startPosition;
         PlayerController player;
+        Func<bool> canContinueCombatCast;
+        internal bool IsCombatCasting => IsCasting && canContinueCombatCast != null;
         GUIStyle textStyle, timerStyle, targetCastStyle, interruptedStyle;
         Texture2D bgTex, fillTex, borderTex, interruptFillTex, interruptBorderTex, shieldFillTex, shieldBorderTex;
 
@@ -64,6 +66,7 @@ namespace Riftbound
             Instance.CastDuration = Mathf.Max(0.1f, duration);
             Instance.CastStartTime = Time.time;
             Instance.OnComplete = onComplete;
+            Instance.canContinueCombatCast = null;
             Instance.InterruptibleOnMove = interruptOnMove;
             Instance.InterruptibleOnDamage = interruptOnDamage;
             Instance.IsCasting = true;
@@ -72,11 +75,25 @@ namespace Riftbound
                 Instance.startPosition = Instance.player.transform.position;
         }
 
+        internal static void StartCombatCast(PlayerController caster, string name, float duration, bool holy,
+            Func<bool> canContinue, Action release)
+        {
+            if (Instance && Instance.IsCasting) return;
+            StartCast(name, duration, release);
+            Instance.player = caster;
+            Instance.startPosition = caster.transform.position;
+            Instance.canContinueCombatCast = canContinue;
+            var pose = caster.GetComponent<SpellCastPose>();
+            if (!pose) pose = caster.gameObject.AddComponent<SpellCastPose>();
+            pose.Begin(caster, Instance, holy);
+        }
+
         public static void CancelCast(string reason = "Interrupted")
         {
             if (!Instance || !Instance.IsCasting) return;
             Instance.IsCasting = false;
             Instance.OnComplete = null;
+            Instance.canContinueCombatCast = null;
             if (Instance.player)
                 Instance.player.Message = reason;
         }
@@ -152,6 +169,11 @@ namespace Riftbound
         {
             if (!IsCasting) return;
             if (!player) player = GetComponent<PlayerController>() ?? FindFirstObjectByType<PlayerController>();
+            if (canContinueCombatCast != null && !canContinueCombatCast())
+            {
+                CancelCast("Cast interrupted.");
+                return;
+            }
 
             // Check if player died
             if (player && (!player.Stats || !player.Stats.Alive))
@@ -186,6 +208,7 @@ namespace Riftbound
                 IsCasting = false;
                 var cb = OnComplete;
                 OnComplete = null;
+                canContinueCombatCast = null;
                 cb?.Invoke();
             }
         }

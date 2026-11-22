@@ -22,6 +22,19 @@ namespace Riftbound
 
     public static class ClassSystem
     {
+        public static float GetAbilityCastSeconds(string cls, int slot)
+        {
+            if (Network.CoopSessionConfig.IsMultiplayer) return 0f;
+            if (cls == "Mage" && slot == 1) return 1.2f;
+            return cls == "Paladin" && slot == 3 ? 1.1f : 0f;
+        }
+
+        public static string GetAbilityCastLabel(string cls, int slot)
+        {
+            float duration = GetAbilityCastSeconds(cls, slot);
+            return duration > 0f ? $"{duration:0.0}s cast" : "Instant";
+        }
+
         public static string GetRaceDescription(string race)
         {
             switch (race)

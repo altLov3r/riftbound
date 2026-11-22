@@ -124,29 +124,35 @@ namespace Riftbound
             if (DrawSlot(new Rect(barX, barY, slotSize, slotSize), "1", s1Icon, s1Cost, 0f, () => player.CastAbility1Public()))
             {
                 hoverTitle = ab1.name;
-                hoverSub = $"{s1Cost}  •  Primary ability  •  Instant";
+                string costPrefix = string.IsNullOrEmpty(s1Cost) ? "" : s1Cost + "  •  ";
+                hoverSub = $"{costPrefix}Primary ability  •  {ClassSystem.GetAbilityCastLabel(player.CharacterClass, 1)}";
                 hoverDesc = ab1.desc + "\nBuilds primary class resource when attacking.";
             }
 
             // Slot 2: Cleave / Burst / Nova
             float cd2 = Mathf.Max(0f, player.CleaveReady - Time.time);
+            int lockedLevel2 = player.HasCombatAbility(2) ? 0 : PlayerController.CombatAbilityUnlockLevel(2);
             string s2Icon = player.CharacterClass == "Mage" ? "❄" : player.CharacterClass == "Rogue" ? "🩸" : player.CharacterClass == "Paladin" ? "☼" : "🌪";
             string s2Cost = player.CharacterClass == "Mage" ? "25 MP" : player.CharacterClass == "Rogue" ? "35 NR" : player.CharacterClass == "Paladin" ? "2 HP" : "20 RG";
-            if (DrawSlot(new Rect(barX + (slotSize + spacing) * 1, barY, slotSize, slotSize), "2", s2Icon, s2Cost, cd2, () => player.CastAbility2Public()))
+            if (DrawSlot(new Rect(barX + slotSize + spacing, barY, slotSize, slotSize), "2", s2Icon, s2Cost, cd2,
+                () => player.CastAbility2Public(), lockedLevel: lockedLevel2))
             {
                 hoverTitle = ab2.name;
-                hoverSub = $"{s2Cost}  •  Instant";
+                hoverSub = lockedLevel2 > 0 ? $"Unlocks at level {lockedLevel2}" : $"{s2Cost}  •  {ClassSystem.GetAbilityCastLabel(player.CharacterClass, 2)}";
                 hoverDesc = ab2.desc + "\nDevastating multi-target burst ability.";
             }
 
             // Slot 3: Utility / Healing / Shield
             float cd3 = Mathf.Max(0f, player.HealReady - Time.time);
+            int lockedLevel3 = player.HasCombatAbility(3) ? 0 : PlayerController.CombatAbilityUnlockLevel(3);
             string s3Icon = player.CharacterClass == "Mage" ? "✦" : player.CharacterClass == "Rogue" ? "⚡" : player.CharacterClass == "Paladin" ? "✚" : "♥";
             string s3Cost = player.CharacterClass == "Mage" ? "20 MP" : player.CharacterClass == "Rogue" ? "20 NR" : player.CharacterClass == "Paladin" ? "3 HP" : "";
-            if (DrawSlot(new Rect(barX + (slotSize + spacing) * 2, barY, slotSize, slotSize), "3", s3Icon, s3Cost, cd3, () => player.CastAbility3Public()))
+            if (DrawSlot(new Rect(barX + (slotSize + spacing) * 2, barY, slotSize, slotSize), "3", s3Icon, s3Cost, cd3,
+                () => player.CastAbility3Public(), lockedLevel: lockedLevel3))
             {
                 hoverTitle = ab3.name;
-                hoverSub = $"{s3Cost}  •  Instant";
+                string costPrefix = string.IsNullOrEmpty(s3Cost) ? "" : s3Cost + "  •  ";
+                hoverSub = lockedLevel3 > 0 ? $"Unlocks at level {lockedLevel3}" : $"{costPrefix}{ClassSystem.GetAbilityCastLabel(player.CharacterClass, 3)}";
                 hoverDesc = ab3.desc + "\nDefensive recovery or mobility ability.";
             }
 
@@ -240,7 +246,7 @@ namespace Riftbound
             }
         }
 
-        bool DrawSlot(Rect rect, string keybind, string icon, string cost, float cd, Action onClick, int artwork = -1)
+        bool DrawSlot(Rect rect, string keybind, string icon, string cost, float cd, Action onClick, int artwork = -1, int lockedLevel = 0)
         {
             // Slot background & border
             GUI.DrawTexture(new Rect(rect.x - 1, rect.y - 1, rect.width + 2, rect.height + 2), borderTex);
@@ -269,7 +275,12 @@ namespace Riftbound
             }
 
             // Cooldown overlay
-            if (cd > 0.05f)
+            if (lockedLevel > 0)
+            {
+                GUI.DrawTexture(rect, cdOverlayTex);
+                GUI.Label(new Rect(rect.x, rect.yMax - 15, rect.width - 3, 14), $"Lv {lockedLevel}", costStyle);
+            }
+            else if (cd > 0.05f)
             {
                 GUI.DrawTexture(rect, cdOverlayTex);
                 GUI.Label(rect, $"{cd:F1}s", cdStyle);
@@ -288,7 +299,7 @@ namespace Riftbound
             // Click handling
             if (Event.current.type == EventType.MouseDown && Event.current.button == 0 && hovered)
             {
-                onClick?.Invoke();
+                if (lockedLevel == 0) onClick?.Invoke();
                 Event.current.Use();
             }
 

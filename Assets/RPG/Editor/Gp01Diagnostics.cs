@@ -365,6 +365,23 @@ namespace Riftbound.Editor
                     pc.AcceptQuest();
                     Assert(pc.QuestAccepted && !pc.DialogueOpen && Cursor.lockState == CursorLockMode.None && Cursor.visible, "GP03 AcceptQuest completes cleanly with unlocked cursor");
 
+                    var experienceProp = typeof(PlayerController).GetProperty(nameof(PlayerController.Experience));
+                    int startingExperience = pc.Experience;
+                    experienceProp.SetValue(pc, 0);
+                    float lockedResource = pc.ClassResource, lockedCleave = pc.CleaveReady, lockedHeal = pc.HealReady;
+                    Assert(pc.HasCombatAbility(1) && !pc.HasCombatAbility(2) && !pc.HasCombatAbility(3),
+                        "GP04 Level 1 learns only the primary class ability");
+                    pc.CastAbility2Public();
+                    Assert(pc.Message.Contains("unlocks at level 3"), "GP04 The shared cast entry point explains the level 3 requirement");
+                    pc.CastAbility3Public();
+                    Assert(pc.Message.Contains("unlocks at level 5") && pc.ClassResource == lockedResource &&
+                        pc.CleaveReady == lockedCleave && pc.HealReady == lockedHeal,
+                        "GP04 Locked casts leave resources and cooldowns untouched");
+                    experienceProp.SetValue(pc, 240);
+                    Assert(pc.Level == 3 && pc.HasCombatAbility(2) && !pc.HasCombatAbility(3), "GP04 Level 3 learns the second ability");
+                    experienceProp.SetValue(pc, 650);
+                    Assert(pc.Level == 5 && pc.HasCombatAbility(3), "GP04 Level 5 learns the third ability");
+
                     // GP04: Second Wind rejects full health cleanly; Whirlwind spends 20 Rage cleanly
                     pc.CastAbility3Public();
                     Assert(pc.Message.Contains("full"), $"GP04 Full-HP Second Wind blocked cleanly ('{pc.Message}')");
@@ -408,8 +425,11 @@ namespace Riftbound.Editor
                     // GP10: Class abilities, non-doubled scaling, dead-corpse guard, and Paladin Consecration debuff
                     var combatMotor = pc.GetComponent<CharacterController>();
                     combatMotor.enabled = false;
-                    pc.transform.SetPositionAndRotation(new Vector3(0, .25f, -12f), Quaternion.identity);
+                    var combatPoint = new Vector3(0f, 0f, 13f);
+                    combatPoint.y = WorldRegions.GroundHeight(combatPoint) + .15f;
+                    pc.transform.SetPositionAndRotation(combatPoint, Quaternion.identity);
                     combatMotor.enabled = true;
+                    Physics.SyncTransforms();
                     combatMotor.Move(Vector3.down * .5f);
                     var liveGo = new GameObject("Gp10TempLiveEnemy");
                     liveGo.transform.position = pc.transform.position + pc.transform.forward * 2.5f;
@@ -442,7 +462,8 @@ namespace Riftbound.Editor
                     atkReadyField.SetValue(pc, 0f);
                     pc.CastAbility2Public();
                     float consDmg = 500f - liveCbt.Health;
-                    Assert(BuffSystem.HasTargetDebuff(liveCbt, "consecration") && !BuffSystem.HasTargetDebuff(liveCbt, "frostbite"), "GP10 Paladin Consecration applies Holy Consecrated debuff (not Frostbite)");
+                    Assert(BuffSystem.HasTargetDebuff(liveCbt, "consecration") && !BuffSystem.HasTargetDebuff(liveCbt, "frostbite"),
+                        $"GP10 Paladin Consecration applies Holy Consecrated debuff (not Frostbite). {pc.Message}");
                     Assert(!BuffSystem.HasTargetDebuff(deadCbt, "consecration"), "GP10 Dead enemy ignored by Consecration AOE");
                     Assert(consDmg >= 35f && consDmg <= 85f, $"GP10 Consecration avoids double Weapon/Level scaling (dmg={consDmg:F1})");
 
@@ -465,6 +486,7 @@ namespace Riftbound.Editor
                     pc.CastAbility2Public();
                     Assert(pc.ClassResource <= 65.01f && liveCbt.Health < hpPreEvis, "GP10 Rogue Eviscerate consumes 35 Energy and damages target");
 
+                    experienceProp.SetValue(pc, startingExperience);
                     pc.CharacterClass = origClass;
                     targetProp.SetValue(pc, null);
                     UnityEngine.Object.Destroy(liveGo);

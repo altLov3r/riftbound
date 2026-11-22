@@ -260,6 +260,7 @@ namespace Riftbound
             var go = new GameObject("FireTrail");
             go.transform.SetParent(parent, false);
             var ps = go.AddComponent<ParticleSystem>();
+            ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
             var main = ps.main;
             main.duration = 2f;
             main.loop = true;
@@ -283,6 +284,7 @@ namespace Riftbound
 
             var pr = go.GetComponent<ParticleSystemRenderer>();
             pr.sharedMaterial = GetParticleMaterial();
+            ps.Play();
             return ps;
         }
 
@@ -291,6 +293,7 @@ namespace Riftbound
             var go = new GameObject("VFXBurst");
             go.transform.position = pos;
             var ps = go.AddComponent<ParticleSystem>();
+            ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
             var main = ps.main;
             main.duration = 0.5f;
             main.loop = false;

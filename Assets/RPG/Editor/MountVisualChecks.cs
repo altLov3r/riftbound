@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using UnityEditor;
 using UnityEditor.Animations;
@@ -81,6 +82,35 @@ namespace Riftbound.Editor
                 Record(true, "Missing controller returns without exception");
                 mount.animator = null; mount.Animate(8, false);
                 Record(true, "Missing Animator returns without exception");
+
+                var gryphonDefinition = AssetDatabase.LoadAssetAtPath<MountDefinition>("Assets/RPG/Data/Mounts/gryphon.asset");
+                var gryphon = Clone(gryphonDefinition.prefab.gameObject).GetComponent<MountVisual>();
+                var seat = gryphon.saddle;
+                Vector3 seatPosition = seat.position;
+                var oldSkin = gryphon.GetComponentsInChildren<SkinnedMeshRenderer>(true);
+                typeof(MountVisual).GetMethod("Awake", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(gryphon, null);
+                var visual = gryphon.transform.Find("Emberford gryphon visual");
+                Record(gryphonDefinition.mountId == "gryphon" && gryphonDefinition.isFlying &&
+                    gryphon.saddle == seat && Vector3.Distance(seatPosition, seat.position) < .0001f,
+                    "Gryphon preserves its flying unlock ID and saddle anchor");
+                Record(visual && oldSkin.Length > 0 && oldSkin.All(renderer => !renderer.enabled) &&
+                    visual.GetComponentsInChildren<MeshFilter>().Length == 7 &&
+                    visual.GetComponentsInChildren<Collider>().Length == 0,
+                    "Gryphon replacement supplies seven mesh pieces, hides the horse skin and adds no collisions");
+                if (visual)
+                {
+                    var wing = visual.Find("Left wing");
+                    var firstWingPose = wing.localRotation;
+                    var art = typeof(MountVisual).GetField("gryphon", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(gryphon);
+                    var animate = art.GetType().GetMethod("Animate", BindingFlags.Instance | BindingFlags.NonPublic);
+                    animate.Invoke(art, new object[] { 16f, true, .12f });
+                    var airbornePose = wing.localRotation;
+                    animate.Invoke(art, new object[] { 16f, true, .12f });
+                    Record(wing.GetComponent<MeshFilter>().sharedMesh.vertexCount > 1000 &&
+                        Quaternion.Angle(firstWingPose, airbornePose) > 10f &&
+                        Quaternion.Angle(airbornePose, wing.localRotation) > 10f,
+                        "Gryphon wing mesh unfolds and flaps as flight advances");
+                }
             }
             catch (Exception e) { failed++; report.AppendLine("FAIL " + e); }
             finally

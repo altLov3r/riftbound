@@ -34,7 +34,10 @@ namespace Riftbound
             if (Mounted)
             {
                 // Dismount with Z or when using combat/utility abilities (1, 2, 3, 4, Q, H); E remains reserved for contextual interact
-                bool action = keys.digit1Key.wasPressedThisFrame || keys.digit2Key.wasPressedThisFrame || keys.digit3Key.wasPressedThisFrame || keys.digit4Key.wasPressedThisFrame || keys.qKey.wasPressedThisFrame || keys.hKey.wasPressedThisFrame;
+                bool action = keys.digit1Key.wasPressedThisFrame ||
+                    (keys.digit2Key.wasPressedThisFrame && HasCombatAbility(2)) ||
+                    (keys.digit3Key.wasPressedThisFrame && HasCombatAbility(3)) ||
+                    keys.digit4Key.wasPressedThisFrame || keys.qKey.wasPressedThisFrame || keys.hKey.wasPressedThisFrame;
                 bool allowAutoDismount = !SettingsSystem.Instance || SettingsSystem.Instance.autoDismount;
                 if (!Stats.Alive || keys.zKey.wasPressedThisFrame || (allowAutoDismount && !MountWindowOpen && action)) { Dismount(); return false; }
                 if (MountWindowOpen) mountInstance.Animate(0, false, false);

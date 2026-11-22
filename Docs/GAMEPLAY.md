@@ -24,6 +24,10 @@ Use the journal [J] to track a quest. The HUD arrow, atlas and minimap follow th
 
 ## Combat input
 
+Each class starts with its first core ability on **1**. Slot **2** unlocks at level **3** and slot **3** at level **5**. Open the spellbook to see the unlock levels. Potions, interrupt, guard, and dodge retain their own rules.
+
+In offline play, Mage **Fireball** casts for 1.2 seconds and Paladin **Holy Light** casts for 1.1 seconds. Movement, damage, and loss of a valid target can interrupt a cast. Resources and cooldowns apply on release. Online cast timing follows the current multiplayer rules.
+
 Abilities 1–3 accept one queued press near the end of recovery. The ability executes once when it is ready and its requirements are met. A brief loss of ground contact can defer an action that requires footing. Losing a primary target, death and blocking windows clear pending input. Damage and resources resolve when the ability executes.
 
 Enemy swings, heavy warnings and interrupt reactions keep their finite presentation windows on observers instead of being immediately replaced by running or idle. Heavy attacks validate cover at contact, and losing a valid target or returning home cancels pending attacks. Enemy damage and outcomes remain controlled by the host. Remote presentation clocks currently begin on receipt, so visual timing under real network latency still needs playtesting.

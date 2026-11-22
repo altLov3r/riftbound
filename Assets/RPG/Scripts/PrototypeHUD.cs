@@ -307,10 +307,12 @@ namespace Riftbound
                 {
                     Panel(new Rect(width / 2 - 300, height - 105, 600, 85));
                     var ab1 = ClassSystem.GetAbilityInfo(player.CharacterClass, 1);
-                    var ab2 = ClassSystem.GetAbilityInfo(player.CharacterClass, 2);
-                    var ab3 = ClassSystem.GetAbilityInfo(player.CharacterClass, 3);
-                    GUI.Label(new Rect(width / 2 - 280, height - 98, 560, 24), $"[1 / LMB] {ab1.name}   [2] {ab2.name}   [3] {ab3.name}", label);
-                    GUI.Label(new Rect(width / 2 - 280, height - 70, 560, 25), $"[2] {Cooldown(player.CleaveReady)}   [3] {Cooldown(player.HealReady)}   [4] Potion x{player.Potions}   ·   {player.ClassResourceName}: {Mathf.RoundToInt(player.ClassResource)}", small);
+                    string ability2 = player.HasCombatAbility(2) ? ClassSystem.GetAbilityInfo(player.CharacterClass, 2).name : $"Lv {PlayerController.CombatAbilityUnlockLevel(2)}";
+                    string ability3 = player.HasCombatAbility(3) ? ClassSystem.GetAbilityInfo(player.CharacterClass, 3).name : $"Lv {PlayerController.CombatAbilityUnlockLevel(3)}";
+                    string cooldown2 = player.HasCombatAbility(2) ? $"[2] {Cooldown(player.CleaveReady)}   " : "";
+                    string cooldown3 = player.HasCombatAbility(3) ? $"[3] {Cooldown(player.HealReady)}   " : "";
+                    GUI.Label(new Rect(width / 2 - 280, height - 98, 560, 24), $"[1 / LMB] {ab1.name}   [2] {ability2}   [3] {ability3}", label);
+                    GUI.Label(new Rect(width / 2 - 280, height - 70, 560, 25), $"{cooldown2}{cooldown3}[4] Potion x{player.Potions}   ·   {player.ClassResourceName}: {Mathf.RoundToInt(player.ClassResource)}", small);
                 }
 
                 // Centered Notification Toast

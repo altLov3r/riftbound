@@ -46,7 +46,7 @@ namespace Riftbound
         public int QuestExperience => QuestIndex == 0 ? 80 : QuestIndex == 1 ? 100 : 180;
         public bool QuestReady => QuestAccepted && (QuestIndex == 0 ? Kills >= 3 : QuestIndex == 1 ? Supplies >= 3 : QuestIndex == 2 && BossDefeated);
         public string QuestObjective => QuestComplete ? "Emberwatch is safe. Adventure complete!" : !QuestAccepted ? "Speak to Abe at the village gate. [E]" : QuestReady ? "Return to Abe for your reward." : QuestIndex == 0 ? $"Defeat forest raiders: {Mathf.Min(Kills, 3)} / 3\nFollow the road north." : QuestIndex == 1 ? $"Recover supply crates: {Supplies} / 3\nAshwood camp, east of the road. [E]" : "Defeat the Ashwood Captain: 0 / 1\nThe ruined watchtower, northeast of camp.";
-        public string QuestDescription => QuestComplete ? "You broke the raiders' hold on the forest. The village will remember your name." : !QuestAccepted ? QuestIndex == 0 ? "Raiders have cut off our forest road. Defeat three of them and return to me. Watch your health, and use Second Wind when you need it." : QuestIndex == 1 ? "The raiders stole our winter supplies. Follow the road north, then turn east into Ashwood camp. Recover the three marked crates. Be careful: two guards remain." : "Those supplies carried a map to the captain's hideout. He waits at the ruined watchtower northeast of camp. His heavy strike takes time to prepare. Move out of the red circle!" : QuestReady ? QuestIndex == 2 ? "The captain has fallen! Take this axe as a symbol of Emberwatch's gratitude. You have earned it." : "Well done! These supplies and a safe road will keep our village alive. Rest here before your next task." : QuestObjective;
+        public string QuestDescription => QuestComplete ? "You broke the raiders' hold on the forest. The village will remember your name." : !QuestAccepted ? QuestIndex == 0 ? "Raiders have cut off our forest road. Defeat three of them and return to me. Use a health potion [4] if you are injured." : QuestIndex == 1 ? "The raiders stole our winter supplies. Follow the road north, then turn east into Ashwood camp. Recover the three marked crates. Be careful: two guards remain." : "Those supplies carried a map to the captain's hideout. He waits at the ruined watchtower northeast of camp. His heavy strike takes time to prepare. Move out of the red circle!" : QuestReady ? QuestIndex == 2 ? "The captain has fallen! Take this axe as a symbol of Emberwatch's gratitude. You have earned it." : "Well done! These supplies and a safe road will keep our village alive. Rest here before your next task." : QuestObjective;
         public Vector3 ObjectivePosition
         {
             get
@@ -121,6 +121,21 @@ namespace Riftbound
                 bool unlockedMilestone = MilestoneTalentsAvailable &&
                     Level / MilestoneTalents.LevelsPerTier > previousLevel / MilestoneTalents.LevelsPerTier;
                 string reward = unlockedMilestone ? "New milestone talent available [N]" : "Health and damage increased";
+                if (!Network.CoopSessionConfig.IsMultiplayer)
+                {
+                    var learned = new List<string>();
+                    for (int slot = 2; slot <= 3; slot++)
+                    {
+                        int requiredLevel = CombatAbilityUnlockLevel(slot);
+                        if (previousLevel < requiredLevel && Level >= requiredLevel)
+                            learned.Add($"{ClassSystem.GetAbilityInfo(CharacterClass, slot).name} [{slot}]");
+                    }
+                    if (learned.Count > 0)
+                    {
+                        reward = $"Learned {string.Join(" and ", learned)}";
+                        if (unlockedMilestone) reward += " · New milestone talent [N]";
+                    }
+                }
                 ZoneBanner.Show($"LEVEL {Level}!", reward);
                 Message = $"Level {Level}! {reward}.";
                 AudioEffects.PlayLevelUp();

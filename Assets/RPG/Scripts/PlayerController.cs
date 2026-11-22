@@ -526,6 +526,25 @@ namespace Riftbound
 
         public void RequestPrimaryAttackInput() => RequestCombatAbility(1);
 
+        public static int CombatAbilityUnlockLevel(int slot) => slot switch
+        {
+            1 => 1,
+            2 => 3,
+            3 => 5,
+            _ => int.MaxValue
+        };
+
+        public int CombatAbilityLevel
+        {
+            get
+            {
+                var owner = Network.RiftboundCoopPlayer.LocalOwner;
+                return Network.CoopSessionConfig.IsMultiplayer ? (owner ? owner.Level.Value : 1) : Level;
+            }
+        }
+
+        public bool HasCombatAbility(int slot) => CombatAbilityLevel >= CombatAbilityUnlockLevel(slot);
+
         bool CanUseCombatInput() => Stats && Stats.Alive && motor && motor.enabled && !Mounted &&
             !Blocking && !PrototypeHUD.MenuOpen && !FrontendMenu.IsOpen && !(orbit && orbit.Paused) &&
             !AnyBlockingWindowOpen();
@@ -541,7 +560,18 @@ namespace Riftbound
 
         void RequestCombatAbility(int slot)
         {
-            if (!CanUseCombatInput() || !HasAbilityFooting(slot))
+            if (CastBarSystem.Instance && CastBarSystem.Instance.IsCombatCasting) return;
+            if (!CanUseCombatInput())
+            {
+                ClearCombatInputBuffer();
+                return;
+            }
+            if (!HasCombatAbility(slot))
+            {
+                Message = $"{ClassSystem.GetAbilityInfo(CharacterClass, slot).name} unlocks at level {CombatAbilityUnlockLevel(slot)}.";
+                return;
+            }
+            if (!HasAbilityFooting(slot))
             {
                 ClearCombatInputBuffer();
                 return;
@@ -565,7 +595,8 @@ namespace Riftbound
         {
             int slot = bufferedAbilitySlot;
             if (slot == 0) return;
-            if (!CanUseCombatInput() || Time.time >= bufferedAbilityExpiresAt ||
+            if (!CanUseCombatInput() || (CastBarSystem.Instance && CastBarSystem.Instance.IsCombatCasting) ||
+                !HasCombatAbility(slot) || Time.time >= bufferedAbilityExpiresAt ||
                 (slot == 1 && (!Target || !Target.Alive)))
             {
                 ClearCombatInputBuffer();
@@ -759,21 +790,17 @@ namespace Riftbound
                     return;
                 }
                 if (!CanSeeCombatTarget(Target)) { Message = "Something blocks your line of sight."; return; }
-                ClassResource -= 15;
-                var dir = Target.transform.position - transform.position; dir.y = 0;
-                if (dir.sqrMagnitude > .01f) transform.rotation = Quaternion.LookRotation(dir);
-                visualYawOffset = 0f;
-                if (animator && hasVisualBaseRotation) animator.transform.localRotation = visualBaseRotation;
-                attackReady = Time.time + 1.25f;
-                busyUntil = Time.time + 0.6f;
-                Play("Attack", true);
-                if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner != null)
-                    Network.RiftboundCoopPlayer.LocalOwner.TriggerActionAnim("Cast", 0.60f);
-                AudioEffects.PlaySpellCast();
-                float dmg = (36 + (Level - 1) * 4 + WeaponBonus) * MilestoneDamageMultiplier;
-                if (CharacterRace == "Brute") dmg *= 1.15f;
-                FireballSpell.Cast(this, Target, dmg);
-                Message = "Fireball launched!";
+                var victim = Target;
+                float castSeconds = ClassSystem.GetAbilityCastSeconds(CharacterClass, 1);
+                if (castSeconds <= 0f) LaunchFireball(victim);
+                else
+                {
+                    FaceSpellTarget(victim);
+                    CastBarSystem.StartCombatCast(this, "Fireball", castSeconds, false,
+                        () => CanUseCombatInput() && victim && victim.Alive && Target == victim && ClassResource >= 15 &&
+                            Vector3.Distance(transform.position, victim.transform.position) <= 28f && CanSeeCombatTarget(victim),
+                        () => LaunchFireball(victim));
+                }
             }
             else
             {
@@ -801,6 +828,33 @@ namespace Riftbound
                     StartCoroutine(Attack(false, attackDuration, 24f, "Strike! (+15 Rage)"));
                 }
             }
+        }
+
+        void FaceSpellTarget(Combatant victim)
+        {
+            var direction = Vector3.ProjectOnPlane(victim.transform.position - transform.position, Vector3.up);
+            if (direction.sqrMagnitude > .01f) transform.rotation = Quaternion.LookRotation(direction);
+            visualYawOffset = 0f;
+            if (animator && hasVisualBaseRotation) animator.transform.localRotation = visualBaseRotation;
+        }
+
+        void LaunchFireball(Combatant victim)
+        {
+            ClassResource -= 15;
+            FaceSpellTarget(victim);
+            attackReady = Time.time + 1.25f;
+            busyUntil = Time.time + 0.6f;
+            if (Network.CoopSessionConfig.IsMultiplayer)
+            {
+                Play("Attack", true);
+                Network.RiftboundCoopPlayer.LocalOwner?.TriggerActionAnim("Cast", 0.60f);
+            }
+            else GetComponent<SpellCastPose>()?.Release();
+            AudioEffects.PlaySpellCast();
+            float damage = (36 + (Level - 1) * 4 + WeaponBonus) * MilestoneDamageMultiplier;
+            if (CharacterRace == "Brute") damage *= 1.15f;
+            FireballSpell.Cast(this, victim, damage);
+            Message = "Fireball launched!";
         }
 
         void CastAbility2()
@@ -928,14 +982,12 @@ namespace Riftbound
             {
                 if (Stats && Stats.Health >= Stats.maxHealth) { Message = "Health is already full."; return; }
                 if (ClassResource < 3) { Message = "Requires 3 Holy Power!"; return; }
-                ClassResource -= 3;
-                HealReady = Time.time + 12f;
-                Stats.Heal(60);
-                if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner != null)
-                    Network.RiftboundCoopPlayer.LocalOwner.RequestAbilityHeal(60, "holy_light");
-                AudioEffects.PlaySpellCast();
-                SpellFX.CreateConsecration(transform.position, 2f);
-                Message = "Holy Light: restored 60 health.";
+                float castSeconds = ClassSystem.GetAbilityCastSeconds(CharacterClass, 3);
+                if (castSeconds <= 0f) ReleaseHolyLight();
+                else
+                    CastBarSystem.StartCombatCast(this, "Holy Light", castSeconds, true,
+                        () => CanUseCombatInput() && ClassResource >= 3 && Stats.Health < Stats.maxHealth,
+                        ReleaseHolyLight);
             }
             else // Warrior
             {
@@ -947,6 +999,19 @@ namespace Riftbound
                 AudioEffects.PlaySpellCast();
                 Message = "Second Wind: restored 45 health.";
             }
+        }
+
+        void ReleaseHolyLight()
+        {
+            ClassResource -= 3;
+            HealReady = Time.time + 12f;
+            Stats.Heal(60);
+            if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner != null)
+                Network.RiftboundCoopPlayer.LocalOwner.RequestAbilityHeal(60, "holy_light");
+            else GetComponent<SpellCastPose>()?.Release();
+            AudioEffects.PlaySpellCast();
+            SpellFX.CreateConsecration(transform.position, 2f);
+            Message = "Holy Light: restored 60 health.";
         }
 
         IEnumerator Attack(bool cleave, float duration = -1f, float damage = 24f, string message = "")
