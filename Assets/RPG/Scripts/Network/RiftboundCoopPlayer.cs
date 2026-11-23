@@ -2123,16 +2123,91 @@ namespace Riftbound.Network
             return false;
         }
 
+        static readonly HashSet<string> ServerClaimedWorldBossKills = new HashSet<string>(System.StringComparer.OrdinalIgnoreCase);
+        static readonly HashSet<string> ServerClaimedWorldBossChests = new HashSet<string>(System.StringComparer.OrdinalIgnoreCase);
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        static void ResetWorldBossServerClaims()
+        {
+            ServerClaimedWorldBossKills.Clear();
+            ServerClaimedWorldBossChests.Clear();
+        }
+
+        public static void ResetServerWorldBossClaimsForTest()
+        {
+            ServerClaimedWorldBossKills.Clear();
+            ServerClaimedWorldBossChests.Clear();
+        }
+
+        string ResolveCharacterRewardKey()
+        {
+            string n = PlayerName.Value.ToString();
+            return !string.IsNullOrWhiteSpace(n) ? n.Trim() : $"client:{OwnerClientId}";
+        }
+
+        public bool GrantServerWorldBossKillReward(int xp, int gold, string itemId, string title)
+        {
+            if (!IsServer || !IsSpawned || Health.Value <= 0) return false;
+            string charKey = ResolveCharacterRewardKey();
+            if (!ServerClaimedWorldBossKills.Add(charKey)) return false;
+
+            GrantAuthoritativeProgress(Mathf.Max(0, xp), Mathf.Max(0, gold));
+            if (IsOwner && localPlayer)
+                ApplyAuthorizedWorldBossKillReward(itemId, title);
+            else if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening)
+                ReceiveWorldBossKillRewardClientRpc(itemId ?? string.Empty, title ?? string.Empty, RpcTarget.Single(OwnerClientId, RpcTargetUse.Temp));
+            return true;
+        }
+
+        [Rpc(SendTo.SpecifiedInParams, InvokePermission = RpcInvokePermission.Server)]
+        void ReceiveWorldBossKillRewardClientRpc(string itemId, string title, RpcParams rpcParams = default)
+        {
+            if (!IsOwner) return;
+            ApplyAuthorizedWorldBossKillReward(itemId, title);
+        }
+
+        void ApplyAuthorizedWorldBossKillReward(string itemId, string title)
+        {
+            if (!localPlayer) localPlayer = FindFirstObjectByType<PlayerController>();
+            if (!localPlayer) return;
+            if (!string.IsNullOrEmpty(itemId))
+            {
+                localPlayer.GrantItem(itemId);
+                var item = ItemCatalog.Get(itemId);
+                if (item != null)
+                {
+                    ChatSystem.LogLoot($"World Boss Loot: Received [{item.name}] ({item.rarity} {item.slot})!");
+                    CombatTextManager.Spawn(localPlayer.transform.position + Vector3.up * 3.0f, $"Looted: {item.name}!", item.color, true);
+                }
+            }
+            if (!string.IsNullOrEmpty(title))
+            {
+                PlayerTitleSystem.SetActiveTitle(title);
+                ChatSystem.LogSystem($"<color=#e0b034>★ Title Unlocked: '{title}'!</color>");
+            }
+        }
+
         bool ValidateChestClaimOnServer(LootChest chest)
         {
             if (Health.Value <= 0 || !chest || string.IsNullOrEmpty(chest.chestId)) return false;
             if (Vector3.Distance(transform.position, chest.transform.position) > 4.5f) return false;
             if (chest.chestId == RiverReaverCamp.CacheId && !serverDefeatedEnemyKeys.Contains(RiverReaverCamp.CaptainId)) return false;
+            if (chest.chestId == WorldBossEncounter.HoardChestId && !WorldBossEncounter.IsBossDefeatedAuthoritative) return false;
             if (chest.requiresCaptainDefeated && !serverDefeatedEnemyKeys.Contains("ashwood-captain")) return false;
             if (chest.requiresWardenDefeated && !serverDefeatedEnemyKeys.Contains("crypt-warden")) return false;
 
-            if (CoopWorldManager.Instance != null && !CoopWorldManager.Instance.TryClaimChestForClient(OwnerClientId, chest.chestId))
+            if (chest.chestId == WorldBossEncounter.HoardChestId)
+            {
+                string charKey = ResolveCharacterRewardKey();
+                if (ServerClaimedWorldBossChests.Contains(charKey)) return false;
+                if (CoopWorldManager.Instance != null && !CoopWorldManager.Instance.TryClaimChestForClient(OwnerClientId, chest.chestId))
+                    return false;
+                ServerClaimedWorldBossChests.Add(charKey);
+            }
+            else if (CoopWorldManager.Instance != null && !CoopWorldManager.Instance.TryClaimChestForClient(OwnerClientId, chest.chestId))
+            {
                 return false;
+            }
 
             GrantAuthoritativeProgress(chest.experience, chest.gold);
             return true;

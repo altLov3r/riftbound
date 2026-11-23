@@ -138,6 +138,11 @@ namespace Riftbound.Network
                 servicesGo = new GameObject("EmberfordServerServices");
                 servicesGo.AddComponent<CastBarSystem>();
                 servicesGo.AddComponent<FactionQuestSystem>();
+                servicesGo.AddComponent<WorldBossEncounter>();
+            }
+            else if (!servicesGo.GetComponent<WorldBossEncounter>())
+            {
+                servicesGo.AddComponent<WorldBossEncounter>();
             }
 
             ExplorationSites.Ensure();
