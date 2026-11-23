@@ -2024,7 +2024,7 @@ namespace Riftbound.Network
                             float hpBeforeIdleHit = eStats.Health;
                             me.RequestAbilityAttack(eStats, "fireball");
                             float wtIdleHit = Time.realtimeSinceStartup;
-                            while (Time.realtimeSinceStartup - wtIdleHit < 1.2f && Mathf.Approximately(eStats.Health, hpBeforeIdleHit))
+                            while (Time.realtimeSinceStartup - wtIdleHit < 2.6f && Mathf.Approximately(eStats.Health, hpBeforeIdleHit))
                                 yield return new WaitForSeconds(0.05f);
                             enemyIdleHitOk = hpBeforeIdleHit - eStats.Health >= 30f && eStats.Health > 0f;
                         }
@@ -2041,7 +2041,7 @@ namespace Riftbound.Network
                         me.RequestAbilityAttack(eStats, rightAb);
                         yield return new WaitForSeconds(0.05f);
                         me.RequestAbilityAttack(eStats, rightAb);
-                        yield return new WaitForSeconds(0.9f);
+                        yield return new WaitForSeconds(rightAb == "fireball" ? 1.6f : 0.9f);
                         float dmgDealt = hpBeforeCd - eStats.Health;
                         bool cooldownRej = dmgDealt > 0f && dmgDealt <= 42f;
 
@@ -2623,11 +2623,38 @@ namespace Riftbound.Network
                     bool lockedSlot2Rejected = Mathf.Approximately(raiderStats.Health, hpBeforeSoloHit) &&
                                                me.LastLockedRequiredLevel == RiftboundCoopPlayer.Slot2UnlockLevel;
 
+                    int soloCastStarts = 0;
+                    int soloCastCancels = 0;
+                    int soloCastReleases = 0;
+                    void OnSoloCast(ServerCastEvent ev)
+                    {
+                        if (ev.Caster != me) return;
+                        if (ev.Phase == ServerCastPhase.Started) soloCastStarts++;
+                        else if (ev.Phase == ServerCastPhase.Canceled) soloCastCancels++;
+                        else if (ev.Phase == ServerCastPhase.Released) soloCastReleases++;
+                    }
+                    RiftboundCoopPlayer.OnServerCastEvent += OnSoloCast;
+
+                    bool cancelTestOk = true;
+                    if (ab == "fireball")
+                    {
+                        me.RequestStartCast("fireball", raiderStats);
+                        yield return new WaitForSeconds(0.25f);
+                        me.RequestCancelCast();
+                        yield return new WaitForSeconds(0.25f);
+                        cancelTestOk = soloCastStarts == 1 && soloCastCancels == 1 && soloCastReleases == 0 &&
+                                       Mathf.Approximately(raiderStats.Health, hpBeforeSoloHit);
+                    }
+
                     me.RequestAbilityAttack(raiderStats, ab);
                     float waitHit = Time.realtimeSinceStartup;
                     while (Time.realtimeSinceStartup - waitHit < 3.5f && raiderStats.Health >= hpBeforeSoloHit)
                         yield return new WaitForSeconds(0.05f);
-                    bool soloCombatOk = lockedSlot2Rejected && raiderStats.Health < hpBeforeSoloHit;
+                    yield return new WaitForSeconds(0.15f);
+                    RiftboundCoopPlayer.OnServerCastEvent -= OnSoloCast;
+
+                    bool releaseTestOk = ab != "fireball" || (soloCastStarts == 2 && soloCastCancels == 1 && soloCastReleases == 1);
+                    bool soloCombatOk = lockedSlot2Rejected && cancelTestOk && releaseTestOk && raiderStats.Health < hpBeforeSoloHit;
 
                     Vector3 soloPosBefore = lp.transform.position;
                     yield return StartCoroutine(MoveLocalStep(new Vector3(0f, 0f, 1f), 0.7f, 4.4f));

@@ -112,7 +112,6 @@ namespace Riftbound
                     Outline(Centered(center + offset, 22), ink);
                 routeCaption = $"{title}  ·  {Mathf.RoundToInt(distance)} m";
             }
-            DrawNeedle(center, player.transform.eulerAngles.y - yaw, 23f, PlayerColor);
 
             float footer = panel.y + 237;
             string location = floor == 0 ? $"{position.x:0} E / {position.z:0} N" : "Underground";
