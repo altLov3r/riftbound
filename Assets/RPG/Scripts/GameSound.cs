@@ -43,6 +43,9 @@ namespace Riftbound
                 return;
             }
             if (!Clips[index])
+                Clips[index] = cue == SoundCue.Heal ? AudioEffects.LoadAuthored("cue_heal")
+                    : cue == SoundCue.Rune ? AudioEffects.LoadAuthored("cue_rune") : null;
+            if (!Clips[index])
             {
                 const int rate = 22050; float duration = cue == SoundCue.Rune ? .8f : cue == SoundCue.Heal ? .58f : .18f;
                 var samples = new float[Mathf.CeilToInt(rate * duration)]; var random = new System.Random(81 + index);
@@ -59,7 +62,7 @@ namespace Riftbound
                 }
                 Clips[index] = AudioClip.Create("Riftbound " + cue, samples.Length, 1, rate, false); Clips[index].SetData(samples, 0);
             }
-            PlayClip(Clips[index], position, .46f);
+            PlayClip(Clips[index], position, cue == SoundCue.Rune || cue == SoundCue.Heal ? .27f : .46f);
         }
 
         public static void StopWorldVoices()

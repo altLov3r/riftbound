@@ -20,9 +20,13 @@ namespace Riftbound
         int nextVoice;
 
         public static float EffectsVolume => SettingsSystem.Instance ? Mathf.Clamp01(SettingsSystem.Instance.sfxVolume) : .85f;
-        public static bool CanPlayWorld => Instance && Instance.isActiveAndEnabled && !FrontendMenu.IsOpen && Time.timeScale > 0 && Time.unscaledTime >= Instance.worldReadyAt;
+        internal static bool WorldSessionReady => !Network.CoopSessionConfig.IsRealmClient ||
+            Network.EmberfordRealmClient.State == Network.RealmConnectionState.InWorld;
+        public static bool CanPlayWorld => Instance && Instance.isActiveAndEnabled && WorldSessionReady &&
+            !FrontendMenu.IsOpen && Time.timeScale > 0 && Time.unscaledTime >= Instance.worldReadyAt;
 
         AudioClip sfxLevelUp;
+        AudioClip sfxBossVictory;
         AudioClip sfxQuestComplete;
         AudioClip sfxQuestAccept;
         AudioClip sfxLootCoin;
@@ -65,12 +69,18 @@ namespace Riftbound
             sfxClick = LoadRecording("mouseclick1");
             if (!sfxClick) sfxClick = CreateToneClip("Click", .045f, 680f, .18f, ToneType.Sine);
             sfxBladeHit = CreateNoiseHitClip("BladeHit", 0.15f, 0.4f);
-            sfxSpellCast = CreateChirpClip("SpellCast", .42f, 220f, 520f, .28f);
+            sfxSpellCast = LoadAuthored("spell_release");
+            if (!sfxSpellCast) sfxSpellCast = CreateChirpClip("SpellCast", .42f, 220f, 520f, .28f);
             sfxLootCoin = CreateArpeggioClip("LootCoin", 0.25f, new float[] { 880f, 1320f, 1760f }, 0.35f);
             sfxQuestAccept = CreateArpeggioClip("QuestAccept", 0.45f, new float[] { 440f, 554.37f, 659.25f }, 0.4f);
-            sfxQuestComplete = CreateArpeggioClip("QuestComplete", 0.7f, new float[] { 523.25f, 659.25f, 783.99f, 1046.50f }, 0.5f);
-            sfxLevelUp = CreateFanfareClip("LevelUp", 1.1f);
-            sfxZoneDiscover = CreateArpeggioClip("ZoneDiscover", 0.85f, new float[] { 392f, 493.88f, 587.33f, 783.99f }, 0.45f);
+            sfxQuestComplete = LoadAuthored("cue_quest_complete");
+            if (!sfxQuestComplete) sfxQuestComplete = CreateArpeggioClip("QuestComplete", .7f, new[] { 523.25f, 659.25f, 783.99f, 1046.50f }, .5f);
+            sfxLevelUp = LoadAuthored("cue_level_up");
+            if (!sfxLevelUp) sfxLevelUp = CreateFanfareClip("LevelUp", 1.1f);
+            sfxBossVictory = LoadAuthored("cue_boss_victory");
+            if (!sfxBossVictory) sfxBossVictory = sfxLevelUp;
+            sfxZoneDiscover = LoadAuthored("cue_discovery");
+            if (!sfxZoneDiscover) sfxZoneDiscover = CreateArpeggioClip("ZoneDiscover", .85f, new[] { 392f, 493.88f, 587.33f, 783.99f }, .45f);
             coinClips = LoadRecordings("handleCoins", "handleCoins2");
             swingClips = LoadRecordings("knifeSlice", "knifeSlice2");
             footstepClips = LoadRecordings("footstep00", "footstep02", "footstep04", "footstep06");
@@ -79,6 +89,7 @@ namespace Riftbound
         }
 
         public static AudioClip LoadRecording(string name) => Resources.Load<AudioClip>("RiftboundAudio/" + name);
+        internal static AudioClip LoadAuthored(string name) => LoadRecording("Authored/" + name);
 
         static AudioClip[] LoadRecordings(params string[] names)
         {
@@ -252,9 +263,9 @@ namespace Riftbound
         }
         public static void PlayLootCoin() { if (Instance) Instance.PlayUi(Instance.Pick(Instance.coinClips, Instance.sfxLootCoin), .38f, 1, .12f); }
         public static void PlayQuestAccept() { if (Instance) Instance.PlayUi(Instance.Pick(Instance.pageClips, Instance.sfxQuestAccept), .4f, 2, .3f); }
-        public static void PlayQuestComplete() { if (Instance) Instance.PlayUi(Instance.sfxQuestComplete, .58f, 3, .5f); }
-        public static void PlayLevelUp() { if (Instance) Instance.PlayUi(Instance.sfxLevelUp, .6f, 4, 1f); }
-        public static void PlayBossVictory() { if (Instance) Instance.PlayUi(Instance.sfxLevelUp, .7f, 4, 1f); }
-        public static void PlayZoneDiscover() { if (Instance) Instance.PlayUi(Instance.sfxZoneDiscover, .36f, 5, 1.5f); }
+        public static void PlayQuestComplete() { if (Instance) Instance.PlayUi(Instance.sfxQuestComplete, .42f, 3, .5f); }
+        public static void PlayLevelUp() { if (Instance) Instance.PlayUi(Instance.sfxLevelUp, .48f, 4, 1f); }
+        public static void PlayBossVictory() { if (Instance) Instance.PlayUi(Instance.sfxBossVictory, .52f, 6, 1f); }
+        public static void PlayZoneDiscover() { if (Instance) Instance.PlayUi(Instance.sfxZoneDiscover, .29f, 5, 1.5f); }
     }
 }

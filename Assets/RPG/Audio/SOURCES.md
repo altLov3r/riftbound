@@ -11,13 +11,19 @@ All three author pages identify the packs as **Creative Commons Zero (CC0)**. Or
 ## Runtime mapping
 
 - `AudioEffects`: recorded click, coin and page variations; recorded weapon swishes; movement-distance footsteps while grounded and on foot.
-- `GameSound`: recorded body-hit variations and metal blocks. Magic/heal/rune cues retain original procedural synthesis, with softer attacks, filtered noise and smooth release tails.
-- Quest completion, discovery and level-up use overlapping bell-like notes rather than hard note switches.
+- `GameSound`: recorded body-hit variations and metal blocks, with original authored heal and rune cues. Procedural fallbacks remain available.
+- Spell release, quest completion, discovery, level-up and boss victory have distinct original cues. Boss victory has its own playback cooldown.
 - UI playback is limited to three voices. World playback is limited to eight spatial voices, four starts per frame, and per-cue cooldowns.
 - World playback is suppressed during the character menu, pause and the short initial load guard. UI clicks remain available in menus. Teleports and mount movement do not emit walking footsteps.
 - The existing master AudioListener setting remains authoritative. The existing SFX, music and ambience controls now scale their corresponding playback paths.
-- Zone music resolves the zone name through `ZoneManager.GetZoneName`, so it follows expanded-world boundaries rather than the old coordinate thresholds. Both crossfade voices pause in menus. Zone changes during a fade are picked up afterward.
-- Environmental wind and musical cues are generated locally by project code; they are not downloaded recordings.
+- Zone audio uses `ZoneManager.GetZoneName` for map boundaries. Emberwatch and Greenhollow share the exploration score, with separate stereo beds. Bloodrock, Deathknell, Wyrmcrest and the crypts have their own beds. Music and ambience crossfade independently after a short boundary hold, and combat brings in percussion while lowering the score and ambience.
+- World audio pauses at the title and while the client waits for Emberford. Ambience and music retain separate volume controls.
+
+## Original Riftbound audio
+
+The WAV files in `Resources/RiftboundAudio/Authored` are original synthetic sound design for this project. The source renderer uses seeded noise, filtered transients, resonant bells, plucked strings and layered percussion. It uses no external samples. The existing Kenney pack attributions above apply to the original OGG files.
+
+Render the 32 kHz PCM masters into a new directory with `python Tools/Audio/render_riftbound_audio.py --output <new-directory>`.
 
 ## Validation
 
