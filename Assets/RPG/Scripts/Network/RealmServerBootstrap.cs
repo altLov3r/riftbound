@@ -162,6 +162,7 @@ namespace Riftbound.Network
 
             ExplorationSites.Ensure();
             RiverReaverCamp.Ensure();
+            PinewatchWoodsZone.Ensure();
             BrassHollows.Ensure();
             RoadPatrolGuard.Ensure();
 

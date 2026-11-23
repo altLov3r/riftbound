@@ -103,6 +103,37 @@ namespace Riftbound
             });
 
             // ==========================================
+            // PINEWATCH RELAY — TIMBERFANG WOODS QUESTLINE
+            // ==========================================
+            Add(new QuestDef
+            {
+                id = "pinewatch_clear_woods", giverNpc = "Watchkeeper Halen",
+                title = "Timberfang in the Pines", faction = "Any", zone = "Pinewatch Relay",
+                description = "Timberfang raiders crept down from the northwest woods during the squall and cut our east signal line. Push west into Timberfang Woods, defeat 4 Timberfang raiders at the logging ambush, and report back to Watchkeeper Halen.",
+                targetType = "defeat_enemy", targetId = "pinewatch-raider", targetName = "Timberfang Raiders",
+                requiredCount = 4, rewardGold = 55, rewardXP = 110,
+                targetLocation = PinewatchWoodsZone.Camp1Position, nextQuestId = "pinewatch_recover_line"
+            });
+            Add(new QuestDef
+            {
+                id = "pinewatch_recover_line", giverNpc = "Watchkeeper Halen",
+                title = "Break the Poacher Glade", faction = "Any", zone = "Pinewatch Relay",
+                description = "My runner spotted the stolen relay winch hauled deeper into the Poacher Glade northwest of the ambush. Defeat 3 Timberfang poachers and hexers holding the glade, then return to Watchkeeper Halen.",
+                targetType = "defeat_enemy", targetId = "pinewatch-poacher", targetName = "Timberfang Poachers",
+                requiredCount = 3, rewardGold = 70, rewardXP = 140,
+                prerequisiteQuestId = "pinewatch_clear_woods", targetLocation = PinewatchWoodsZone.Camp2Position, nextQuestId = "pinewatch_warchief_boss"
+            });
+            Add(new QuestDef
+            {
+                id = "pinewatch_warchief_boss", giverNpc = "Watchkeeper Halen",
+                title = "Crown of Briarhollow", faction = "Any", zone = "Pinewatch Relay",
+                description = "Warchief Grimgnaw is directing the Timberfang raids from Briarhollow Den at the far edge of the woods. Slay Warchief Grimgnaw, claim his spoils chest, and return to Watchkeeper Halen to secure Pinewatch Relay.",
+                targetType = "defeat_enemy", targetId = PinewatchWoodsZone.BossId, targetName = PinewatchWoodsZone.BossName,
+                requiredCount = 1, rewardGold = 115, rewardXP = 220, rewardItem = "pinewatch-warden-crest",
+                prerequisiteQuestId = "pinewatch_recover_line", targetLocation = PinewatchWoodsZone.BossPosition
+            });
+
+            // ==========================================
             // 1. EMBERWATCH OUTPOST (HUMAN / ALLIANCE STARTER VILLAGE)
             // ==========================================
             Add(new QuestDef
@@ -1027,7 +1058,7 @@ namespace Riftbound
             }
         }
 
-        static bool ExactBossTarget(string id) => id == "redridge-outcast-boss" || id == "vermithrax-boss" || id == RiverReaverCamp.CaptainId;
+        static bool ExactBossTarget(string id) => id == "redridge-outcast-boss" || id == "vermithrax-boss" || id == RiverReaverCamp.CaptainId || id == PinewatchWoodsZone.BossId;
 
         public void OnTalkedToNPC(string npcName)
         {

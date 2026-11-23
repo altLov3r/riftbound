@@ -40,6 +40,7 @@ namespace Riftbound
             }
             ExplorationSites.Ensure();
             RiverReaverCamp.Ensure();
+            PinewatchWoodsZone.Ensure();
             if (player) WesternRoadCamps.Ensure(player);
             BrassHollows.Ensure();
             RoadPatrolGuard.Ensure();
