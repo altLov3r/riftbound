@@ -76,6 +76,10 @@ namespace Riftbound
             if (point.x <= -240 && point.z <= -85) return "Thornwatch Citadel";
             if (point.x >= 320 && point.z >= 380) return "Skyreach Aerie";
             if (point.x >= 85 && point.x <= 150 && point.z <= -75) return "Sunstone Abbey";
+            if (point.x >= 335 && point.z >= 55 && point.z <= 135) return "Ironmaw Quarry";
+            if (point.x <= -230 && point.z >= 485) return "Frostpine Watch";
+            if (point.x >= 330 && point.z <= -75) return "Redtide Harbor";
+            if (point.x <= -240 && point.z >= 95 && point.z <= 155) return "Willowmere Mill";
             if (point.z > 430 && point.x > 95) return "Wyrmcrest Summit";
             if (point.z > 330 && point.x >= 110) return "Wyrmcrest Crags";
             if (point.z > 320 && point.x < 110) return "Greenhollow Valley";

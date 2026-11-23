@@ -193,6 +193,8 @@ namespace Riftbound
                     chestPrompt = "Locked Reliquary (Defeat Ursolak, Bear Guardian)";
                 else if (chest.chestId == SunstoneAbbeyZone.BossChestId && !HasDefeated(SunstoneAbbeyZone.BossId))
                     chestPrompt = "Locked Reliquary (Defeat Arch-Inquisitor Malrik)";
+                else if (chest.chestId == IronmawQuarryZone.BossChestId && !HasDefeated(IronmawQuarryZone.BossId))
+                    chestPrompt = "Locked Ore Vault (Defeat Ironjaw Krag)";
                 else if (chest.requiresCaptainDefeated && !BossDefeated)
                     chestPrompt = "Locked Cache (Defeat Ashwood Captain)";
                 else if (chest.requiresWardenDefeated && !HasDefeated("crypt-warden"))
@@ -300,6 +302,8 @@ namespace Riftbound
             { Message = "Defeat Ursolak, Ancient Bear Guardian in Ashenmaw Cavern to unlock this reliquary."; return false; }
             if (chest && chest.chestId == SunstoneAbbeyZone.BossChestId && !HasDefeated(SunstoneAbbeyZone.BossId))
             { Message = "Defeat Arch-Inquisitor Malrik at Sunstone Abbey to unlock his reliquary."; return false; }
+            if (chest && chest.chestId == IronmawQuarryZone.BossChestId && !HasDefeated(IronmawQuarryZone.BossId))
+            { Message = "Defeat Ironjaw Krag in Ironmaw Quarry to unlock the Ore Vault."; return false; }
             if (chest && chest.requiresCaptainDefeated && !BossDefeated) { Message = "Defeat the captain to unlock this cache."; return false; }
             if (chest && chest.requiresWardenDefeated && !HasDefeated("crypt-warden")) { Message = "Defeat the Crypt Warden to unlock the reliquary."; return false; }
             if (!chest || !Stats.Alive || FrontendMenu.IsOpen || DialogueOpen || ShopOpen || MapOpen || JournalOpen || (orbit && orbit.Paused) || Vector3.Distance(transform.position, chest.transform.position) >= 3 || string.IsNullOrEmpty(chest.chestId) || HasOpenedChest(chest.chestId)) return false;

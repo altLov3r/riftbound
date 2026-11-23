@@ -120,6 +120,10 @@ namespace Riftbound
             "Thornwatch Citadel" => new(.34f, .46f, .54f),
             "Skyreach Aerie" => new(.52f, .64f, .72f),
             "Sunstone Abbey" => new(.50f, .36f, .52f),
+            "Ironmaw Quarry" => new(.54f, .36f, .24f),
+            "Frostpine Watch" => new(.38f, .52f, .56f),
+            "Redtide Harbor" => new(.42f, .36f, .44f),
+            "Willowmere Mill" => new(.30f, .50f, .42f),
             "The Scarlet Crypts" => new(.47f, .39f, .55f),
             _ => new(.34f, .49f, .32f)
         };

@@ -85,7 +85,8 @@ namespace Riftbound
             // Frontier Questline Boss Rewards
             new GearItem("pinewatch-warden-crest", "Pinewatch Warden's Crest", GearSlot.Trinket, "Rare", 4, 2, 45, 28, "Insignia", "Carved cedar-and-iron crest awarded by Watchkeeper Halen for breaking Warchief Grimgnaw's Timberfang raids."),
             new GearItem("ursolak-spirit-pelt", "Mantle of Ursolak", GearSlot.Armor, "Epic", 5, 10, 65, 42, "Spirit Leather", "Woven with glowing jade spirit-runes from the Ancient Bear Guardian of Ashenmaw Cavern."),
-            new GearItem("sunstone-reliquary-staff", "Sunstone Reliquary Staff", GearSlot.Weapon, "Epic", 20, 2, 45, 40, "Two-Hand Staff", "Recovered from Arch-Inquisitor Malrik's high altar; hums with reclaimed solar fire.")
+            new GearItem("sunstone-reliquary-staff", "Sunstone Reliquary Staff", GearSlot.Weapon, "Epic", 20, 2, 45, 40, "Two-Hand Staff", "Recovered from Arch-Inquisitor Malrik's high altar; hums with reclaimed solar fire."),
+            new GearItem("ironmaw-cleaver", "Ironjaw's Quarry Cleaver", GearSlot.Weapon, "Epic", 22, 0, 40, 44, "Two-Hand Axe", "Forged from raw Ironmaw pig-iron and wrested from Ironjaw Krag in the eastern pit.")
         };
 
         public static GearItem Get(string id)

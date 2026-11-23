@@ -34,6 +34,7 @@ namespace Riftbound.Editor
             GameObject woodsRoot = null;
             GameObject cavernRoot = null;
             GameObject abbeyRoot = null;
+            GameObject quarryRoot = null;
             GameObject fqsGo = null;
             GameObject signGo = null;
 
@@ -158,6 +159,19 @@ namespace Riftbound.Editor
                 bool abbeyOk = abbeyEnemies.Length == 8 && malrik != null && malrik.isBoss && sq1 != null && sq2 != null && ItemCatalog.Get("sunstone-reliquary-staff") != null;
                 Check("sunstone_abbey_ruins_questline_and_boss", abbeyOk,
                     $"enemies={abbeyEnemies.Length}, malrik={(malrik != null)}, quests=({sq1 != null},{sq2 != null}), staff={(ItemCatalog.Get("sunstone-reliquary-staff") != null)}");
+
+                // 12. Ironmaw Quarry + Frostpine Watch + Redtide Harbor + Willowmere Mill
+                IronmawQuarryZone.Ensure();
+                quarryRoot = GameObject.Find(IronmawQuarryZone.RootName);
+                var qEnemies = quarryRoot ? quarryRoot.GetComponentsInChildren<EnemyController>(true) : Array.Empty<EnemyController>();
+                var krag = qEnemies.FirstOrDefault(e => e.enemyId == IronmawQuarryZone.BossId);
+                bool ironmawOk = qEnemies.Length == 5 && krag != null && krag.isBoss && FactionQuestSystem.GetQuest("ironmaw_outlaw_boss") != null && ItemCatalog.Get("ironmaw-cleaver") != null;
+                Check("ironmaw_quarry_outlaw_boss_and_quest", ironmawOk, $"enemies={qEnemies.Length}, krag={(krag != null)}");
+
+                bool threeHamletsOk = frontierStaged.transform.Find("Frostpine Watch") != null &&
+                                      frontierStaged.transform.Find("Redtide Harbor") != null &&
+                                      frontierStaged.transform.Find("Willowmere Mill") != null;
+                Check("frostpine_redtide_and_willowmere_staged", threeHamletsOk, $"staged={threeHamletsOk}");
             }
             catch (Exception ex)
             {
@@ -167,6 +181,7 @@ namespace Riftbound.Editor
             {
                 if (signGo) Object.DestroyImmediate(signGo);
                 if (fqsGo) Object.DestroyImmediate(fqsGo);
+                if (quarryRoot) Object.DestroyImmediate(quarryRoot);
                 if (abbeyRoot) Object.DestroyImmediate(abbeyRoot);
                 if (cavernRoot) Object.DestroyImmediate(cavernRoot);
                 if (woodsRoot) Object.DestroyImmediate(woodsRoot);

@@ -44,6 +44,10 @@ namespace Riftbound.Editor
             StageThornwatchCitadel(root.transform, terrains, report);
             StageSkyreachAerie(root.transform, terrains, report);
             StageSunstoneAbbeyRuins(root.transform, terrains, report);
+            StageIronmawQuarry(root.transform, terrains, report);
+            StageFrostpineWatch(root.transform, terrains, report);
+            StageRedtideHarbor(root.transform, terrains, report);
+            StageWillowmereMill(root.transform, terrains, report);
 
             return root;
         }
@@ -526,6 +530,157 @@ namespace Riftbound.Editor
             BuildGroundedFoundation(root.transform, "Abbey_BellTowerRuins", new Vector3(104.5f, 0f, -133f), 4.6f, 4.6f, 12.5f, "Limestone", terrains);
 
             report.AppendLine("Staged South-Central Ruins: Sunstone Abbey at (115,-115).");
+        }
+
+        // =========================================================================
+        // 7. FAR EAST OUTLAW QUARRY ARCHITECTURE — IRONMAW QUARRY (385, 90)
+        // =========================================================================
+        static void StageIronmawQuarry(Transform parent, Terrain[] terrains, StringBuilder report)
+        {
+            var root = new GameObject("Ironmaw Quarry Architecture");
+            root.transform.SetParent(parent, false);
+
+            // Tall timber & black-iron mine headframe behind Ironjaw Krag's pit
+            float hfBase = BuildGroundedFoundation(root.transform, "Ironmaw_HeadframeBase", new Vector3(398f, 0f, 90f), 7.2f, 7.2f, 1.2f, "Basalt", terrains);
+            Vector3 hp = new Vector3(398f, hfBase, 90f);
+            Part(root.transform, "Ironmaw_MastA", hp + new Vector3(-2.4f, 6.2f, -2.4f), new Vector3(0.65f, 12.4f, 0.65f), "Dark Wood", collider: true);
+            Part(root.transform, "Ironmaw_MastB", hp + new Vector3(-2.4f, 6.2f, 2.4f), new Vector3(0.65f, 12.4f, 0.65f), "Dark Wood", collider: true);
+            Part(root.transform, "Ironmaw_MastC", hp + new Vector3(2.4f, 6.2f, -2.4f), new Vector3(0.65f, 12.4f, 0.65f), "Dark Wood", collider: true);
+            Part(root.transform, "Ironmaw_MastD", hp + new Vector3(2.4f, 6.2f, 2.4f), new Vector3(0.65f, 12.4f, 0.65f), "Dark Wood", collider: true);
+            Part(root.transform, "Ironmaw_HoistCrown", hp + Vector3.up * 12.2f, new Vector3(6.4f, 1.2f, 6.4f), "Black Iron", collider: false);
+            Part(root.transform, "Ironmaw_SmelterGlow", hp + new Vector3(-3.2f, 1.6f, 0f), new Vector3(1.6f, 1.8f, 2.6f), "Amber", collider: false);
+
+            // Palisade watchtowers framing the western pit entrance
+            BuildGroundedFoundation(root.transform, "Ironmaw_WatchtowerN", new Vector3(372f, 0f, 102f), 3.6f, 3.6f, 6.8f, "Dark Wood", terrains);
+            BuildGroundedFoundation(root.transform, "Ironmaw_WatchtowerS", new Vector3(372f, 0f, 78f), 3.6f, 3.6f, 6.8f, "Dark Wood", terrains);
+
+            report.AppendLine("Staged Far-East Ironmaw Quarry headframe & watchtowers at (385,90).");
+        }
+
+        // =========================================================================
+        // 8. FAR NORTHWEST TIMBER MILL — FROSTPINE WATCH (-270, 520)
+        // =========================================================================
+        static void StageFrostpineWatch(Transform parent, Terrain[] terrains, StringBuilder report)
+        {
+            var root = new GameObject("Frostpine Watch");
+            root.transform.SetParent(parent, false);
+
+            float towerTop = BuildGroundedFoundation(root.transform, "Frostpine_TowerBase", new Vector3(-270f, 0f, 520f), 6.2f, 6.2f, 2.4f, "Limestone", terrains);
+            Vector3 tp = new Vector3(-270f, towerTop, 520f);
+            Part(root.transform, "Frostpine_TowerShaft", tp + Vector3.up * 4.5f, new Vector3(4.2f, 9.0f, 4.2f), "Dark Wood", collider: true);
+            Part(root.transform, "Frostpine_Beacon", tp + Vector3.up * 9.8f, new Vector3(1.8f, 1.6f, 1.8f), "Amber", collider: false);
+
+            float millTop = BuildGroundedFoundation(root.transform, "Frostpine_SawmillBase", new Vector3(-258f, 0f, 516f), 8.2f, 5.6f, 0.45f, "Limestone", terrains);
+            Vector3 mp = new Vector3(-258f, millTop, 516f);
+            Part(root.transform, "Frostpine_SawmillWalls", mp + Vector3.up * 1.9f, new Vector3(7.4f, 3.8f, 5.0f), "Oak", collider: true);
+            Part(root.transform, "Frostpine_SawmillRoof", mp + Vector3.up * 4.1f, new Vector3(8.4f, 0.45f, 6.2f), "Slate", collider: false);
+
+            AddTownNpc(root.transform, "Forester Orin", "Frostpine Watch", "Human", "Warrior",
+                new Vector3(-264f, 0f, 515f),
+                "Frostpine Watch cuts the northern cedar that keeps Pinewatch and Greenhollow supplied. Stay warm near the mill fire.",
+                terrains);
+
+            var pin = new GameObject("Frostpine Watch map pin").AddComponent<SettlementWaystop>();
+            pin.transform.SetParent(root.transform, false);
+            pin.transform.position = PhysicsSurface(new Vector3(-263f, 0f, 517f), terrains);
+            pin.displayName = "Frostpine Watch";
+            pin.notice = "Frostpine Watch — Far-northwest timber mill and northern signal tower.";
+
+            AddCivilianWalker(root.transform, "Frostpine Sawyer", "Human", "Warrior", 1.35f, 2.2f, terrains, new[]
+            {
+                new Vector3(-262f, 0f, 511f),
+                new Vector3(-258f, 0f, 511f),
+                new Vector3(-258f, 0f, 512.5f),
+                new Vector3(-262f, 0f, 512.5f)
+            });
+
+            report.AppendLine("Staged Far-NW Frostpine Watch at (-270,520).");
+        }
+
+        // =========================================================================
+        // 9. FAR SOUTHEAST COAST — REDTIDE HARBOR & LIGHTHOUSE (365, -110)
+        // =========================================================================
+        static void StageRedtideHarbor(Transform parent, Terrain[] terrains, StringBuilder report)
+        {
+            var root = new GameObject("Redtide Harbor");
+            root.transform.SetParent(parent, false);
+
+            // 17m Striped Stone & Red-Iron Lighthouse
+            float lhBase = BuildGroundedFoundation(root.transform, "Redtide_LighthouseBase", new Vector3(365f, 0f, -110f), 7.6f, 7.6f, 3.0f, "Pale Stone", terrains);
+            Vector3 lp = new Vector3(365f, lhBase, -110f);
+            Part(root.transform, "Redtide_TowerLow", lp + Vector3.up * 3.0f, new Vector3(4.8f, 6.0f, 4.8f), "Pale Stone", collider: true);
+            Part(root.transform, "Redtide_TowerMid", lp + Vector3.up * 8.0f, new Vector3(4.2f, 4.2f, 4.2f), "Red Iron", collider: true);
+            Part(root.transform, "Redtide_TowerTop", lp + Vector3.up * 11.6f, new Vector3(3.8f, 3.2f, 3.8f), "Pale Stone", collider: true);
+            Part(root.transform, "Redtide_LanternGlow", lp + Vector3.up * 14.4f, new Vector3(2.4f, 2.4f, 2.4f), "Amber", collider: false);
+            Part(root.transform, "Redtide_Cap", lp + Vector3.up * 16.4f, new Vector3(4.0f, 1.4f, 4.0f), "Black Iron", collider: false);
+
+            // Timber Dockyard Warehouse
+            float whTop = BuildGroundedFoundation(root.transform, "Redtide_WarehouseBase", new Vector3(352f, 0f, -104f), 9.0f, 6.2f, 0.55f, "Limestone", terrains);
+            Vector3 wp = new Vector3(352f, whTop, -104f);
+            Part(root.transform, "Redtide_WarehouseWalls", wp + Vector3.up * 2.1f, new Vector3(8.2f, 4.2f, 5.4f), "Dark Wood", collider: true);
+            Part(root.transform, "Redtide_WarehouseRoof", wp + Vector3.up * 4.5f, new Vector3(9.2f, 0.45f, 6.4f), "Slate", collider: false);
+
+            AddTownNpc(root.transform, "Harbormaster Vance", "Redtide Harbor", "Human", "Rogue",
+                new Vector3(358f, 0f, -105f),
+                "Redtide Harbor ships Cinderroad iron and timber down the southern coast. Keep an eye on the lighthouse beam at dusk.",
+                terrains);
+
+            var pin = new GameObject("Redtide Harbor map pin").AddComponent<SettlementWaystop>();
+            pin.transform.SetParent(root.transform, false);
+            pin.transform.position = PhysicsSurface(new Vector3(359f, 0f, -107f), terrains);
+            pin.displayName = "Redtide Harbor";
+            pin.notice = "Redtide Harbor — Far-southeast lighthouse port and coastal freight warehouse.";
+
+            AddCivilianWalker(root.transform, "Redtide Dockhand", "Human", "Warrior", 1.35f, 2.2f, terrains, new[]
+            {
+                new Vector3(356f, 0f, -99f),
+                new Vector3(361f, 0f, -99f),
+                new Vector3(361f, 0f, -101.5f),
+                new Vector3(356f, 0f, -101.5f)
+            });
+
+            report.AppendLine("Staged Far-SE Redtide Harbor at (365,-110).");
+        }
+
+        // =========================================================================
+        // 10. WESTERN RIVERLANDS — WILLOWMERE MILL & FERRY HAMLET (-270, 125)
+        // =========================================================================
+        static void StageWillowmereMill(Transform parent, Terrain[] terrains, StringBuilder report)
+        {
+            var root = new GameObject("Willowmere Mill");
+            root.transform.SetParent(parent, false);
+
+            float millTop = BuildGroundedFoundation(root.transform, "Willowmere_MillBase", new Vector3(-270f, 0f, 125f), 8.2f, 6.4f, 0.55f, "Limestone", terrains);
+            Vector3 mp = new Vector3(-270f, millTop, 125f);
+            Part(root.transform, "Willowmere_MillHouse", mp + Vector3.up * 2.4f, new Vector3(7.4f, 4.8f, 5.6f), "Plaster", collider: true);
+            Part(root.transform, "Willowmere_MillRoof", mp + Vector3.up * 5.2f, new Vector3(8.4f, 0.50f, 6.6f), "Oak", collider: false);
+            Part(root.transform, "Willowmere_WaterWheel", mp + new Vector3(-4.1f, 1.8f, 0f), new Vector3(0.65f, 4.2f, 4.2f), "Dark Wood", collider: false);
+
+            float barnTop = BuildGroundedFoundation(root.transform, "Willowmere_BarnBase", new Vector3(-258f, 0f, 128f), 6.8f, 5.2f, 0.40f, "Limestone", terrains);
+            Vector3 bp = new Vector3(-258f, barnTop, 128f);
+            Part(root.transform, "Willowmere_BarnWalls", bp + Vector3.up * 1.9f, new Vector3(6.2f, 3.8f, 4.6f), "Oak", collider: true);
+            Part(root.transform, "Willowmere_BarnRoof", bp + Vector3.up * 4.1f, new Vector3(7.0f, 0.42f, 5.4f), "Slate", collider: false);
+
+            AddTownNpc(root.transform, "Miller Bram", "Willowmere Mill", "Human", "Warrior",
+                new Vector3(-264f, 0f, 123f),
+                "We grind grain for Silverglen and the western ferry road. The wheel turns day and night as long as the river stays clear.",
+                terrains);
+
+            var pin = new GameObject("Willowmere Mill map pin").AddComponent<SettlementWaystop>();
+            pin.transform.SetParent(root.transform, false);
+            pin.transform.position = PhysicsSurface(new Vector3(-263f, 0f, 125f), terrains);
+            pin.displayName = "Willowmere Mill";
+            pin.notice = "Willowmere Mill — Riverside grain mill and ferry hamlet between Silverglen and Deathknell.";
+
+            AddCivilianWalker(root.transform, "Willowmere Ferryhand", "Human", "Rogue", 1.35f, 2.2f, terrains, new[]
+            {
+                new Vector3(-264f, 0f, 118.5f),
+                new Vector3(-259f, 0f, 118.5f),
+                new Vector3(-259f, 0f, 121.0f),
+                new Vector3(-264f, 0f, 121.0f)
+            });
+
+            report.AppendLine("Staged Western Riverlands Willowmere Mill at (-270,125).");
         }
 
         // =========================================================================

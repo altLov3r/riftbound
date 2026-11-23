@@ -178,6 +178,19 @@ namespace Riftbound
             });
 
             // ==========================================
+            // IRONMAW QUARRY — FAR-EAST OUTLAW BOUNTY
+            // ==========================================
+            Add(new QuestDef
+            {
+                id = "ironmaw_outlaw_boss", giverNpc = IronmawQuarryZone.QuestGiverName,
+                title = "Reclaim Ironmaw Quarry", faction = "Any", zone = "Ironmaw Quarry",
+                description = "Ironjaw Krag and his outlaw gang seized the eastern iron pit and locked the ore vault. Fight into Ironmaw Quarry, defeat Ironjaw Krag, loot the vault, and report back to Overseer Rusk.",
+                targetType = "defeat_enemy", targetId = IronmawQuarryZone.BossId, targetName = IronmawQuarryZone.BossName,
+                requiredCount = 1, rewardGold = 150, rewardXP = 280, rewardItem = "ironmaw-cleaver",
+                targetLocation = IronmawQuarryZone.QuarryPos
+            });
+
+            // ==========================================
             // 1. EMBERWATCH OUTPOST (HUMAN / ALLIANCE STARTER VILLAGE)
             // ==========================================
             Add(new QuestDef
@@ -1102,7 +1115,7 @@ namespace Riftbound
             }
         }
 
-        static bool ExactBossTarget(string id) => id == "redridge-outcast-boss" || id == "vermithrax-boss" || id == RiverReaverCamp.CaptainId || id == PinewatchWoodsZone.BossId || id == AshenmawCavernZone.BossId || id == SunstoneAbbeyZone.BossId;
+        static bool ExactBossTarget(string id) => id == "redridge-outcast-boss" || id == "vermithrax-boss" || id == RiverReaverCamp.CaptainId || id == PinewatchWoodsZone.BossId || id == AshenmawCavernZone.BossId || id == SunstoneAbbeyZone.BossId || id == IronmawQuarryZone.BossId;
 
         public void OnTalkedToNPC(string npcName)
         {
