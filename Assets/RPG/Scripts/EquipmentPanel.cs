@@ -7,6 +7,7 @@ namespace Riftbound
     {
         string selectedItem = "starter-axe";
         Vector2 bagScroll;
+        GearWeaponPreview weaponPreview;
 
         void DrawEquipment(float width, float height)
         {
@@ -46,7 +47,7 @@ namespace Riftbound
             });
 
             // Slot 2: Chest Armor Slot
-            DrawEquippedSlot(leftX, leftY + 76f, leftW, 46f, "🛡", "Chest Armor", player.Armor, () => {
+            DrawEquippedSlot(leftX, leftY + 76f, leftW, 46f, "🛡", "Armor", player.Armor, () => {
                 if (player.Armor != null) selectedItem = player.Armor.id;
             });
 
@@ -89,7 +90,8 @@ namespace Riftbound
             float rightY = leftY;
             float rightW = 384f;
 
-            GUI.Label(new Rect(rightX, rightY, rightW, 20f), "BACKPACK INVENTORY (16 SLOTS)", label);
+            var items = player.OwnedItems;
+            GUI.Label(new Rect(rightX, rightY, rightW, 20f), $"BACKPACK  /  {items.Count} ITEMS", label);
 
             // 4x4 Grid of Item Slots
             float slotBoxSize = 44f;
@@ -97,15 +99,18 @@ namespace Riftbound
             float gridStartX = rightX;
             float gridStartY = rightY + 24f;
 
-            var items = player.OwnedItems;
-            int totalSlots = 16;
+            int totalSlots = Mathf.Max(16, ((items.Count + 3) / 4) * 4);
+            var viewport = new Rect(gridStartX, gridStartY, 218f, 194f);
+            bool insideBackpack = viewport.Contains(Event.current.mousePosition);
+            bagScroll = GUI.BeginScrollView(viewport, bagScroll,
+                new Rect(0, 0, 194, totalSlots / 4 * (slotBoxSize + slotGap) - slotGap));
 
             for (int i = 0; i < totalSlots; i++)
             {
                 int col = i % 4;
                 int row = i / 4;
-                float sx = gridStartX + col * (slotBoxSize + slotGap);
-                float sy = gridStartY + row * (slotBoxSize + slotGap);
+                float sx = col * (slotBoxSize + slotGap);
+                float sy = row * (slotBoxSize + slotGap);
 
                 Rect slotRect = new Rect(sx, sy, slotBoxSize, slotBoxSize);
                 bool hasItem = i < items.Count;
@@ -129,7 +134,7 @@ namespace Riftbound
 
                     // Item Icon
                     string icon = item.slot == GearSlot.Weapon ? "⚔" : item.slot == GearSlot.Armor ? "🛡" : "💍";
-                    GUI.Label(new Rect(sx, sy + 6f, slotBoxSize, slotBoxSize - 6f), icon, questButton);
+                    DrawGearIcon(new Rect(sx + 3, sy + 3, slotBoxSize - 6, slotBoxSize - 6), item, icon);
 
                     // Equipped badge [E]
                     if (isEquipped)
@@ -139,7 +144,7 @@ namespace Riftbound
                     }
 
                     // Click Handling: Left Click to select, Right Click to equip instantly!
-                    if (Event.current.type == EventType.MouseDown && slotRect.Contains(Event.current.mousePosition))
+                    if (insideBackpack && Event.current.type == EventType.MouseDown && slotRect.Contains(Event.current.mousePosition))
                     {
                         if (Event.current.button == 0) // Left click
                         {
@@ -167,6 +172,7 @@ namespace Riftbound
                     Fill(new Rect(sx + slotBoxSize - 1f, sy, 1f, slotBoxSize), new Color(0.2f, 0.2f, 0.25f, 0.6f));
                 }
             }
+            GUI.EndScrollView();
 
             // Selected Item Detailed Inspection Box (WoW-style Tooltip)
             float inspectY = gridStartY + 4 * (slotBoxSize + slotGap) + 4f;
@@ -178,6 +184,7 @@ namespace Riftbound
 
             if (curSelected != null)
             {
+                DrawGearPortrait(new Rect(rightX + 226, gridStartY + 8, 152, 158), curSelected);
                 Fill(new Rect(rightX, inspectY, rightW, 2f), curSelected.color);
 
                 var tipStyle = new GUIStyle(small) { richText = true, wordWrap = true, fontSize = 11 };
@@ -242,7 +249,7 @@ namespace Riftbound
 
             // Slot Icon
             Fill(new Rect(x + 4f, y + 4f, 38f, 38f), new Color(0.12f, 0.14f, 0.18f, 0.95f));
-            GUI.Label(new Rect(x + 4f, y + 4f, 38f, 38f), icon, questButton);
+            DrawGearIcon(new Rect(x + 5f, y + 5f, 36f, 36f), item, icon);
 
             if (item != null)
             {
@@ -263,6 +270,24 @@ namespace Riftbound
                 emptyStyle.normal.textColor = new Color(0.6f, 0.6f, 0.65f);
                 GUI.Label(new Rect(x + 48f, y + 14f, w - 60f, 18f), $"<Empty {slotName} Slot>", emptyStyle);
             }
+        }
+
+        void DrawGearIcon(Rect rect, GearItem item, string fallback)
+        {
+            var art = GearArt.Icon(item);
+            if (art) GUI.DrawTexture(rect, art, ScaleMode.ScaleToFit);
+            else GUI.Label(rect, fallback, questButton);
+        }
+
+        void DrawGearPortrait(Rect rect, GearItem item)
+        {
+            if (!weaponPreview) weaponPreview = gameObject.AddComponent<GearWeaponPreview>();
+            Texture art = weaponPreview.Show(player, item);
+            Fill(rect, new Color(.06f, .10f, .12f, 1));
+            if (!art) art = GearArt.Icon(item);
+            if (art) GUI.DrawTexture(rect, art, ScaleMode.ScaleToFit);
+            Fill(new Rect(rect.x, rect.yMax - 1, rect.width, 1), item.color);
+            GUI.Label(new Rect(rect.x + 4, rect.yMax + 7, rect.width - 8, 20), item.subType, small);
         }
     }
 }
