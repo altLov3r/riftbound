@@ -7,6 +7,7 @@ namespace Riftbound
     {
         const int MapSize = 128;
         readonly float[] elevations = new float[MapSize * MapSize];
+        readonly bool[] mappedTerrain = new bool[MapSize * MapSize];
         readonly Color32[] mapPixels = new Color32[MapSize * MapSize];
         readonly List<MapLine> mapLines = new();
         readonly List<Bounds> dungeonFloors = new();
@@ -53,7 +54,9 @@ namespace Riftbound
             {
                 int i = y * MapSize + x;
                 var point = start + new Vector3((x + .5f) * metersPerPixel, 0f, (y + .5f) * metersPerPixel);
-                elevations[i] = floor == 0 ? WorldRegions.GroundHeight(point, terrains) : point.y;
+                Terrain terrain = floor == 0 ? WorldRegions.TerrainAt(point, terrains) : null;
+                mappedTerrain[i] = terrain;
+                elevations[i] = terrain ? terrain.SampleHeight(point) + terrain.transform.position.y : point.y;
             }
             for (int y = 0; y < MapSize; y++)
             for (int x = 0; x < MapSize; x++)
@@ -67,9 +70,16 @@ namespace Riftbound
                 }
                 var point = start + new Vector3((x + .5f) * metersPerPixel, 0f, (y + .5f) * metersPerPixel);
                 point.y = elevations[i];
+                if (floor == 0 && !mappedTerrain[i])
+                {
+                    mapPixels[i] = new Color(.09f, .13f, .16f, edge);
+                    continue;
+                }
                 Color color = floor == 0 ? TerrainColor(point) : DungeonColor(point, floor);
-                float high = elevations[y * MapSize + Mathf.Min(MapSize - 1, x + 1)];
-                float north = elevations[Mathf.Min(MapSize - 1, y + 1) * MapSize + x];
+                int eastSample = y * MapSize + Mathf.Min(MapSize - 1, x + 1);
+                int northSample = Mathf.Min(MapSize - 1, y + 1) * MapSize + x;
+                float high = mappedTerrain[eastSample] ? elevations[eastSample] : point.y;
+                float north = mappedTerrain[northSample] ? elevations[northSample] : point.y;
                 float grade = Mathf.Clamp((high - point.y) * -.18f + (north - point.y) * .22f, -.30f, .25f);
                 float contour = floor == 0 && Mathf.Floor(point.y / 4f) != Mathf.Floor(high / 4f) ? -.09f : 0f;
                 float noise = floor == 0 ? (Mathf.PerlinNoise(point.x * .11f, point.z * .11f) - .5f) * .15f : 0f;

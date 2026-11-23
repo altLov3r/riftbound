@@ -266,7 +266,7 @@ namespace Riftbound
 
             // Keep the world visible: show only active objectives, with details in the journal.
             float qtw = 236f, qtx = width - qtw - 20f;
-            float qty = (MinimapRadar.Instance != null && MinimapRadar.Instance.showMinimap) ? MinimapRadar.TrackerTop : 20f;
+            float qty = (MinimapRadar.Instance != null && MinimapRadar.Instance.showMinimap) ? MinimapRadar.NavigationTrackerTop : 20f;
             var fqs = FactionQuestSystem.Instance;
             var fq = fqs != null ? fqs.GetActiveQuest() : null;
             bool hasObjective = fq != null || player.QuestAccepted;
@@ -407,7 +407,7 @@ namespace Riftbound
                 if (player.Stats.Alive && GUI.Button(new Rect(width / 2 - 205, height / 2 + 100, 410, 35), "Save & Return to Main Menu", questButton)) player.GetComponent<FrontendMenu>().ReturnToMenu();
             }
 
-            if (MinimapRadar.Instance) MinimapRadar.Instance.DrawRadarGUI(width, height);
+            if (MinimapRadar.Instance) MinimapRadar.Instance.DrawNavigationHud(width);
             if (ZoneBanner.Instance) ZoneBanner.Instance.DrawBannerGUI(width, height);
             if (ChatSystem.Instance) ChatSystem.Instance.DrawChatGUI(width, height);
             if (LootDropSystem.Instance) LootDropSystem.Instance.DrawLootGUI(width, height);

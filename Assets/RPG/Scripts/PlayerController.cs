@@ -280,7 +280,7 @@ namespace Riftbound
 
             var mouse = Mouse.current;
             if (mouse != null && (mouse.leftButton.wasPressedThisFrame || mouse.rightButton.wasPressedThisFrame) &&
-                !MinimapRadar.TakesMouse(this, mouse.position.ReadValue()) &&
+                !MinimapRadar.NavigationTakesMouse(this, mouse.position.ReadValue()) &&
                 !PrototypeHUD.QuestPointerTakesMouse(this, mouse.position.ReadValue(), mouse.leftButton.wasPressedThisFrame) &&
                 !DialogueOpen && !ShopOpen && !MapOpen && !JournalOpen && !InventoryOpen && Camera.main)
             {

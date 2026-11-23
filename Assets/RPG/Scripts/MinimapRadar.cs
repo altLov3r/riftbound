@@ -107,6 +107,7 @@ namespace Riftbound
             if (Instance == this) Instance = null;
             if (terrainTex) Destroy(terrainTex);
             if (mapDisc) Destroy(mapDisc);
+            if (navigationArrow) Destroy(navigationArrow);
         }
 
         void Update()

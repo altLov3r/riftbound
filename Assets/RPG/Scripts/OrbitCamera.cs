@@ -108,7 +108,7 @@ namespace Riftbound
             if (mouse != null)
                 blocked |= PrototypeHUD.QuestPointerTakesMouse(player, mouse.position.ReadValue(), mouse.leftButton.wasPressedThisFrame);
             if (!blocked && mouse != null && player)
-                blocked = MinimapRadar.TakesMouse(player, mouse.position.ReadValue());
+                blocked = MinimapRadar.NavigationTakesMouse(player, mouse.position.ReadValue());
             if (blocked)
             {
                 IsSteering = IsFreeLooking = BothMouseButtonsPressed = false;
