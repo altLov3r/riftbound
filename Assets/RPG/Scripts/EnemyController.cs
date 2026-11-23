@@ -69,6 +69,9 @@ namespace Riftbound
         public bool IsWarningActive => warning != null && warning.enabled;
         public bool HasPendingAttack => pendingDamage || heavyUntil > 0f;
         public bool IsEvading => evading;
+        public bool IsChasing => wasChasing;
+        public Vector3 HomePosition => home;
+        public event System.Action OnEvadeReset;
         void Awake() { Initialize(); }
         void Initialize()
         {
@@ -104,6 +107,7 @@ namespace Riftbound
             stats.Restore();
             resetPoseOnEnable = true;
             ResetIdlePose();
+            OnEvadeReset?.Invoke();
         }
         void ResetIdlePose()
         {
@@ -523,7 +527,14 @@ namespace Riftbound
                 Vector3.Distance(home, targetTransform.position) < 25 &&
                 (hasSight || Time.time - stats.LastHit < .3f || wasChasing && Time.time < pursuitUntil);
             if (!inPursuitRange && homeDistance > 1.2f) evading = true;
-            if (evading && homeDistance <= 1.2f) { evading = false; stats.Restore(); }
+            if (evading && homeDistance <= 1.2f)
+            {
+                evading = false;
+                stats.Restore();
+                OnEvadeReset?.Invoke();
+                if (Network.CoopSessionConfig.IsMultiplayer)
+                    Network.RealmWorldChannel.DispatchEnemyState(this);
+            }
             bool chasing = inPursuitRange && !evading;
             if (chasing && !wasChasing)
             {

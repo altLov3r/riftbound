@@ -98,6 +98,13 @@ namespace Riftbound.Network
             RiftboundCoopPlayer.BroadcastWorldEventState(eventId, active, pos);
         }
 
+        public static void DispatchWorldBossEvent(byte eventKind, Vector3 pos, float radius, float duration)
+        {
+            var ch = ResolveActiveServerChannel();
+            if (ch != null)
+                ch.BroadcastWorldBossEventClientRpc(eventKind, pos, radius, duration);
+        }
+
         public static void DispatchWorldSnapshotToClient(ulong clientId)
         {
             var ch = ResolveActiveServerChannel();
@@ -138,6 +145,14 @@ namespace Riftbound.Network
             if (LivingWorldEvents.Instance != null)
             {
                 LivingWorldEvents.Instance.SendEventSnapshotViaChannel(this, rpcParams);
+            }
+            if (WorldBossEncounter.Instance != null && (WorldBossEncounter.IsBossDefeatedAuthoritative || WorldBossEncounter.Instance.IsEnraged))
+            {
+                SendWorldBossSnapshotClientRpc(
+                    WorldBossEncounter.IsBossDefeatedAuthoritative,
+                    WorldBossEncounter.Instance.HoardChestPosition,
+                    WorldBossEncounter.Instance.IsEnraged,
+                    rpcParams);
             }
         }
 
@@ -216,6 +231,24 @@ namespace Riftbound.Network
             if (!IsAuthorizedServerSender(rpcParams.Receive.SenderClientId)) return;
             if (RiftboundCoopPlayer.LocalOwner) RiftboundCoopPlayer.LocalOwner.SetServerReadyCheckSeqForChannel(checkId);
             if (CoopWorldManager.Instance) CoopWorldManager.Instance.OpenReadyCheck(initiatorName);
+        }
+
+        [Rpc(SendTo.Everyone, InvokePermission = RpcInvokePermission.Server)]
+        void BroadcastWorldBossEventClientRpc(byte eventKind, Vector3 pos, float radius, float duration, RpcParams rpcParams = default)
+        {
+            if (IsServer) return;
+            if (!IsAuthorizedServerSender(rpcParams.Receive.SenderClientId)) return;
+            if (WorldBossEncounter.Instance)
+                WorldBossEncounter.Instance.ApplyReplicatedBossEvent(eventKind, pos, radius, duration);
+        }
+
+        [Rpc(SendTo.SpecifiedInParams, InvokePermission = RpcInvokePermission.Server)]
+        void SendWorldBossSnapshotClientRpc(bool defeated, Vector3 chestPos, bool enraged, RpcParams rpcParams = default)
+        {
+            if (IsServer) return;
+            if (!IsAuthorizedServerSender(rpcParams.Receive.SenderClientId)) return;
+            if (WorldBossEncounter.Instance)
+                WorldBossEncounter.Instance.ApplyReplicatedBossSnapshot(defeated, chestPos, enraged);
         }
     }
 }
