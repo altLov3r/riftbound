@@ -245,6 +245,7 @@ namespace Riftbound.Network
                     Vector3 slotPos = ComputeSpawnPosition(basePos, SpawnSlot.Value);
                     AuthorizeHostTeleport(slotPos);
                 }
+                HydrateServerRealmCharacterIfInitialized();
             }
 
             if (IsOwner)
@@ -271,6 +272,7 @@ namespace Riftbound.Network
             serverSprintUntil = -10f;
             if (IsServer)
             {
+                PersistServerRealmCharacterIfInitialized();
                 if (IsSprinting.Value) IsSprinting.Value = false;
                 if (IsLeader.Value && OwnerClientId != NetworkManager.ServerClientId)
                 {
@@ -2150,8 +2152,14 @@ namespace Riftbound.Network
             if (!IsServer || !IsSpawned || Health.Value <= 0) return false;
             string charKey = ResolveCharacterRewardKey();
             if (!ServerClaimedWorldBossKills.Add(charKey)) return false;
+            if (RealmPersistenceService.IsInitialized)
+            {
+                if (!RealmPersistenceService.TryClaimBossKillOnce(ResolveServerAccountId(), charKey, "worldboss-gorgonax", Mathf.Max(0, gold), Mathf.Max(0, xp)))
+                    return false;
+            }
 
             GrantAuthoritativeProgress(Mathf.Max(0, xp), Mathf.Max(0, gold));
+            PersistServerRealmCharacterIfInitialized();
             if (IsOwner && localPlayer)
                 ApplyAuthorizedWorldBossKillReward(itemId, title);
             else if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening)
@@ -2192,13 +2200,21 @@ namespace Riftbound.Network
             if (Health.Value <= 0 || !chest || string.IsNullOrEmpty(chest.chestId)) return false;
             if (Vector3.Distance(transform.position, chest.transform.position) > 4.5f) return false;
             if (chest.chestId == RiverReaverCamp.CacheId && !serverDefeatedEnemyKeys.Contains(RiverReaverCamp.CaptainId)) return false;
+            if (chest.chestId == PinewatchWoodsZone.BossChestId && !serverDefeatedEnemyKeys.Contains(PinewatchWoodsZone.BossId)) return false;
+            if (chest.chestId == AshenmawCavernZone.BossChestId && !serverDefeatedEnemyKeys.Contains(AshenmawCavernZone.BossId)) return false;
             if (chest.chestId == WorldBossEncounter.HoardChestId && !WorldBossEncounter.IsBossDefeatedAuthoritative) return false;
             if (chest.requiresCaptainDefeated && !serverDefeatedEnemyKeys.Contains("ashwood-captain")) return false;
             if (chest.requiresWardenDefeated && !serverDefeatedEnemyKeys.Contains("crypt-warden")) return false;
 
+            string charKey = ResolveCharacterRewardKey();
+            if (RealmPersistenceService.IsInitialized)
+            {
+                if (!RealmPersistenceService.TryClaimChestOnce(ResolveServerAccountId(), charKey, chest.chestId, chest.gold, chest.experience))
+                    return false;
+            }
+
             if (chest.chestId == WorldBossEncounter.HoardChestId)
             {
-                string charKey = ResolveCharacterRewardKey();
                 if (ServerClaimedWorldBossChests.Contains(charKey)) return false;
                 if (CoopWorldManager.Instance != null && !CoopWorldManager.Instance.TryClaimChestForClient(OwnerClientId, chest.chestId))
                     return false;
@@ -2210,7 +2226,87 @@ namespace Riftbound.Network
             }
 
             GrantAuthoritativeProgress(chest.experience, chest.gold);
+            PersistServerRealmCharacterIfInitialized();
             return true;
+        }
+
+        string serverAssignedAccountId;
+
+        public void SetServerAccountIdForSession(string accountId)
+        {
+            if (!IsServer) return;
+            serverAssignedAccountId = string.IsNullOrWhiteSpace(accountId) ? "" : accountId.Trim();
+            HydrateServerRealmCharacterIfInitialized();
+        }
+
+        string ResolveServerAccountId()
+        {
+            if (!string.IsNullOrWhiteSpace(serverAssignedAccountId)) return serverAssignedAccountId;
+            return $"realm_c{OwnerClientId}";
+        }
+
+        void HydrateServerRealmCharacterIfInitialized()
+        {
+            if (!IsServer || !RealmPersistenceService.IsInitialized) return;
+            string charKey = ResolveCharacterRewardKey();
+            var save = RealmPersistenceService.LoadOrCreateCharacter(ResolveServerAccountId(), charKey, Race.Value.ToString(), ClassName.Value.ToString(), "Alliance");
+            if (save.level > Level.Value) Level.Value = save.level;
+            if (save.experience > Experience.Value) Experience.Value = save.experience;
+            if (save.gold > Gold.Value) Gold.Value = save.gold;
+            if (save.maxHealth > MaxHealth.Value) MaxHealth.Value = save.maxHealth;
+            if (save.health > 0 && save.health <= MaxHealth.Value) Health.Value = save.health;
+            if (save.claimedBossKills != null && save.claimedBossKills.Contains("worldboss-gorgonax"))
+                ServerClaimedWorldBossKills.Add(charKey);
+            if (save.claimedChests != null && save.claimedChests.Contains(WorldBossEncounter.HoardChestId))
+                ServerClaimedWorldBossChests.Add(charKey);
+        }
+
+        void PersistServerRealmCharacterIfInitialized()
+        {
+            if (!IsServer || !RealmPersistenceService.IsInitialized) return;
+            string charKey = ResolveCharacterRewardKey();
+            var save = RealmPersistenceService.LoadOrCreateCharacter(ResolveServerAccountId(), charKey, Race.Value.ToString(), ClassName.Value.ToString(), "Alliance");
+            save.level = Mathf.Max(1, Level.Value);
+            save.experience = Mathf.Max(0, Experience.Value);
+            save.gold = Mathf.Max(0, Gold.Value);
+            save.maxHealth = Mathf.Max(100, MaxHealth.Value);
+            save.health = Mathf.Clamp(Health.Value, 0, save.maxHealth);
+            save.posX = transform.position.x;
+            save.posY = transform.position.y;
+            save.posZ = transform.position.z;
+            RealmPersistenceService.SaveCharacter(save);
+        }
+
+        public bool LastStaffCommandAllowed { get; private set; }
+        public string LastStaffCommandMessage { get; private set; } = "";
+
+        public void RequestStaffAction(RealmStaffAction action, string target = "", string detail = "")
+        {
+            if (!IsOwner || !IsSpawned) return;
+            RequestStaffActionServerRpc((byte)action, target ?? "", detail ?? "");
+        }
+
+        [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Owner)]
+        void RequestStaffActionServerRpc(byte actionByte, string target, string detail)
+        {
+            var action = (RealmStaffAction)actionByte;
+            string actor = ResolveServerAccountId();
+            bool allowed = RealmPersistenceService.TryAuthorizeStaffAction(actor, action, target, detail, out string reason);
+            if (allowed && action == RealmStaffAction.ResetBoss && WorldBossEncounter.Instance != null)
+            {
+                WorldBossEncounter.Instance.ResetEncounterState();
+                reason = "Gorgonax encounter reset by staff.";
+            }
+            ReceiveStaffActionResultClientRpc(allowed, reason ?? "", RpcTarget.Single(OwnerClientId, RpcTargetUse.Temp));
+        }
+
+        [Rpc(SendTo.SpecifiedInParams, InvokePermission = RpcInvokePermission.Server)]
+        void ReceiveStaffActionResultClientRpc(bool allowed, string message, RpcParams rpcParams = default)
+        {
+            if (!IsOwner) return;
+            LastStaffCommandAllowed = allowed;
+            LastStaffCommandMessage = message ?? "";
+            ChatSystem.LogSystem(allowed ? $"<color=#6ee7b7>[Staff] {message}</color>" : $"<color=#f87171>[Staff] {message}</color>");
         }
 
         [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Owner)]
