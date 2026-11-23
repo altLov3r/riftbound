@@ -5,9 +5,9 @@ namespace Riftbound
 {
     public partial class MinimapRadar
     {
-        const float PanelWidth = 244f, PanelHeight = 312f, Diameter = 204f;
-        const float PanelTop = 52f;
-        internal const float TrackerTop = PanelTop + PanelHeight + 12f;
+        const float PanelWidth = 204f, PanelHeight = 246f, Diameter = 172f;
+        const float PanelTop = 44f;
+        internal const float TrackerTop = PanelTop + PanelHeight + 10f;
         static readonly Color Copper = new(.66f, .53f, .34f);
         static readonly Color Paper = new(.96f, .90f, .76f);
         static readonly Color Muted = new(.73f, .76f, .72f);
@@ -55,7 +55,7 @@ namespace Riftbound
             if (!IsVisible) return;
             PrepareMapStyle();
             var panel = PanelBounds(screenW);
-            Vector2 center = new(panel.center.x, panel.y + 132);
+            Vector2 center = new(panel.center.x, panel.y + 116f);
             var map = Centered(center, Diameter);
             Vector3 position = player.transform.position;
             int floor = MapFloor(position);
@@ -113,18 +113,12 @@ namespace Riftbound
                 routeCaption = $"{title}  ·  {Mathf.RoundToInt(distance)} m";
             }
 
-            float footer = panel.y + 237;
-            string location = floor == 0 ? $"{position.x:0} E / {position.z:0} N" : "Underground";
-            Label(new Rect(panel.x + 9, footer, 114, 23), location, caption, Muted);
-            if (GUI.Button(new Rect(panel.xMax - 127, footer + 1, 26, 22), "−", button)) ChangeRange(-1);
-            if (GUI.Button(new Rect(panel.xMax - 99, footer + 1, 26, 22), "+", button)) ChangeRange(1);
-            if (GUI.Button(new Rect(panel.xMax - 69, footer + 1, 60, 22), "Map [M]", button)) player.MapOpen = true;
-            Fill(new Rect(panel.x + 8, footer + 28, panel.width - 16, 1), Copper * .65f);
-            Label(new Rect(panel.x + 10, footer + 33, panel.width - 20, 20),
-                hovered ?? routeCaption ?? "! Quest     ◆ Objective     ? Turn in", centered, Paper);
-            if (GUI.Button(new Rect(panel.x + 9, footer + 53, 61, 17), filtersOpen ? "Close" : "Filters", button)) filtersOpen = !filtersOpen;
-            if (customWaypoint.HasValue && GUI.Button(new Rect(panel.xMax - 70, footer + 53, 61, 17), "Clear pin", button)) ClearWaypoint();
-            if (filtersOpen) DrawFilters(FilterBounds(panel));
+            float footer = panel.y + 210f;
+            string location = floor == 0 ? $"{position.x:0}, {position.z:0}" : "Cave";
+            Label(new Rect(panel.x + 8, footer + 2, 84, 22), hovered ?? routeCaption ?? location, caption, Muted);
+            if (GUI.Button(new Rect(panel.xMax - 102, footer + 2, 24, 22), "−", button)) ChangeRange(-1);
+            if (GUI.Button(new Rect(panel.xMax - 76, footer + 2, 24, 22), "+", button)) ChangeRange(1);
+            if (GUI.Button(new Rect(panel.xMax - 48, footer + 2, 40, 22), "M", button)) player.MapOpen = true;
 
             var input = Event.current;
             Vector2 clickOffset = input.mousePosition - center;

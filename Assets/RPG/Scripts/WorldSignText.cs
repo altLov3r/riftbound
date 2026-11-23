@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace Riftbound
 {
-    internal static class WorldSignText
+    public static class WorldSignText
     {
         // Match complete authored captions so quest prompts and floating zone labels stay separate.
         static readonly Dictionary<string, string> Copy = new Dictionary<string, string>
@@ -37,7 +37,7 @@ namespace Riftbound
             ["TALLYKEEPERS’ REST"] = "TALLYKEEPERS’ REST"
         };
 
-        internal static bool Show(TextMesh text)
+        public static bool Show(TextMesh text)
         {
             if (string.IsNullOrEmpty(text.text)) return false;
             if (text.transform.parent && !text.transform.parent.gameObject.activeInHierarchy)
@@ -54,9 +54,45 @@ namespace Riftbound
             var renderer = text.GetComponent<MeshRenderer>();
             if (renderer) renderer.enabled = true;
             var billboard = text.GetComponent<WorldLabel>();
-            if (billboard) billboard.enabled = true;
+            if (billboard) billboard.enabled = false;
+            if (!text.GetComponent<SignFrontFaceCuller>())
+                text.gameObject.AddComponent<SignFrontFaceCuller>();
             text.gameObject.SetActive(true);
             return true;
+        }
+    }
+
+    /// <summary>
+    /// Hides 3D sign TextMesh renderers when viewed from behind (TextMesh faces -transform.forward)
+    /// or beyond readable range so signs are never readable backwards from the rear.
+    /// </summary>
+    public sealed class SignFrontFaceCuller : MonoBehaviour
+    {
+        MeshRenderer textRenderer;
+
+        void Awake()
+        {
+            textRenderer = GetComponent<MeshRenderer>();
+        }
+
+        void LateUpdate()
+        {
+            if (!textRenderer) textRenderer = GetComponent<MeshRenderer>();
+            if (!textRenderer) return;
+            var cam = Camera.main;
+            if (!cam) return;
+
+            Vector3 toCam = cam.transform.position - transform.position;
+            float sqrDist = toCam.sqrMagnitude;
+            if (sqrDist > 900f)
+            {
+                textRenderer.enabled = false;
+                return;
+            }
+
+            // Unity TextMesh glyphs face -transform.forward; require camera to be in front of the sign face.
+            bool frontFacing = Vector3.Dot(toCam.normalized, -transform.forward) > 0.08f;
+            textRenderer.enabled = frontFacing;
         }
     }
 }

@@ -134,6 +134,28 @@ namespace Riftbound
             });
 
             // ==========================================
+            // ASHENMAW SEAMLESS CAVERN — BRIARCLAW TRIBE & BEAR GUARDIAN
+            // ==========================================
+            Add(new QuestDef
+            {
+                id = "ashenmaw_tribe_cull", giverNpc = AshenmawCavernZone.QuestGiverName,
+                title = "Shadows of Ashenmaw", faction = "Any", zone = "Ashenmaw Cavern",
+                description = "The Briarclaw Tribe broke into Ashenmaw Cavern and roused the ancient spirit within. Walk straight into the cavern north of Warden Kaelen's campfire, slay 6 Briarclaw tribesmen, and report back.",
+                targetType = "defeat_enemy", targetId = "ashenmaw-tribe", targetName = "Briarclaw Tribesmen",
+                requiredCount = 6, rewardGold = 80, rewardXP = 160,
+                targetLocation = AshenmawCavernZone.EntrancePos, nextQuestId = "ashenmaw_bear_guardian"
+            });
+            Add(new QuestDef
+            {
+                id = "ashenmaw_bear_guardian", giverNpc = AshenmawCavernZone.QuestGiverName,
+                title = "Trial of the Bear Guardian", faction = "Any", zone = "Ashenmaw Cavern",
+                description = "Deep inside the cavern's vaulted sanctum, Ursolak—the Ancient Bear Guardian—still rages before the spirit altar. Defeat Ursolak, claim his spirit reliquary, and return to Warden Kaelen.",
+                targetType = "defeat_enemy", targetId = AshenmawCavernZone.BossId, targetName = AshenmawCavernZone.BossName,
+                requiredCount = 1, rewardGold = 160, rewardXP = 300, rewardItem = "ursolak-spirit-pelt",
+                prerequisiteQuestId = "ashenmaw_tribe_cull", targetLocation = AshenmawCavernZone.SanctumPos
+            });
+
+            // ==========================================
             // 1. EMBERWATCH OUTPOST (HUMAN / ALLIANCE STARTER VILLAGE)
             // ==========================================
             Add(new QuestDef
@@ -1058,7 +1080,7 @@ namespace Riftbound
             }
         }
 
-        static bool ExactBossTarget(string id) => id == "redridge-outcast-boss" || id == "vermithrax-boss" || id == RiverReaverCamp.CaptainId || id == PinewatchWoodsZone.BossId;
+        static bool ExactBossTarget(string id) => id == "redridge-outcast-boss" || id == "vermithrax-boss" || id == RiverReaverCamp.CaptainId || id == PinewatchWoodsZone.BossId || id == AshenmawCavernZone.BossId;
 
         public void OnTalkedToNPC(string npcName)
         {

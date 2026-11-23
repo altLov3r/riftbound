@@ -113,7 +113,7 @@ namespace Riftbound
         void Update()
         {
             if (!player || FrontendMenu.IsOpen || Time.unscaledTime < nextQuestUpdate) return;
-            nextQuestUpdate = Time.unscaledTime + .5f;
+            nextQuestUpdate = Time.unscaledTime + .15f;
             RefreshQuestNavigation();
             RefreshQuestPins();
             if (showMinimap) RefreshMapPoints();

@@ -5,7 +5,7 @@ namespace Riftbound
 {
     public partial class MinimapRadar
     {
-        const int MapSize = 128;
+        const int MapSize = 64;
         readonly float[] elevations = new float[MapSize * MapSize];
         readonly bool[] mappedTerrain = new bool[MapSize * MapSize];
         readonly Color32[] mapPixels = new Color32[MapSize * MapSize];
@@ -35,15 +35,15 @@ namespace Riftbound
         {
             if (!terrainTex)
                 terrainTex = new Texture2D(MapSize, MapSize, TextureFormat.RGBA32, false)
-                    { name = "Local map relief", wrapMode = TextureWrapMode.Clamp };
+                    { name = "Local map relief", wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear };
             bool scaleChanged = lastRange != range || lastFloor != floor;
             float movement = (terrainOrigin - position).sqrMagnitude;
-            if (!scaleChanged && (movement < .8f || movement < 900f && Time.unscaledTime < nextTerrainUpdate)) return;
+            if (!scaleChanged && (movement < .15f || movement < 400f && Time.unscaledTime < nextTerrainUpdate)) return;
             if (!hasRoutes && floor == 0) CacheRoutes();
             if (floor > 0 && lastFloor != floor) CacheDungeonFloors(floor);
             lastRange = range;
             lastFloor = floor;
-            nextTerrainUpdate = Time.unscaledTime + .35f;
+            nextTerrainUpdate = Time.unscaledTime + .08f;
             terrainOrigin = position;
             var terrains = Terrain.activeTerrains;
             float half = MapSize * .5f;

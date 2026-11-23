@@ -67,6 +67,7 @@ namespace Riftbound
 
         public static string ZoneName(Vector3 point)
         {
+            if (AshenmawCavernZone.Inside(point)) return "Ashenmaw Cavern";
             if (BrassHollows.Inside(point)) return "The Brass Hollows";
             if (Underground(point)) return "The Scarlet Crypts";
             if (point.z > 430 && point.x > 95) return "Wyrmcrest Summit";

@@ -41,8 +41,8 @@ namespace Riftbound
             ExplorationSites.Ensure();
             RiverReaverCamp.Ensure();
             PinewatchWoodsZone.Ensure();
+            AshenmawCavernZone.Ensure();
             if (player) WesternRoadCamps.Ensure(player);
-            BrassHollows.Ensure();
             RoadPatrolGuard.Ensure();
             if (!ActionBarSystem.Instance && !GetComponent<ActionBarSystem>()) gameObject.AddComponent<ActionBarSystem>();
             if (!CathedralBossEncounter.Instance && !GetComponent<CathedralBossEncounter>()) gameObject.AddComponent<CathedralBossEncounter>();
