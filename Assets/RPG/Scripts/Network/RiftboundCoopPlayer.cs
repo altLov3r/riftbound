@@ -5,6 +5,63 @@ using UnityEngine;
 
 namespace Riftbound.Network
 {
+    public enum ServerCastPhase : byte
+    {
+        None = 0,
+        Started = 1,
+        Canceled = 2,
+        Released = 3
+    }
+
+    public enum ServerCastCancelReason : byte
+    {
+        None = 0,
+        Moved = 1,
+        Damaged = 2,
+        Died = 3,
+        ManualCancel = 4,
+        Mounted = 5,
+        InvalidTarget = 6,
+        LineOfSight = 7,
+        OutOfRange = 8,
+        Replaced = 9
+    }
+
+    public readonly struct ServerCastEvent
+    {
+        public readonly RiftboundCoopPlayer Caster;
+        public readonly bool IsLocalOwner;
+        public readonly uint CastSeq;
+        public readonly string AbilityId;
+        public readonly string TargetEnemyKey;
+        public readonly ServerCastPhase Phase;
+        public readonly ServerCastCancelReason CancelReason;
+        public readonly float Duration;
+        public readonly double ServerStartTime;
+
+        public ServerCastEvent(
+            RiftboundCoopPlayer caster,
+            bool isLocalOwner,
+            uint castSeq,
+            string abilityId,
+            string targetEnemyKey,
+            ServerCastPhase phase,
+            ServerCastCancelReason cancelReason,
+            float duration,
+            double serverStartTime)
+        {
+            Caster = caster;
+            IsLocalOwner = isLocalOwner;
+            CastSeq = castSeq;
+            AbilityId = abilityId ?? string.Empty;
+            TargetEnemyKey = targetEnemyKey ?? string.Empty;
+            Phase = phase;
+            CancelReason = cancelReason;
+            Duration = duration;
+            ServerStartTime = serverStartTime;
+        }
+    }
+
     public class RiftboundCoopPlayer : NetworkBehaviour
     {
         public static readonly List<RiftboundCoopPlayer> AllPlayers = new List<RiftboundCoopPlayer>();
@@ -39,6 +96,7 @@ namespace Riftbound.Network
         public NetworkVariable<int> Gold = new NetworkVariable<int>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
         public NetworkVariable<bool> IsMounted = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+        public NetworkVariable<bool> IsSprinting = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
         public NetworkVariable<FixedString32Bytes> MountId = new NetworkVariable<FixedString32Bytes>(new FixedString32Bytes("horse"), NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
         public NetworkVariable<float> MoveSpeed = new NetworkVariable<float>(0f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
         public NetworkVariable<byte> LocomotionFlags = new NetworkVariable<byte>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server); // bit0=airborne, bit1=walking, bit2=blocking
@@ -123,17 +181,59 @@ namespace Riftbound.Network
         float serverBlockUntil;
         float serverDodgeUntil;
         float serverLastDodgeTime = -10f;
+        float serverSprintUntil;
+        float serverBlinkAllowanceMeters;
+        float serverBlinkExpiresAt;
+        float serverMoveBudget = 1.35f;
+        float serverLastDamagedAt = -10f;
+
+        bool serverCastActive;
+        bool serverCastReleased;
+        uint serverCastSeq;
+        string serverCastAbility = string.Empty;
+        string serverCastEnemyKey = string.Empty;
+        float serverCastStartTime;
+        double serverCastStartNetTime;
+        float serverCastEndTime;
+        float serverCastDuration;
+        Vector3 serverCastStartPos;
+        uint serverLastReleasedCastSeq;
+        uint serverLastCanceledCastSeq;
+        ServerCastCancelReason serverLastCancelReason;
+
+        uint activeClientCastSeq;
+        string activeClientCastAbility = string.Empty;
+        string activeClientCastTargetKey = string.Empty;
+        float activeClientCastDuration;
+        float activeClientCastStartTime;
+        double activeClientCastServerStartTime;
+        ServerCastPhase activeClientCastPhase;
+        ServerCastCancelReason lastClientCastCancelReason;
+        uint lastClientCastEventSeq;
+        ServerCastPhase lastClientCastEventPhase;
+        uint lastReleasedCastSeq;
+        uint lastCanceledCastSeq;
         static GUIStyle nameplateStyle;
 
         bool IsServerBlocking => serverBlocking && Time.time <= serverBlockUntil;
+        public bool IsServerSprinting => Time.time <= serverSprintUntil && Health.Value > 0 && !IsMounted.Value;
 
         public override void OnNetworkSpawn()
         {
             if (!AllPlayers.Contains(this)) AllPlayers.Add(this);
             lastServerMoveTime = Time.time;
+            serverMoveBudget = 1.35f;
+            serverSprintUntil = -10f;
+            serverBlinkAllowanceMeters = 0f;
+            serverBlinkExpiresAt = 0f;
+            serverCastActive = false;
+            serverCastReleased = false;
+            activeClientCastSeq = 0;
+            activeClientCastPhase = ServerCastPhase.None;
 
             if (IsServer)
             {
+                IsSprinting.Value = false;
                 SpawnSlot.Value = CoopWorldManager.AllocateSpawnSlot(this);
                 IsLeader.Value = !CoopSessionConfig.IsDedicatedServer && OwnerClientId == NetworkManager.ServerClientId;
                 MaxHealth.Value = 100;
@@ -166,10 +266,17 @@ namespace Riftbound.Network
 
         public override void OnNetworkDespawn()
         {
-            if (IsServer && IsLeader.Value && OwnerClientId != NetworkManager.ServerClientId)
+            serverCastActive = false;
+            serverCastReleased = false;
+            serverSprintUntil = -10f;
+            if (IsServer)
             {
-                var hostPeer = FindByClientId(NetworkManager.ServerClientId);
-                if (hostPeer && hostPeer != this) hostPeer.IsLeader.Value = true;
+                if (IsSprinting.Value) IsSprinting.Value = false;
+                if (IsLeader.Value && OwnerClientId != NetworkManager.ServerClientId)
+                {
+                    var hostPeer = FindByClientId(NetworkManager.ServerClientId);
+                    if (hostPeer && hostPeer != this) hostPeer.IsLeader.Value = true;
+                }
             }
             AllPlayers.Remove(this);
             if (LocalOwner == this) LocalOwner = null;
@@ -534,8 +641,13 @@ namespace Riftbound.Network
         {
             if (!IsSpawned) return;
 
-            if (IsServer && Health.Value <= 0 && IsMounted.Value)
-                IsMounted.Value = false;
+            if (IsServer)
+            {
+                if (Health.Value <= 0 && IsMounted.Value)
+                    IsMounted.Value = false;
+                TickServerSprintState();
+                TickServerActiveCast();
+            }
 
             if (IsOwner)
             {
@@ -678,18 +790,27 @@ namespace Riftbound.Network
             if (Health.Value <= 0)
             {
                 if (IsMounted.Value) IsMounted.Value = false;
+                if (IsSprinting.Value) IsSprinting.Value = false;
+                serverSprintUntil = -10f;
                 return;
             }
 
-            float maxSpeed = IsMounted.Value ? 15.5f : 9.5f;
-            float maxStep = maxSpeed * dt + 1.5f;
-            float dist = Vector3.Distance(transform.position, pos);
+            TickServerSprintState();
+            float maxSpeed = IsMounted.Value ? 15.5f : (IsServerSprinting ? 14.5f : 9.5f);
+            float maxBudget = Mathf.Max(0.95f, maxSpeed * 0.14f);
+            serverMoveBudget = Mathf.Min(maxBudget, serverMoveBudget + maxSpeed * dt);
+
+            float horizDist = Vector2.Distance(
+                new Vector2(transform.position.x, transform.position.z),
+                new Vector2(pos.x, pos.z));
+            float dist = Mathf.Max(horizDist, Mathf.Abs(pos.y - transform.position.y) * 0.5f);
 
             if (hostTeleportAuthorized)
             {
                 if (Vector3.Distance(pos, authorizedTeleportTarget) <= 3.5f)
                 {
                     hostTeleportAuthorized = false;
+                    serverMoveBudget = maxBudget;
                     transform.SetPositionAndRotation(pos, Quaternion.Euler(0f, yaw, 0f));
                 }
                 else
@@ -697,17 +818,30 @@ namespace Riftbound.Network
                     return; // Ignore stale pre-teleport movement packets until client acknowledges teleport
                 }
             }
-            else if (dist <= maxStep)
+            else if (dist <= serverMoveBudget)
             {
+                serverMoveBudget = Mathf.Max(0f, serverMoveBudget - dist);
+                transform.SetPositionAndRotation(pos, Quaternion.Euler(0f, yaw, 0f));
+            }
+            else if (serverBlinkAllowanceMeters > 0f && Time.time <= serverBlinkExpiresAt && dist <= serverMoveBudget + serverBlinkAllowanceMeters)
+            {
+                // One-shot Blink displacement allowance granted only on server-validated Lv 5+ Arcane Ward
+                serverBlinkAllowanceMeters = 0f;
+                serverBlinkExpiresAt = 0f;
+                serverMoveBudget = 0f;
                 transform.SetPositionAndRotation(pos, Quaternion.Euler(0f, yaw, 0f));
             }
             else
             {
-                Vector3 dir = (pos - transform.position).normalized;
-                Vector3 clamped = transform.position + dir * maxStep;
+                float ratio = dist > 0.0001f ? Mathf.Clamp01(serverMoveBudget / dist) : 0f;
+                Vector3 clamped = Vector3.Lerp(transform.position, pos, ratio);
+                serverMoveBudget = 0f;
                 transform.SetPositionAndRotation(clamped, Quaternion.Euler(0f, yaw, 0f));
                 CorrectPositionClientRpc(clamped, RpcTarget.Single(OwnerClientId, RpcTargetUse.Temp));
             }
+
+            if (serverCastActive && !serverCastReleased && Vector3.Distance(transform.position, serverCastStartPos) > 0.25f)
+                CancelActiveServerCast(ServerCastCancelReason.Moved);
 
             MoveSpeed.Value = Mathf.Clamp(speed, 0f, maxSpeed);
             LocomotionFlags.Value = (byte)(flags & 0x07);
@@ -720,7 +854,10 @@ namespace Riftbound.Network
             if (!IsServer) return;
             hostTeleportAuthorized = true;
             authorizedTeleportTarget = destination;
+            serverMoveBudget = 1.5f;
             transform.position = destination;
+            if (serverCastActive && !serverCastReleased && Vector3.Distance(destination, serverCastStartPos) > 0.25f)
+                CancelActiveServerCast(ServerCastCancelReason.Moved);
             CorrectPositionClientRpc(destination, RpcTarget.Single(OwnerClientId, RpcTargetUse.Temp));
         }
 
@@ -769,6 +906,10 @@ namespace Riftbound.Network
             if (Health.Value <= 0) { IsMounted.Value = false; return; }
             if (!IsSupportedMountId(normalized)) return;
             if (normalized == "zebra" && ServerGreenhollowCount() < 3) return;
+            if (serverCastActive && !serverCastReleased)
+                CancelActiveServerCast(ServerCastCancelReason.Mounted);
+            if (IsSprinting.Value) IsSprinting.Value = false;
+            serverSprintUntil = -10f;
             MountId.Value = new FixedString32Bytes(normalized);
             IsMounted.Value = true;
         }
@@ -853,13 +994,58 @@ namespace Riftbound.Network
             }
         }
 
-        // ── O-01 Host-Authoritative Combat ──────────────────────────────────────────────
+        // ── O-01 Host-Authoritative Combat & Server-Timed Casts ────────────────────────
 
         public const int Slot1UnlockLevel = 1;
         public const int Slot2UnlockLevel = 3;
         public const int Slot3UnlockLevel = 5;
 
+        public const float FireballCastDuration = 1.20f;
+        public const float HolyLightCastDuration = 1.50f;
+        public const float CastMoveInterruptThreshold = 0.25f;
+
         public static event System.Action<string, int, int> OnAbilityRejectedLocked;
+        public static event System.Action<ServerCastEvent> OnServerCastStarted;
+        public static event System.Action<ServerCastEvent> OnServerCastCanceled;
+        public static event System.Action<ServerCastEvent> OnServerCastReleased;
+        public static event System.Action<ServerCastEvent> OnServerCastEvent;
+
+        public bool HasActiveServerCast => IsServer && serverCastActive && !serverCastReleased;
+        public uint ServerLastReleasedCastSeq => serverLastReleasedCastSeq;
+        public uint ServerLastCanceledCastSeq => serverLastCanceledCastSeq;
+        public ServerCastCancelReason ServerLastCancelReason => serverLastCancelReason;
+
+        public bool HasActiveClientCast => activeClientCastSeq != 0 && activeClientCastPhase == ServerCastPhase.Started;
+        public uint ActiveClientCastSeq => activeClientCastSeq;
+        public string ActiveClientCastAbilityId => activeClientCastAbility;
+        public string ActiveClientCastTargetEnemyKey => activeClientCastTargetKey;
+        public float ActiveClientCastDuration => activeClientCastDuration;
+        public float ActiveClientCastStartTime => activeClientCastStartTime;
+        public double ActiveClientCastServerStartTime => activeClientCastServerStartTime;
+        public float ActiveClientCastProgress => HasActiveClientCast ? Mathf.Clamp01((Time.time - activeClientCastStartTime) / Mathf.Max(0.05f, activeClientCastDuration)) : 0f;
+        public float ActiveClientCastRemaining => HasActiveClientCast ? Mathf.Max(0f, activeClientCastDuration - (Time.time - activeClientCastStartTime)) : 0f;
+        public ServerCastPhase LastClientCastPhase => activeClientCastPhase;
+        public ServerCastCancelReason LastClientCastCancelReason => lastClientCastCancelReason;
+        public uint LastReleasedCastSeq => lastReleasedCastSeq;
+        public uint LastCanceledCastSeq => lastCanceledCastSeq;
+
+        public static bool IsCastTimedAbility(string abilityId)
+        {
+            if (string.IsNullOrWhiteSpace(abilityId)) return false;
+            string norm = abilityId.Trim().ToLowerInvariant();
+            return norm == "fireball" || norm == "holy_light";
+        }
+
+        public static float GetServerCastDuration(string abilityId)
+        {
+            if (string.IsNullOrWhiteSpace(abilityId)) return 0f;
+            switch (abilityId.Trim().ToLowerInvariant())
+            {
+                case "fireball": return FireballCastDuration;
+                case "holy_light": return HolyLightCastDuration;
+                default: return 0f;
+            }
+        }
 
         public string LastLockedAbilityRejection { get; private set; } = string.Empty;
         public int LastLockedRequiredLevel { get; private set; }
@@ -1035,6 +1221,12 @@ namespace Riftbound.Network
                 return;
             }
 
+            if (key == "fireball")
+            {
+                TryBeginServerTimedCast("fireball", enemy.NetworkKey);
+                return;
+            }
+
             serverAbilityCooldowns[cdKey] = Time.time + cd;
 
             float baseDmg = key switch
@@ -1057,7 +1249,7 @@ namespace Riftbound.Network
 
             if (actualApplied > 0f)
                 ConfirmAbilityHitClientRpc(enemy.NetworkKey, Mathf.RoundToInt(actualApplied), RpcTarget.Single(OwnerClientId, RpcTargetUse.Temp));
-            BroadcastServerFallbackActionAnim(key == "fireball" || key == "frostnova" || key == "consecration" ? "Cast" : "Attack", 0.50f);
+            BroadcastServerFallbackActionAnim(key == "frostnova" || key == "consecration" ? "Cast" : "Attack", 0.50f);
             BroadcastEnemyState(enemy);
         }
 
@@ -1070,9 +1262,419 @@ namespace Riftbound.Network
             if (enemyCombatant) localPlayer.ApplyConfirmedHitPresentation(enemyCombatant, serverDamage, false);
         }
 
+        public void RequestStartCast(string abilityId, Combatant targetCombatant = null)
+        {
+            string enemyKey = string.Empty;
+            if (targetCombatant)
+            {
+                var ec = targetCombatant.GetComponent<EnemyController>();
+                if (ec) enemyKey = ec.NetworkKey ?? string.Empty;
+            }
+            RequestStartCast(abilityId, enemyKey);
+        }
+
+        public void RequestStartCast(string abilityId, string targetEnemyKey)
+        {
+            if (!CoopSessionConfig.IsMultiplayer || !IsSpawned || NetworkManager.Singleton == null || !NetworkManager.Singleton.IsListening)
+                return;
+            if (IsServer)
+                TryBeginServerTimedCast(abilityId, targetEnemyKey);
+            else if (IsOwner)
+                RequestStartCastServerRpc(abilityId ?? string.Empty, targetEnemyKey ?? string.Empty);
+        }
+
+        public void RequestCancelCast()
+        {
+            if (!CoopSessionConfig.IsMultiplayer || !IsSpawned || NetworkManager.Singleton == null || !NetworkManager.Singleton.IsListening)
+                return;
+            if (IsServer)
+                CancelActiveServerCast(ServerCastCancelReason.ManualCancel);
+            else if (IsOwner)
+                RequestCancelCastServerRpc();
+        }
+
+        [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Owner)]
+        void RequestStartCastServerRpc(string abilityId, string targetEnemyKey) =>
+            TryBeginServerTimedCast(abilityId, targetEnemyKey);
+
+        [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Owner)]
+        void RequestCancelCastServerRpc() =>
+            CancelActiveServerCast(ServerCastCancelReason.ManualCancel);
+
+        bool TryBeginServerTimedCast(string abilityId, string enemyKey)
+        {
+            if (!IsServer || Health.Value <= 0 || IsMounted.Value) return false;
+            string key = string.IsNullOrWhiteSpace(abilityId) ? string.Empty : abilityId.Trim().ToLowerInvariant();
+            if (!IsCastTimedAbility(key)) return false;
+
+            string cls = ClassName.Value.ToString();
+            if (key == "fireball" && cls != "Mage") return false;
+            if (key == "holy_light" && cls != "Paladin") return false;
+
+            int serverLevel = Mathf.Max(1, Level.Value);
+            if (!TryGetAbilitySlotRequirement(key, out _, out int requiredLevel) || serverLevel < requiredLevel)
+            {
+                RejectLockedAbilityOnServer(key, requiredLevel, serverLevel);
+                return false;
+            }
+
+            if (serverCastActive && !serverCastReleased && serverCastAbility == key)
+                return false;
+
+            if (key == "fireball")
+            {
+                if (serverAbilityCooldowns.TryGetValue("fireball", out float fbReady) && Time.time < fbReady) return false;
+                var enemy = EnemyController.FindByKey(enemyKey);
+                if (!HasValidFireballTarget(enemy, 30f)) return false;
+            }
+            else if (key == "holy_light")
+            {
+                if (Health.Value >= MaxHealth.Value) return false;
+                if (serverAbilityCooldowns.TryGetValue("heal:holy_light", out float hlReady) && Time.time < hlReady) return false;
+            }
+
+            if (serverCastActive && !serverCastReleased)
+                CancelActiveServerCast(ServerCastCancelReason.Replaced);
+
+            float duration = GetServerCastDuration(key);
+            uint seq = ++serverCastSeq;
+            serverCastActive = true;
+            serverCastReleased = false;
+            serverCastAbility = key;
+            serverCastEnemyKey = enemyKey ?? string.Empty;
+            serverCastDuration = duration;
+            serverCastStartTime = Time.time;
+            serverCastStartNetTime = NetworkManager.Singleton != null ? NetworkManager.Singleton.ServerTime.Time : Time.timeAsDouble;
+            serverCastEndTime = serverCastStartTime + duration;
+            serverCastStartPos = transform.position;
+
+            BroadcastServerCastEventClientRpc(
+                seq,
+                key,
+                serverCastEnemyKey,
+                (byte)ServerCastPhase.Started,
+                (byte)ServerCastCancelReason.None,
+                duration,
+                serverCastStartNetTime);
+            return true;
+        }
+
+        bool HasValidFireballTarget(EnemyController enemy, float rangeLimit)
+        {
+            if (!enemy) return false;
+            var stats = enemy.GetComponent<Combatant>();
+            if (!stats || !stats.Alive) return false;
+            if (Vector3.Distance(transform.position, enemy.transform.position) > rangeLimit) return false;
+
+            Vector3 eye = transform.position + Vector3.up * 1.2f;
+            Vector3 tgt = enemy.transform.position + Vector3.up * 1.1f;
+            if (Physics.Linecast(eye, tgt, out RaycastHit hit, ~(1 << 2), QueryTriggerInteraction.Ignore))
+            {
+                if (hit.collider && !hit.collider.transform.IsChildOf(enemy.transform) && !hit.collider.transform.IsChildOf(transform))
+                    return false;
+            }
+            return true;
+        }
+
+        void TickServerActiveCast()
+        {
+            if (!IsServer || !serverCastActive || serverCastReleased) return;
+
+            if (Health.Value <= 0)
+            {
+                CancelActiveServerCast(ServerCastCancelReason.Died);
+                return;
+            }
+            if (IsMounted.Value)
+            {
+                CancelActiveServerCast(ServerCastCancelReason.Mounted);
+                return;
+            }
+            if (Vector3.Distance(transform.position, serverCastStartPos) > CastMoveInterruptThreshold)
+            {
+                CancelActiveServerCast(ServerCastCancelReason.Moved);
+                return;
+            }
+            if (serverLastDamagedAt > serverCastStartTime)
+            {
+                CancelActiveServerCast(ServerCastCancelReason.Damaged);
+                return;
+            }
+
+            if (serverCastAbility == "fireball")
+            {
+                var enemy = EnemyController.FindByKey(serverCastEnemyKey);
+                var stats = enemy ? enemy.GetComponent<Combatant>() : null;
+                if (!enemy || !stats || !stats.Alive)
+                {
+                    CancelActiveServerCast(ServerCastCancelReason.InvalidTarget);
+                    return;
+                }
+                if (Vector3.Distance(transform.position, enemy.transform.position) > 32f)
+                {
+                    CancelActiveServerCast(ServerCastCancelReason.OutOfRange);
+                    return;
+                }
+            }
+
+            if (Time.time >= serverCastEndTime)
+                CompleteServerTimedCast();
+        }
+
+        void CancelActiveServerCast(ServerCastCancelReason reason)
+        {
+            if (!IsServer || !serverCastActive || serverCastReleased) return;
+            uint seq = serverCastSeq;
+            string ability = serverCastAbility;
+            string enemyKey = serverCastEnemyKey;
+            float dur = serverCastDuration;
+
+            serverCastActive = false;
+            serverLastCanceledCastSeq = seq;
+            serverLastCancelReason = reason;
+
+            BroadcastServerCastEventClientRpc(
+                seq,
+                ability,
+                enemyKey,
+                (byte)ServerCastPhase.Canceled,
+                (byte)reason,
+                dur,
+                serverCastStartNetTime);
+        }
+
+        void CompleteServerTimedCast()
+        {
+            if (!IsServer || !serverCastActive || serverCastReleased) return;
+
+            uint seq = serverCastSeq;
+            string ability = serverCastAbility;
+            string enemyKey = serverCastEnemyKey;
+            float dur = serverCastDuration;
+            double startNet = serverCastStartNetTime;
+
+            // Lock one-time release BEFORE applying side effects so re-entrancy cannot duplicate effects.
+            serverCastReleased = true;
+            serverCastActive = false;
+
+            if (ability == "fireball")
+            {
+                var enemy = EnemyController.FindByKey(enemyKey);
+                var stats = enemy ? enemy.GetComponent<Combatant>() : null;
+                if (!enemy || !stats || !stats.Alive)
+                {
+                    serverLastCanceledCastSeq = seq;
+                    serverLastCancelReason = ServerCastCancelReason.InvalidTarget;
+                    BroadcastServerCastEventClientRpc(seq, ability, enemyKey, (byte)ServerCastPhase.Canceled, (byte)ServerCastCancelReason.InvalidTarget, dur, startNet);
+                    return;
+                }
+                if (Vector3.Distance(transform.position, enemy.transform.position) > 32f)
+                {
+                    serverLastCanceledCastSeq = seq;
+                    serverLastCancelReason = ServerCastCancelReason.OutOfRange;
+                    BroadcastServerCastEventClientRpc(seq, ability, enemyKey, (byte)ServerCastPhase.Canceled, (byte)ServerCastCancelReason.OutOfRange, dur, startNet);
+                    return;
+                }
+                if (!HasValidFireballTarget(enemy, 32f))
+                {
+                    serverLastCanceledCastSeq = seq;
+                    serverLastCancelReason = ServerCastCancelReason.LineOfSight;
+                    BroadcastServerCastEventClientRpc(seq, ability, enemyKey, (byte)ServerCastPhase.Canceled, (byte)ServerCastCancelReason.LineOfSight, dur, startNet);
+                    return;
+                }
+
+                serverAbilityCooldowns["fireball"] = Time.time + 1.1f;
+                float computedDamage = 34f + (Level.Value - 1) * 4f;
+                if (Race.Value.ToString() == "Brute") computedDamage *= 1.15f;
+
+                float hpBeforeHit = stats.Health;
+                stats.Damage(computedDamage);
+                float actualApplied = Mathf.Max(0f, hpBeforeHit - stats.Health);
+                if (actualApplied > 0f)
+                    ConfirmAbilityHitClientRpc(enemy.NetworkKey, Mathf.RoundToInt(actualApplied), RpcTarget.Single(OwnerClientId, RpcTargetUse.Temp));
+                BroadcastEnemyState(enemy);
+            }
+            else if (ability == "holy_light")
+            {
+                if (Health.Value <= 0)
+                {
+                    serverLastCanceledCastSeq = seq;
+                    serverLastCancelReason = ServerCastCancelReason.Died;
+                    BroadcastServerCastEventClientRpc(seq, ability, enemyKey, (byte)ServerCastPhase.Canceled, (byte)ServerCastCancelReason.Died, dur, startNet);
+                    return;
+                }
+                serverAbilityCooldowns["heal:holy_light"] = Time.time + 8.0f;
+                if (Health.Value < MaxHealth.Value)
+                    Health.Value = Mathf.Min(MaxHealth.Value, Health.Value + 60);
+            }
+
+            serverLastReleasedCastSeq = seq;
+            BroadcastServerCastEventClientRpc(
+                seq,
+                ability,
+                enemyKey,
+                (byte)ServerCastPhase.Released,
+                (byte)ServerCastCancelReason.None,
+                dur,
+                startNet);
+        }
+
+        [Rpc(SendTo.Everyone, InvokePermission = RpcInvokePermission.Server)]
+        void BroadcastServerCastEventClientRpc(
+            uint castSeq,
+            string abilityId,
+            string targetEnemyKey,
+            byte phaseByte,
+            byte cancelReasonByte,
+            float duration,
+            double serverStartTime)
+        {
+            if (castSeq == 0 || !System.Enum.IsDefined(typeof(ServerCastPhase), phaseByte)) return;
+            var phase = (ServerCastPhase)phaseByte;
+            var cancelReason = System.Enum.IsDefined(typeof(ServerCastCancelReason), cancelReasonByte)
+                ? (ServerCastCancelReason)cancelReasonByte
+                : ServerCastCancelReason.None;
+
+            if (castSeq < lastClientCastEventSeq) return;
+            if (castSeq == lastClientCastEventSeq)
+            {
+                if (phase == ServerCastPhase.Started || lastClientCastEventPhase != ServerCastPhase.Started)
+                    return;
+            }
+
+            lastClientCastEventSeq = castSeq;
+            lastClientCastEventPhase = phase;
+            activeClientCastServerStartTime = serverStartTime;
+
+            if (phase == ServerCastPhase.Started)
+            {
+                activeClientCastSeq = castSeq;
+                activeClientCastAbility = abilityId ?? string.Empty;
+                activeClientCastTargetKey = targetEnemyKey ?? string.Empty;
+                activeClientCastDuration = Mathf.Max(0.1f, duration);
+                activeClientCastStartTime = Time.time;
+                activeClientCastPhase = ServerCastPhase.Started;
+                lastClientCastCancelReason = ServerCastCancelReason.None;
+
+                if (!IsOwner) PlayObserverCastVisual(Mathf.Clamp(duration, 0.25f, 2.2f), false);
+            }
+            else if (phase == ServerCastPhase.Canceled)
+            {
+                activeClientCastSeq = 0;
+                activeClientCastAbility = string.Empty;
+                activeClientCastTargetKey = string.Empty;
+                activeClientCastDuration = 0f;
+                activeClientCastPhase = ServerCastPhase.Canceled;
+                lastClientCastCancelReason = cancelReason;
+                lastCanceledCastSeq = castSeq;
+
+                if (!IsOwner) actionAnimUntil = 0f;
+            }
+            else if (phase == ServerCastPhase.Released)
+            {
+                activeClientCastSeq = 0;
+                activeClientCastAbility = string.Empty;
+                activeClientCastTargetKey = string.Empty;
+                activeClientCastDuration = 0f;
+                activeClientCastPhase = ServerCastPhase.Released;
+                lastClientCastCancelReason = ServerCastCancelReason.None;
+                lastReleasedCastSeq = castSeq;
+
+                if (!IsOwner) PlayObserverCastVisual(0.35f, true);
+            }
+
+            var ev = new ServerCastEvent(
+                this,
+                IsOwner,
+                castSeq,
+                abilityId,
+                targetEnemyKey,
+                phase,
+                cancelReason,
+                duration,
+                serverStartTime);
+
+            OnServerCastEvent?.Invoke(ev);
+            if (phase == ServerCastPhase.Started) OnServerCastStarted?.Invoke(ev);
+            else if (phase == ServerCastPhase.Canceled) OnServerCastCanceled?.Invoke(ev);
+            else if (phase == ServerCastPhase.Released) OnServerCastReleased?.Invoke(ev);
+        }
+
+        void PlayObserverCastVisual(float duration, bool releaseFlash)
+        {
+            if (Health.Value <= 0 || IsMounted.Value || !remoteAnimator) return;
+            string preferred = releaseFlash ? "Attack" : "Cast";
+            string resolved = preferred;
+            if (!remoteAnimator.HasState(0, Animator.StringToHash(resolved)))
+                resolved = remoteAnimator.HasState(0, Animator.StringToHash("Cleave")) ? "Cleave" : "Attack";
+            if (remoteAnimator.HasState(0, Animator.StringToHash(resolved)))
+            {
+                remoteAnimator.CrossFadeInFixedTime(resolved, 0.08f, 0, 0f);
+                actionAnimUntil = Time.time + duration;
+                currentRemoteAnim = resolved;
+            }
+        }
+
+        public void RequestSprint() => RequestMovementAbility("sprint");
+
+        public void RequestMovementAbility(string abilityId)
+        {
+            if (!CoopSessionConfig.IsMultiplayer || !IsSpawned || NetworkManager.Singleton == null || !NetworkManager.Singleton.IsListening)
+                return;
+            if (IsServer)
+                ApplyServerMovementAbility(abilityId);
+            else if (IsOwner)
+                RequestMovementAbilityServerRpc(abilityId ?? string.Empty);
+        }
+
+        [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Owner)]
+        void RequestMovementAbilityServerRpc(string abilityId) => ApplyServerMovementAbility(abilityId);
+
+        void ApplyServerMovementAbility(string abilityId)
+        {
+            if (!IsServer || Health.Value <= 0) return;
+            string key = string.IsNullOrWhiteSpace(abilityId) ? string.Empty : abilityId.Trim().ToLowerInvariant();
+            string cls = ClassName.Value.ToString();
+
+            if (key == "sprint")
+            {
+                if (cls != "Rogue") return;
+                int serverLevel = Mathf.Max(1, Level.Value);
+                if (!TryGetAbilitySlotRequirement(key, out _, out int requiredLevel) || serverLevel < requiredLevel)
+                {
+                    RejectLockedAbilityOnServer(key, requiredLevel, serverLevel);
+                    return;
+                }
+                if (IsMounted.Value) return;
+                if (serverAbilityCooldowns.TryGetValue("move:sprint", out float readyAt) && Time.time < readyAt) return;
+                serverAbilityCooldowns["move:sprint"] = Time.time + 10.0f;
+                serverSprintUntil = Time.time + 5.0f;
+                IsSprinting.Value = true;
+            }
+            else if (key == "arcane_ward")
+            {
+                ApplyServerAbilityHeal(40, "arcane_ward");
+            }
+        }
+
+        void TickServerSprintState()
+        {
+            if (!IsServer) return;
+            bool shouldSprint = Time.time <= serverSprintUntil && Health.Value > 0 && !IsMounted.Value;
+            if (IsSprinting.Value != shouldSprint)
+                IsSprinting.Value = shouldSprint;
+        }
+
         public void RequestAbilityHeal(int amount, string abilityId)
         {
-            if (!CoopSessionConfig.IsMultiplayer || !IsSpawned || amount <= 0) return;
+            if (!CoopSessionConfig.IsMultiplayer || !IsSpawned) return;
+            string key = string.IsNullOrWhiteSpace(abilityId) ? string.Empty : abilityId.Trim().ToLowerInvariant();
+            if (key == "sprint")
+            {
+                RequestMovementAbility("sprint");
+                return;
+            }
+            if (amount <= 0 && key != "arcane_ward") return;
             if (IsServer) ApplyServerAbilityHeal(amount, abilityId);
             else RequestAbilityHealServerRpc(amount, abilityId);
         }
@@ -1085,9 +1687,21 @@ namespace Riftbound.Network
             if (!IsServer || Health.Value <= 0) return;
             string key = string.IsNullOrEmpty(abilityId) ? "" : abilityId.ToLowerInvariant();
             string cls = ClassName.Value.ToString();
+
+            if (key == "sprint")
+            {
+                ApplyServerMovementAbility("sprint");
+                return;
+            }
+            if (key == "holy_light")
+            {
+                if (cls != "Paladin") return;
+                TryBeginServerTimedCast("holy_light", string.Empty);
+                return;
+            }
+
             int serverHeal = 0;
             if (key == "arcane_ward" && cls == "Mage") serverHeal = 40;
-            else if (key == "holy_light" && cls == "Paladin") serverHeal = 60;
             else if (key == "second_wind" && cls == "Warrior") serverHeal = 45;
             else return;
 
@@ -1098,12 +1712,17 @@ namespace Riftbound.Network
                 return;
             }
 
-            if (Health.Value >= MaxHealth.Value) return;
+            if (key != "arcane_ward" && Health.Value >= MaxHealth.Value) return;
             if (serverAbilityCooldowns.TryGetValue("heal:" + key, out float readyAt) && Time.time < readyAt) return;
             serverAbilityCooldowns["heal:" + key] = Time.time + 8.0f;
-            if (key == "arcane_ward") lastServerMoveTime -= 0.85f; // Allow 7.5m Blink displacement once per validated arcane_ward cast
+            if (key == "arcane_ward")
+            {
+                serverBlinkAllowanceMeters = 8.5f;
+                serverBlinkExpiresAt = Time.time + 1.0f;
+            }
 
-            Health.Value = Mathf.Min(MaxHealth.Value, Health.Value + serverHeal);
+            if (Health.Value < MaxHealth.Value)
+                Health.Value = Mathf.Min(MaxHealth.Value, Health.Value + serverHeal);
         }
 
         public void SyncDefenseState(bool blocking, bool dodgeTriggered)
@@ -1261,7 +1880,10 @@ namespace Riftbound.Network
             float mitigated = damage;
             if (avatar.IsServerBlocking) mitigated *= 0.5f;
             int dmgInt = Mathf.Max(1, Mathf.RoundToInt(mitigated));
+            avatar.serverLastDamagedAt = Time.time;
             avatar.Health.Value = Mathf.Max(0, avatar.Health.Value - dmgInt);
+            if (avatar.serverCastActive && !avatar.serverCastReleased)
+                avatar.CancelActiveServerCast(avatar.Health.Value <= 0 ? ServerCastCancelReason.Died : ServerCastCancelReason.Damaged);
             if (avatar.Health.Value <= 0 && avatar.IsMounted.Value)
                 avatar.IsMounted.Value = false;
             avatar.ReceiveEnemyHitClientRpc(dmgInt, enemyKey, false, avatar.RpcTarget.Single(targetClientId, RpcTargetUse.Temp));

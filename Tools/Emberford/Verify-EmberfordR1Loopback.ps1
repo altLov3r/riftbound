@@ -1,7 +1,7 @@
 param(
     [string]$ServerExe = "Builds/EmberfordServer01/EmberfordServer.exe",
     [string]$ClientExe = "Builds/EmberfordClient01/Riftbound.exe",
-    [ushort]$Port = 7777,
+    [uint16]$Port = 7777,
     [int]$MaxPlayers = 4,
     [int]$TimeoutSeconds = 95
 )

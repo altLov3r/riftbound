@@ -2074,7 +2074,7 @@ namespace Riftbound.Network
                             float hpBeforeIdleHit = eStats.Health;
                             me.RequestAbilityAttack(eStats, "fireball");
                             float wtIdleHit = Time.realtimeSinceStartup;
-                            while (Time.realtimeSinceStartup - wtIdleHit < 1.2f && Mathf.Approximately(eStats.Health, hpBeforeIdleHit))
+                            while (Time.realtimeSinceStartup - wtIdleHit < 2.6f && Mathf.Approximately(eStats.Health, hpBeforeIdleHit))
                                 yield return new WaitForSeconds(0.05f);
                             enemyIdleHitOk = hpBeforeIdleHit - eStats.Health >= 30f && eStats.Health > 0f;
                         }
@@ -2091,7 +2091,7 @@ namespace Riftbound.Network
                         me.RequestAbilityAttack(eStats, rightAb);
                         yield return new WaitForSeconds(0.05f);
                         me.RequestAbilityAttack(eStats, rightAb);
-                        yield return new WaitForSeconds(0.9f);
+                        yield return new WaitForSeconds(rightAb == "fireball" ? 1.6f : 0.9f);
                         float dmgDealt = hpBeforeCd - eStats.Health;
                         bool cooldownRej = dmgDealt > 0f && dmgDealt <= 42f;
 
@@ -2673,26 +2673,62 @@ namespace Riftbound.Network
                     bool lockedSlot2Rejected = Mathf.Approximately(raiderStats.Health, hpBeforeSoloHit) &&
                                                me.LastLockedRequiredLevel == RiftboundCoopPlayer.Slot2UnlockLevel;
 
+                    int soloCastStarts = 0;
+                    int soloCastCancels = 0;
+                    int soloCastReleases = 0;
+                    void OnSoloCast(ServerCastEvent ev)
+                    {
+                        if (ev.Caster != me) return;
+                        if (ev.Phase == ServerCastPhase.Started) soloCastStarts++;
+                        else if (ev.Phase == ServerCastPhase.Canceled) soloCastCancels++;
+                        else if (ev.Phase == ServerCastPhase.Released) soloCastReleases++;
+                    }
+                    RiftboundCoopPlayer.OnServerCastEvent += OnSoloCast;
+
+                    bool cancelTestOk = true;
+                    if (ab == "fireball")
+                    {
+                        me.RequestStartCast("fireball", raiderStats);
+                        yield return new WaitForSeconds(0.25f);
+                        me.RequestCancelCast();
+                        yield return new WaitForSeconds(0.25f);
+                        cancelTestOk = soloCastStarts == 1 && soloCastCancels == 1 && soloCastReleases == 0 &&
+                                       Mathf.Approximately(raiderStats.Health, hpBeforeSoloHit);
+                    }
+
                     me.RequestAbilityAttack(raiderStats, ab);
                     float waitHit = Time.realtimeSinceStartup;
                     while (Time.realtimeSinceStartup - waitHit < 3.5f && raiderStats.Health >= hpBeforeSoloHit)
                         yield return new WaitForSeconds(0.05f);
-                    bool soloCombatOk = lockedSlot2Rejected && raiderStats.Health < hpBeforeSoloHit;
+                    yield return new WaitForSeconds(0.15f);
+                    RiftboundCoopPlayer.OnServerCastEvent -= OnSoloCast;
+
+                    bool releaseTestOk = ab != "fireball" || (soloCastStarts == 2 && soloCastCancels == 1 && soloCastReleases == 1);
+                    bool soloCombatOk = lockedSlot2Rejected && cancelTestOk && releaseTestOk && raiderStats.Health < hpBeforeSoloHit;
 
                     Vector3 soloPosBefore = lp.transform.position;
                     yield return StartCoroutine(MoveLocalStep(new Vector3(0f, 0f, 1f), 0.7f, 4.4f));
                     bool soloMoveOk = Vector3.Distance(lp.transform.position, soloPosBefore) >= 1.8f;
 
                     while (Time.realtimeSinceStartup < deadline && CountSpawnedPeers() < 2)
-                        yield return new WaitForSeconds(0.15f);
-                    yield return new WaitForSeconds(0.4f);
+                        yield return new WaitForSeconds(0.1f);
 
-                    RiftboundCoopPlayer rejoinPeer = null;
-                    foreach (var p in RiftboundCoopPlayer.AllPlayers)
-                        if (p && p.IsSpawned && !p.IsOwner) { rejoinPeer = p; break; }
-                    bool sawRejoin = CountSpawnedPeers() >= 2 && rejoinPeer != null && HasValidObserverGrounding(rejoinPeer);
+                    bool sawRejoin = false;
+                    float rejoinGrace = Mathf.Min(deadline, Time.realtimeSinceStartup + 2.5f);
+                    while (Time.realtimeSinceStartup < rejoinGrace)
+                    {
+                        RiftboundCoopPlayer rejoinPeer = null;
+                        foreach (var p in RiftboundCoopPlayer.AllPlayers)
+                            if (p && p.IsSpawned && !p.IsOwner) { rejoinPeer = p; break; }
+                        if (CountSpawnedPeers() >= 2 && rejoinPeer != null && HasValidObserverGrounding(rejoinPeer))
+                        {
+                            sawRejoin = true;
+                            break;
+                        }
+                        yield return new WaitForSeconds(0.05f);
+                    }
 
-                    yield return new WaitForSeconds(0.8f); // allow c1_rejoin to confirm snapshot + peer presence before exiting
+                    yield return new WaitForSeconds(0.4f); // allow c1_rejoin to finish snapshot checks cleanly
                     bool pass = peerGroundingOk && sawPeerMove && sawEnemyAction && sawDropToOne && soloCombatOk && soloMoveOk && sawRejoin;
                     WriteResult(pass, $"peerGv={peerGroundingOk}, sawPeerMove={sawPeerMove}, sawEnemyAction={sawEnemyAction}(seq={observedSeq},kind={observedKind}), drop1={sawDropToOne}, soloCombat={soloCombatOk}(raiderHp={raiderStats.Health:F0}/{raiderStats.maxHealth:F0}), soloMove={soloMoveOk}, sawRejoin={sawRejoin}");
                     if (nm != null && nm.IsListening) nm.Shutdown();
@@ -2703,19 +2739,22 @@ namespace Riftbound.Network
             }
             else if (role == "c1_rejoin")
             {
+                bool sawTwoPeers = false;
                 bool peerGroundingOk = false;
                 bool worldSnapshotOk = false;
                 float waitSnap = Time.realtimeSinceStartup;
                 while (Time.realtimeSinceStartup - waitSnap < 10f)
                 {
+                    if (CountSpawnedPeers() >= 2) sawTwoPeers = true;
                     peerGroundingOk = HasValidObserverGrounding(peer);
                     if (raiderStats.Health < raiderStats.maxHealth) worldSnapshotOk = true;
-                    if (peerGroundingOk && worldSnapshotOk) break;
+                    if (sawTwoPeers && peerGroundingOk && worldSnapshotOk) break;
                     yield return new WaitForSeconds(0.15f);
                 }
 
-                bool pass = CountSpawnedPeers() >= 2 && peerGroundingOk && worldSnapshotOk;
-                WriteResult(pass, $"players={CountSpawnedPeers()}, peerGv={peerGroundingOk}, snapshotDamagedRaider={worldSnapshotOk}(raiderHp={raiderStats.Health:F0}/{raiderStats.maxHealth:F0})");
+                yield return new WaitForSeconds(0.75f); // stay spawned briefly so c2 deterministically observes rejoin
+                bool pass = sawTwoPeers && peerGroundingOk && worldSnapshotOk;
+                WriteResult(pass, $"sawTwo={sawTwoPeers}, peerGv={peerGroundingOk}, snapshotDamagedRaider={worldSnapshotOk}(raiderHp={raiderStats.Health:F0}/{raiderStats.maxHealth:F0})");
                 if (nm != null && nm.IsListening) nm.Shutdown();
                 yield return new WaitForSeconds(0.2f);
                 Application.Quit(pass ? 0 : 1);
