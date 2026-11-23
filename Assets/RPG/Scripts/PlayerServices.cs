@@ -191,6 +191,8 @@ namespace Riftbound
                     chestPrompt = "Locked Spoils (Defeat Warchief Grimgnaw)";
                 else if (chest.chestId == AshenmawCavernZone.BossChestId && !HasDefeated(AshenmawCavernZone.BossId))
                     chestPrompt = "Locked Reliquary (Defeat Ursolak, Bear Guardian)";
+                else if (chest.chestId == SunstoneAbbeyZone.BossChestId && !HasDefeated(SunstoneAbbeyZone.BossId))
+                    chestPrompt = "Locked Reliquary (Defeat Arch-Inquisitor Malrik)";
                 else if (chest.requiresCaptainDefeated && !BossDefeated)
                     chestPrompt = "Locked Cache (Defeat Ashwood Captain)";
                 else if (chest.requiresWardenDefeated && !HasDefeated("crypt-warden"))
@@ -296,6 +298,8 @@ namespace Riftbound
             { Message = "Defeat Warchief Grimgnaw in Briarhollow Den to unlock his spoils chest."; return false; }
             if (chest && chest.chestId == AshenmawCavernZone.BossChestId && !HasDefeated(AshenmawCavernZone.BossId))
             { Message = "Defeat Ursolak, Ancient Bear Guardian in Ashenmaw Cavern to unlock this reliquary."; return false; }
+            if (chest && chest.chestId == SunstoneAbbeyZone.BossChestId && !HasDefeated(SunstoneAbbeyZone.BossId))
+            { Message = "Defeat Arch-Inquisitor Malrik at Sunstone Abbey to unlock his reliquary."; return false; }
             if (chest && chest.requiresCaptainDefeated && !BossDefeated) { Message = "Defeat the captain to unlock this cache."; return false; }
             if (chest && chest.requiresWardenDefeated && !HasDefeated("crypt-warden")) { Message = "Defeat the Crypt Warden to unlock the reliquary."; return false; }
             if (!chest || !Stats.Alive || FrontendMenu.IsOpen || DialogueOpen || ShopOpen || MapOpen || JournalOpen || (orbit && orbit.Paused) || Vector3.Distance(transform.position, chest.transform.position) >= 3 || string.IsNullOrEmpty(chest.chestId) || HasOpenedChest(chest.chestId)) return false;

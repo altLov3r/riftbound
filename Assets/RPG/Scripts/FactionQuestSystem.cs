@@ -156,6 +156,28 @@ namespace Riftbound
             });
 
             // ==========================================
+            // SUNSTONE ABBEY RUINS — ASHEN CULT QUESTLINE
+            // ==========================================
+            Add(new QuestDef
+            {
+                id = "sunstone_cultist_cull", giverNpc = SunstoneAbbeyZone.QuestGiverName,
+                title = "Cinders of the Abbey", faction = "Any", zone = "Sunstone Abbey",
+                description = "Ashen Cultists have overrun the ruined nave of Sunstone Abbey south of my watchfire. Cleanse 5 Ashen Cultists from the courtyard and return to Brother Aldric.",
+                targetType = "defeat_enemy", targetId = "sunstone-cultist", targetName = "Ashen Cultists",
+                requiredCount = 5, rewardGold = 75, rewardXP = 155,
+                targetLocation = SunstoneAbbeyZone.NavePos, nextQuestId = "sunstone_inquisitor_boss"
+            });
+            Add(new QuestDef
+            {
+                id = "sunstone_inquisitor_boss", giverNpc = SunstoneAbbeyZone.QuestGiverName,
+                title = "Fall of Arch-Inquisitor Malrik", faction = "Any", zone = "Sunstone Abbey",
+                description = "Arch-Inquisitor Malrik channels forbidden fire beside the broken high altar at the south end of the abbey. Slay Malrik, claim his reliquary chest, and report back to Brother Aldric.",
+                targetType = "defeat_enemy", targetId = SunstoneAbbeyZone.BossId, targetName = SunstoneAbbeyZone.BossName,
+                requiredCount = 1, rewardGold = 140, rewardXP = 260, rewardItem = "sunstone-reliquary-staff",
+                prerequisiteQuestId = "sunstone_cultist_cull", targetLocation = SunstoneAbbeyZone.AltarPos
+            });
+
+            // ==========================================
             // 1. EMBERWATCH OUTPOST (HUMAN / ALLIANCE STARTER VILLAGE)
             // ==========================================
             Add(new QuestDef
@@ -1080,7 +1102,7 @@ namespace Riftbound
             }
         }
 
-        static bool ExactBossTarget(string id) => id == "redridge-outcast-boss" || id == "vermithrax-boss" || id == RiverReaverCamp.CaptainId || id == PinewatchWoodsZone.BossId || id == AshenmawCavernZone.BossId;
+        static bool ExactBossTarget(string id) => id == "redridge-outcast-boss" || id == "vermithrax-boss" || id == RiverReaverCamp.CaptainId || id == PinewatchWoodsZone.BossId || id == AshenmawCavernZone.BossId || id == SunstoneAbbeyZone.BossId;
 
         public void OnTalkedToNPC(string npcName)
         {

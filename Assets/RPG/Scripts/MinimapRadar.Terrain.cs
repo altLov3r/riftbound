@@ -118,6 +118,8 @@ namespace Riftbound
             "Whisperwood Exchange" => new(.30f, .49f, .34f),
             "Cinderroad Ironworks" => new(.56f, .34f, .24f),
             "Thornwatch Citadel" => new(.34f, .46f, .54f),
+            "Skyreach Aerie" => new(.52f, .64f, .72f),
+            "Sunstone Abbey" => new(.50f, .36f, .52f),
             "The Scarlet Crypts" => new(.47f, .39f, .55f),
             _ => new(.34f, .49f, .32f)
         };

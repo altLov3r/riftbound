@@ -84,7 +84,8 @@ namespace Riftbound
             new GearItem("cinderfury-signet", "Cinderfury Signet", GearSlot.Trinket, "Epic", 6, 4, 65, 45, "Finger Ring", "Radiates intense heat, empowering all melee and spell attacks."),
             // Frontier Questline Boss Rewards
             new GearItem("pinewatch-warden-crest", "Pinewatch Warden's Crest", GearSlot.Trinket, "Rare", 4, 2, 45, 28, "Insignia", "Carved cedar-and-iron crest awarded by Watchkeeper Halen for breaking Warchief Grimgnaw's Timberfang raids."),
-            new GearItem("ursolak-spirit-pelt", "Mantle of Ursolak", GearSlot.Armor, "Epic", 5, 10, 65, 42, "Spirit Leather", "Woven with glowing jade spirit-runes from the Ancient Bear Guardian of Ashenmaw Cavern.")
+            new GearItem("ursolak-spirit-pelt", "Mantle of Ursolak", GearSlot.Armor, "Epic", 5, 10, 65, 42, "Spirit Leather", "Woven with glowing jade spirit-runes from the Ancient Bear Guardian of Ashenmaw Cavern."),
+            new GearItem("sunstone-reliquary-staff", "Sunstone Reliquary Staff", GearSlot.Weapon, "Epic", 20, 2, 45, 40, "Two-Hand Staff", "Recovered from Arch-Inquisitor Malrik's high altar; hums with reclaimed solar fire.")
         };
 
         public static GearItem Get(string id)

@@ -2202,6 +2202,7 @@ namespace Riftbound.Network
             if (chest.chestId == RiverReaverCamp.CacheId && !serverDefeatedEnemyKeys.Contains(RiverReaverCamp.CaptainId)) return false;
             if (chest.chestId == PinewatchWoodsZone.BossChestId && !serverDefeatedEnemyKeys.Contains(PinewatchWoodsZone.BossId)) return false;
             if (chest.chestId == AshenmawCavernZone.BossChestId && !serverDefeatedEnemyKeys.Contains(AshenmawCavernZone.BossId)) return false;
+            if (chest.chestId == SunstoneAbbeyZone.BossChestId && !serverDefeatedEnemyKeys.Contains(SunstoneAbbeyZone.BossId)) return false;
             if (chest.chestId == WorldBossEncounter.HoardChestId && !WorldBossEncounter.IsBossDefeatedAuthoritative) return false;
             if (chest.requiresCaptainDefeated && !serverDefeatedEnemyKeys.Contains("ashwood-captain")) return false;
             if (chest.requiresWardenDefeated && !serverDefeatedEnemyKeys.Contains("crypt-warden")) return false;

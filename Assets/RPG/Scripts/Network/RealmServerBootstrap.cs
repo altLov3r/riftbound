@@ -166,6 +166,7 @@ namespace Riftbound.Network
             RiverReaverCamp.Ensure();
             PinewatchWoodsZone.Ensure();
             AshenmawCavernZone.Ensure();
+            SunstoneAbbeyZone.Ensure();
             RoadPatrolGuard.Ensure();
 
             LogServer($"Scene '{SceneManager.GetActiveScene().name}' prepared headless: avatarSuppressed={LocalAvatarSuppressed}, offlineSavesSuppressed={OfflineSavesSuppressed}, spawnAnchor={SceneDefaultSpawnAnchor}");

@@ -33,6 +33,7 @@ namespace Riftbound.Editor
             GameObject frontierStaged = null;
             GameObject woodsRoot = null;
             GameObject cavernRoot = null;
+            GameObject abbeyRoot = null;
             GameObject fqsGo = null;
             GameObject signGo = null;
 
@@ -140,6 +141,23 @@ namespace Riftbound.Editor
                 bool twWalkersOk = ValidateWalkers(twWalkers, terrains, out string twDetail);
                 bool twOk = twRoot != null && twRoot.Find("Thornwatch_KeepShaft") != null && twRoot.Find("Thornwatch_GateLintel") != null && twWalkers.Length == 3 && twWalkersOk;
                 Check("thornwatch_citadel_sw_corner_and_patrols", twOk, twDetail);
+
+                // 10. Far NE Mountain Sanctuary: Skyreach Aerie
+                var srRoot = frontierStaged.transform.Find("Skyreach Aerie");
+                var srWalkers = srRoot ? srRoot.GetComponentsInChildren<CivilianRouteWalker>(true) : Array.Empty<CivilianRouteWalker>();
+                bool srOk = srRoot != null && srRoot.Find("Skyreach_WindspireShaft") != null && srWalkers.Length == 1;
+                Check("skyreach_aerie_ne_sanctuary", srOk, $"windspire={(srRoot && srRoot.Find("Skyreach_WindspireShaft") != null)}, walkers={srWalkers.Length}");
+
+                // 11. South-Central Sunstone Abbey Quest Zone & Arch-Inquisitor Malrik Boss
+                SunstoneAbbeyZone.Ensure();
+                abbeyRoot = GameObject.Find(SunstoneAbbeyZone.RootName);
+                var abbeyEnemies = abbeyRoot ? abbeyRoot.GetComponentsInChildren<EnemyController>(true) : Array.Empty<EnemyController>();
+                var malrik = abbeyEnemies.FirstOrDefault(e => e.enemyId == SunstoneAbbeyZone.BossId);
+                var sq1 = FactionQuestSystem.GetQuest("sunstone_cultist_cull");
+                var sq2 = FactionQuestSystem.GetQuest("sunstone_inquisitor_boss");
+                bool abbeyOk = abbeyEnemies.Length == 8 && malrik != null && malrik.isBoss && sq1 != null && sq2 != null && ItemCatalog.Get("sunstone-reliquary-staff") != null;
+                Check("sunstone_abbey_ruins_questline_and_boss", abbeyOk,
+                    $"enemies={abbeyEnemies.Length}, malrik={(malrik != null)}, quests=({sq1 != null},{sq2 != null}), staff={(ItemCatalog.Get("sunstone-reliquary-staff") != null)}");
             }
             catch (Exception ex)
             {
@@ -149,6 +167,7 @@ namespace Riftbound.Editor
             {
                 if (signGo) Object.DestroyImmediate(signGo);
                 if (fqsGo) Object.DestroyImmediate(fqsGo);
+                if (abbeyRoot) Object.DestroyImmediate(abbeyRoot);
                 if (cavernRoot) Object.DestroyImmediate(cavernRoot);
                 if (woodsRoot) Object.DestroyImmediate(woodsRoot);
                 if (frontierStaged) Object.DestroyImmediate(frontierStaged);

@@ -24,6 +24,8 @@ namespace Riftbound.Editor
         public static readonly Vector3 WhisperwoodCenter = new Vector3(35f, 0f, 250f);
         public static readonly Vector3 CinderroadCenter = new Vector3(262f, 0f, -55f);
         public static readonly Vector3 ThornwatchCenter = new Vector3(-275f, 0f, -110f);
+        public static readonly Vector3 SkyreachCenter = new Vector3(355f, 0f, 420f);
+        public static readonly Vector3 SunstoneCenter = new Vector3(115f, 0f, -115f);
 
         public static GameObject StageAll(Scene scene, StringBuilder report = null)
         {
@@ -40,6 +42,8 @@ namespace Riftbound.Editor
             StageWhisperwoodExchange(root.transform, terrains, report);
             StageCinderroadIronworks(root.transform, terrains, report);
             StageThornwatchCitadel(root.transform, terrains, report);
+            StageSkyreachAerie(root.transform, terrains, report);
+            StageSunstoneAbbeyRuins(root.transform, terrains, report);
 
             return root;
         }
@@ -436,6 +440,92 @@ namespace Riftbound.Editor
             });
 
             report.AppendLine("Staged SW Mega-Site: Thornwatch Citadel at (-275,-110).");
+        }
+
+        // =========================================================================
+        // 5. FAR NE MOUNTAIN SANCTUARY — SKYREACH AERIE (355, 420)
+        // =========================================================================
+        static void StageSkyreachAerie(Transform parent, Terrain[] terrains, StringBuilder report)
+        {
+            var root = new GameObject("Skyreach Aerie");
+            root.transform.SetParent(parent, false);
+
+            // 16m Pale-Stone & Steel Windspire Observatory
+            float obsBase = BuildGroundedFoundation(root.transform, "Skyreach_ObservatoryBase", SkyreachCenter, 9.2f, 9.2f, 2.8f, "Pale Stone", terrains);
+            Vector3 sp = new Vector3(SkyreachCenter.x, obsBase, SkyreachCenter.z);
+            Part(root.transform, "Skyreach_WindspireShaft", sp + Vector3.up * 5.5f, new Vector3(5.2f, 11.0f, 5.2f), "Pale Stone", collider: true);
+            Part(root.transform, "Skyreach_SteelRing", sp + Vector3.up * 11.2f, new Vector3(7.2f, 1.4f, 7.2f), "Steel", collider: true);
+            Part(root.transform, "Skyreach_SkyBeacon", sp + Vector3.up * 13.6f, new Vector3(2.4f, 2.8f, 2.4f), "Amber", collider: false);
+            Part(root.transform, "Skyreach_Crown", sp + Vector3.up * 15.8f, new Vector3(4.2f, 1.4f, 4.2f), "Banner Teal", collider: false);
+
+            // Grand Stone Sky-Archway framing the southwest cliff approach
+            BuildGroundedFoundation(root.transform, "Skyreach_ArchL", new Vector3(345f, 0f, 412f), 2.6f, 2.6f, 6.2f, "Pale Stone", terrains);
+            BuildGroundedFoundation(root.transform, "Skyreach_ArchR", new Vector3(351f, 0f, 408f), 2.6f, 2.6f, 6.2f, "Pale Stone", terrains);
+            float archY = Mathf.Max(PhysicsSurface(new Vector3(345f, 0f, 412f), terrains).y, PhysicsSurface(new Vector3(351f, 0f, 408f), terrains).y) + 5.8f;
+            var archTop = Part(root.transform, "Skyreach_ArchLintel", new Vector3(348f, archY, 410f), new Vector3(9.4f, 1.2f, 2.2f), "Steel", collider: true);
+            archTop.transform.rotation = Quaternion.Euler(0f, 34f, 0f);
+
+            // Sheltered Storm-Watcher Lodge
+            float lodgeTop = BuildGroundedFoundation(root.transform, "Skyreach_LodgeBase", new Vector3(366f, 0f, 416f), 7.6f, 5.8f, 0.45f, "Limestone", terrains);
+            Vector3 lp = new Vector3(366f, lodgeTop, 416f);
+            Part(root.transform, "Skyreach_LodgeWalls", lp + Vector3.up * 2.0f, new Vector3(7.0f, 4.0f, 5.2f), "Plaster", collider: true);
+            var lrA = Part(root.transform, "Skyreach_LodgeRoofA", lp + new Vector3(0f, 4.5f, 1.4f), new Vector3(7.8f, 0.28f, 3.6f), "Slate", collider: false);
+            lrA.transform.rotation = Quaternion.Euler(22f, 0f, 0f);
+            var lrB = Part(root.transform, "Skyreach_LodgeRoofB", lp + new Vector3(0f, 4.5f, -1.4f), new Vector3(7.8f, 0.28f, 3.6f), "Slate", collider: false);
+            lrB.transform.rotation = Quaternion.Euler(-22f, 0f, 0f);
+
+            AddTownNpc(root.transform, "Storm-Watcher Lyra", "Skyreach Aerie", "Elf", "Mage",
+                new Vector3(352f, 0f, 413f),
+                "From Skyreach Aerie you can watch the drakes circle Wyrmcrest Summit and the smoke rise from Breaker Works. Safe footing on the ridge, traveler.",
+                terrains);
+
+            var pin = new GameObject("Skyreach Aerie map pin").AddComponent<SettlementWaystop>();
+            pin.transform.SetParent(root.transform, false);
+            pin.transform.position = PhysicsSurface(new Vector3(350f, 0f, 412f), terrains);
+            pin.displayName = "Skyreach Aerie";
+            pin.notice = "Skyreach Aerie — Northeast mountain observatory overlooking Wyrmcrest Crags and the Redridge basin.";
+
+            AddCivilianWalker(root.transform, "Skyreach Wind-Scout", "Elf", "Rogue", 1.40f, 2.2f, terrains, new[]
+            {
+                new Vector3(358f, 0f, 411f),
+                new Vector3(360.5f, 0f, 411f),
+                new Vector3(360.5f, 0f, 414f),
+                new Vector3(358f, 0f, 414f)
+            });
+
+            report.AppendLine("Staged NE Mountain Sanctuary: Skyreach Aerie at (355,420).");
+        }
+
+        // =========================================================================
+        // 6. SOUTH-CENTRAL RUINS — SUNSTONE ABBEY ARCHITECTURE (115, -115)
+        // =========================================================================
+        static void StageSunstoneAbbeyRuins(Transform parent, Terrain[] terrains, StringBuilder report)
+        {
+            var root = new GameObject("Sunstone Abbey Ruins");
+            root.transform.SetParent(parent, false);
+
+            // Ruined Cathedral Nave Colonnade flanking (115, -110) — leaves wide open combat aisle inside!
+            for (int i = 0; i < 4; i++)
+            {
+                float z = -100f - i * 7.5f;
+                float hL = (i == 1) ? 4.2f : 6.4f;
+                float hR = (i == 2) ? 3.8f : 6.4f;
+                BuildGroundedFoundation(root.transform, $"Abbey_PillarL_{i}", new Vector3(106.5f, 0f, z), 2.0f, 2.0f, hL, "Pale Stone", terrains);
+                BuildGroundedFoundation(root.transform, $"Abbey_PillarR_{i}", new Vector3(123.5f, 0f, z), 2.0f, 2.0f, hR, "Pale Stone", terrains);
+            }
+
+            // Grand Ruined Entry Archway at (115, -96)
+            BuildGroundedFoundation(root.transform, "Abbey_EntryTowerL", new Vector3(109.5f, 0f, -96f), 2.8f, 2.8f, 7.6f, "Limestone", terrains);
+            BuildGroundedFoundation(root.transform, "Abbey_EntryTowerR", new Vector3(120.5f, 0f, -96f), 2.8f, 2.8f, 7.6f, "Limestone", terrains);
+            float eY = Mathf.Max(PhysicsSurface(new Vector3(109.5f, 0f, -96f), terrains).y, PhysicsSurface(new Vector3(120.5f, 0f, -96f), terrains).y) + 7.2f;
+            Part(root.transform, "Abbey_EntryLintel", new Vector3(115f, eY, -96f), new Vector3(13.6f, 1.4f, 2.4f), "Slate", collider: true);
+            Part(root.transform, "Abbey_RoseCrest", new Vector3(115f, eY + 1.4f, -96f), new Vector3(3.2f, 2.2f, 0.8f), "Violet", collider: false);
+
+            // Broken High Altar Apse Wall behind Arch-Inquisitor Malrik (115, -135)
+            BuildGroundedFoundation(root.transform, "Abbey_ApseWall", new Vector3(115f, 0f, -135f), 16.5f, 2.4f, 8.2f, "Pale Stone", terrains);
+            BuildGroundedFoundation(root.transform, "Abbey_BellTowerRuins", new Vector3(104.5f, 0f, -133f), 4.6f, 4.6f, 12.5f, "Limestone", terrains);
+
+            report.AppendLine("Staged South-Central Ruins: Sunstone Abbey at (115,-115).");
         }
 
         // =========================================================================

@@ -42,6 +42,7 @@ namespace Riftbound
             RiverReaverCamp.Ensure();
             PinewatchWoodsZone.Ensure();
             AshenmawCavernZone.Ensure();
+            SunstoneAbbeyZone.Ensure();
             if (player) WesternRoadCamps.Ensure(player);
             RoadPatrolGuard.Ensure();
             if (!ActionBarSystem.Instance && !GetComponent<ActionBarSystem>()) gameObject.AddComponent<ActionBarSystem>();
