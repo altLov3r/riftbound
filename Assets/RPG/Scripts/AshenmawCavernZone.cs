@@ -3,10 +3,11 @@ using UnityEngine;
 namespace Riftbound
 {
     /// <summary>
-    /// Seamless subterranean cavern ("Ashenmaw Cavern") carved directly INTO the terrain hillside
-    /// via an in-memory TerrainData.SetHoles cutout (never modifying authored terrain assets on disk).
-    /// Loads sculpted Blender FBX meshes for both the organic rock cavern (Ashenmaw_CavernShell.fbx)
-    /// and Ursolak, Ancient Bear Guardian (Ursolak_BearGuardian.fbx). Zero loading screen, zero teleport.
+    /// Seamless walk-in mountain cavern ("Ashenmaw Cavern") carved directly INTO the Wyrmcrest
+    /// western cliffside at (155, 415 -> 490) via in-memory TerrainData.SetHoles (never modifying
+    /// authored terrain assets on disk). Uses sculpted double-walled Blender FBX geometry
+    /// (Ashenmaw_Cavern_Complete.fbx) with a solid stone approach apron and animated Ursolak,
+    /// Ancient Bear Guardian FBX boss (Ursolak_BearGuardian.fbx).
     /// </summary>
     public static class AshenmawCavernZone
     {
@@ -16,9 +17,9 @@ namespace Riftbound
         public const string BossName = "Ursolak, Bear Guardian";
         public const string BossChestId = "ashenmaw-guardian-chest";
 
-        public static readonly Vector3 EntrancePos = new Vector3(-115f, 0f, 444f);
-        public static readonly Vector3 CampfirePos = new Vector3(-115f, 0f, 434f);
-        public static readonly Vector3 SanctumPos = new Vector3(-115f, 0f, 504f);
+        public static readonly Vector3 CampfirePos = new Vector3(155f, 0f, 395f);
+        public static readonly Vector3 EntrancePos = new Vector3(155f, 0f, 415f);
+        public static readonly Vector3 SanctumPos = new Vector3(155f, 0f, 475f);
 
         public static bool Inside(Vector3 point)
         {
@@ -34,37 +35,41 @@ namespace Riftbound
             var root = new GameObject(RootName).transform;
 
             float entranceY = SampleGround(EntrancePos);
-            float undergroundFloorY = entranceY - 7.5f;
+            float undergroundFloorY = entranceY - 4.20f;
 
-            // 1. Carve a REAL hole into an in-memory clone of the terrain tile at the cave mouth
-            CarveTerrainEntranceHole(EntrancePos, halfWidthMeters: 5.2f, startZOffset: 0.5f, lengthMeters: 16.5f);
+            // 1. Instantiate sculpted double-walled Blender cavern shell & auto-verify +Z orientation
+            bool rotated180 = BuildOrganicCavernFromFbx(root, entranceY, undergroundFloorY);
 
-            // 2. Instantiate sculpted organic Blender cavern shell descending underneath the terrain
-            BuildOrganicCavernFromFbx(root, entranceY, undergroundFloorY);
+            // 2. Build solid stone approach steps & plinth connecting Campfire approach terrain to cave apron (zero gap!)
+            BuildApproachApron(root, entranceY);
 
-            // 3. Outside Quest Camp (Warden Kaelen + Campfire + Atlas Waystop)
+            // 3. Carve a REAL hole into an in-memory clone of the terrain tile inside the stone archway
+            //    where the solid stone cavern floor sits cleanly beneath it.
+            CarveTerrainEntranceHole(EntrancePos, halfWidthMeters: 4.6f, startZOffset: 0.2f, lengthMeters: 20.0f);
+
+            // 4. Safe Outside Watch Camp at Z=395 (20m south of cave mouth, >=48m from all hostile tribe members)
             BuildOutsideCamp(root, entranceY);
 
-            // 4. Briarclaw Tribe (8 hostile NPCs inside the descending tunnel, ritual chamber & sanctum)
-            SpawnTribeMember(root, player, "ashenmaw-tribe-1", "Briarclaw Ravager", "Orc", "Warrior", new Vector3(EntrancePos.x + 1.2f, entranceY - 4.8f, EntrancePos.z + 15.5f), false);
-            SpawnTribeMember(root, player, "ashenmaw-tribe-2", "Briarclaw Bone-Thrower", "Orc", "Rogue", new Vector3(EntrancePos.x + 2.2f, entranceY - 6.8f, EntrancePos.z + 21.5f), true);
-            SpawnTribeMember(root, player, "ashenmaw-tribe-3", "Briarclaw Ravager", "Human", "Warrior", new Vector3(EntrancePos.x - 2.4f, undergroundFloorY, EntrancePos.z + 29.0f), false);
+            // 5. Briarclaw Tribe (8 hostile NPCs inside subterranean tunnel, ritual chamber & sanctum throat)
+            SpawnTribeMember(root, player, "ashenmaw-tribe-1", "Briarclaw Ravager", "Orc", "Warrior", new Vector3(EntrancePos.x + 0.6f, undergroundFloorY, EntrancePos.z + 29.0f), false);
+            SpawnTribeMember(root, player, "ashenmaw-tribe-2", "Briarclaw Bone-Thrower", "Orc", "Rogue", new Vector3(EntrancePos.x - 2.4f, undergroundFloorY, EntrancePos.z + 31.0f), true);
+            SpawnTribeMember(root, player, "ashenmaw-tribe-3", "Briarclaw Ravager", "Human", "Warrior", new Vector3(EntrancePos.x + 2.8f, undergroundFloorY, EntrancePos.z + 32.5f), false);
 
-            SpawnTribeMember(root, player, "ashenmaw-tribe-4", "Briarclaw Blood-Shaman", "Undead", "Mage", new Vector3(EntrancePos.x - 4.2f, undergroundFloorY, EntrancePos.z + 34.5f), true);
-            SpawnTribeMember(root, player, "ashenmaw-tribe-5", "Briarclaw Mauler", "Orc", "Warrior", new Vector3(EntrancePos.x + 3.6f, undergroundFloorY, EntrancePos.z + 36.0f), false);
-            SpawnTribeMember(root, player, "ashenmaw-tribe-6", "Briarclaw Stalker", "Orc", "Rogue", new Vector3(EntrancePos.x - 0.5f, undergroundFloorY, EntrancePos.z + 43.0f), false);
+            SpawnTribeMember(root, player, "ashenmaw-tribe-4", "Briarclaw Blood-Shaman", "Undead", "Mage", new Vector3(EntrancePos.x - 4.2f, undergroundFloorY, EntrancePos.z + 36.5f), true);
+            SpawnTribeMember(root, player, "ashenmaw-tribe-5", "Briarclaw Mauler", "Orc", "Warrior", new Vector3(EntrancePos.x + 3.6f, undergroundFloorY, EntrancePos.z + 37.5f), false);
+            SpawnTribeMember(root, player, "ashenmaw-tribe-6", "Briarclaw Stalker", "Orc", "Rogue", new Vector3(EntrancePos.x - 0.5f, undergroundFloorY, EntrancePos.z + 44.0f), false);
 
-            SpawnTribeMember(root, player, "ashenmaw-tribe-7", "Briarclaw Totem-Guard", "Orc", "Warrior", new Vector3(EntrancePos.x - 5.2f, undergroundFloorY, SanctumPos.z - 8f), false);
-            SpawnTribeMember(root, player, "ashenmaw-tribe-8", "Briarclaw Totem-Guard", "Orc", "Warrior", new Vector3(EntrancePos.x + 5.2f, undergroundFloorY, SanctumPos.z - 8f), false);
+            SpawnTribeMember(root, player, "ashenmaw-tribe-7", "Briarclaw Totem-Guard", "Orc", "Warrior", new Vector3(EntrancePos.x - 5.2f, undergroundFloorY, SanctumPos.z - 8.5f), false);
+            SpawnTribeMember(root, player, "ashenmaw-tribe-8", "Briarclaw Totem-Guard", "Orc", "Warrior", new Vector3(EntrancePos.x + 5.2f, undergroundFloorY, SanctumPos.z - 8.5f), false);
 
-            // 5. Ursolak, Ancient Bear Guardian Boss (480 HP, real sculpted Blender FBX model)
-            SpawnBearGuardianBoss(root, player, new Vector3(SanctumPos.x, undergroundFloorY, SanctumPos.z + 2f));
+            // 6. Ursolak, Ancient Bear Guardian Boss (480 HP, real sculpted Blender FBX V3)
+            SpawnBearGuardianBoss(root, player, new Vector3(SanctumPos.x, undergroundFloorY, SanctumPos.z), rotated180);
 
-            // 6. Boss-Locked Reliquary Chest at the back of the Sanctum
+            // 7. Boss-Locked Reliquary Chest at the Spirit Altar
             var prefab = Resources.Load<GameObject>("Props/TreasureChest");
             if (prefab)
             {
-                Vector3 chestPos = new Vector3(SanctumPos.x, undergroundFloorY + 0.08f, SanctumPos.z + 10.0f);
+                Vector3 chestPos = new Vector3(SanctumPos.x, undergroundFloorY + 0.06f, SanctumPos.z + 6.5f);
                 var instance = Object.Instantiate(prefab, chestPos, Quaternion.Euler(0f, 180f, 0f), root);
                 instance.name = "Ursolak's Spirit Reliquary";
                 var chest = instance.GetComponent<LootChest>() ?? instance.AddComponent<LootChest>();
@@ -74,13 +79,80 @@ namespace Riftbound
             }
         }
 
+        static bool BuildOrganicCavernFromFbx(Transform root, float entranceY, float undergroundFloorY)
+        {
+            bool rotated180 = false;
+            var fbx = Resources.Load<GameObject>("Ashenmaw/Ashenmaw_Cavern_Complete");
+            if (fbx)
+            {
+                var shell = Object.Instantiate(fbx, new Vector3(EntrancePos.x, entranceY, EntrancePos.z), Quaternion.identity, root);
+                shell.name = "Ashenmaw_OrganicCavern";
+
+                // Auto-verify FBX tunnel direction using combined renderer bounds: tunnel MUST extend north (+Z)!
+                Bounds b = MeasureBounds(shell);
+                if (b.center.z < EntrancePos.z + 5.0f)
+                {
+                    shell.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
+                    rotated180 = true;
+                }
+
+                foreach (var mf in shell.GetComponentsInChildren<MeshFilter>(true))
+                {
+                    if (!mf.sharedMesh) continue;
+                    var mc = mf.gameObject.GetComponent<MeshCollider>();
+                    if (!mc) mc = mf.gameObject.AddComponent<MeshCollider>();
+                    mc.sharedMesh = mf.sharedMesh;
+                }
+                ApplyCavernMaterials(shell);
+            }
+
+            if (!Application.isBatchMode)
+            {
+                AddCaveLight(root, "CaveLight_Mouth", new Vector3(EntrancePos.x, entranceY + 2.8f, EntrancePos.z + 2f), new Color(1.0f, 0.58f, 0.22f), 20f, 3.0f);
+                AddCaveLight(root, "CaveLight_Descent", new Vector3(EntrancePos.x + 0.5f, entranceY - 0.1f, EntrancePos.z + 16f), new Color(0.24f, 0.90f, 0.65f), 20f, 2.6f);
+                AddCaveLight(root, "CaveLight_Hearth", new Vector3(EntrancePos.x - 0.5f, undergroundFloorY + 3.5f, EntrancePos.z + 34f), new Color(1.0f, 0.52f, 0.16f), 24f, 3.4f);
+                AddCaveLight(root, "CaveLight_Sanctum", new Vector3(SanctumPos.x, undergroundFloorY + 5.2f, SanctumPos.z + 2f), new Color(0.20f, 0.96f, 0.68f), 30f, 4.0f);
+            }
+            return rotated180;
+        }
+
+        static void BuildApproachApron(Transform root, float entranceY)
+        {
+            // Solid stone bridge-ramp from natural terrain at Z=397.5 smoothly to the sloped courtyard apron edge at Z=407.0
+            Vector3 startPos = new Vector3(EntrancePos.x, SampleGround(new Vector3(EntrancePos.x, 0f, EntrancePos.z - 17.5f)) - 0.06f, EntrancePos.z - 17.5f);
+            Vector3 endPos = new Vector3(EntrancePos.x, entranceY - 2.60f, EntrancePos.z - 8.0f);
+            Vector3 span = endPos - startPos;
+            Quaternion rot = Quaternion.LookRotation(span.normalized, Vector3.up);
+
+            var ramp = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            ramp.name = "Ashenmaw_ApproachRamp";
+            ramp.transform.SetParent(root, false);
+            ramp.transform.position = (startPos + endPos) * 0.5f + rot * Vector3.down * 0.625f;
+            ramp.transform.localScale = new Vector3(8.8f, 1.25f, span.magnitude + 0.25f);
+            ramp.transform.rotation = rot;
+
+            // Solid masonry plinth beneath the outdoor courtyard apron (top kept safely below sloped flagstones)
+            var skirt = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            skirt.name = "Ashenmaw_ApronPlinth";
+            skirt.transform.SetParent(root, false);
+            skirt.transform.position = new Vector3(EntrancePos.x, entranceY - 4.70f, EntrancePos.z - 3.9f);
+            skirt.transform.localScale = new Vector3(9.2f, 4.0f, 8.0f);
+
+            Shader sh = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+            if (sh)
+            {
+                var mat = new Material(sh) { color = new Color(0.22f, 0.24f, 0.26f) };
+                ramp.GetComponent<MeshRenderer>().sharedMaterial = mat;
+                skirt.GetComponent<MeshRenderer>().sharedMaterial = mat;
+            }
+        }
+
         static void CarveTerrainEntranceHole(Vector3 mouthXZ, float halfWidthMeters, float startZOffset, float lengthMeters)
         {
-            if (!Application.isPlaying) return; // Never mutate authored terrain in EditMode
+            if (!Application.isPlaying) return;
             var tile = WorldRegions.TerrainAt(mouthXZ, Terrain.activeTerrains);
             if (!tile || !tile.terrainData) return;
 
-            // Clone TerrainData in memory so authored .asset files stay 100% untouched
             var cloned = Object.Instantiate(tile.terrainData);
             tile.terrainData = cloned;
             var tc = tile.GetComponent<TerrainCollider>();
@@ -97,35 +169,8 @@ namespace Riftbound
 
             int w = Mathf.Max(1, maxX - minX + 1);
             int h = Mathf.Max(1, maxZ - minZ + 1);
-            bool[,] holes = new bool[h, w]; // false = carved hole!
+            bool[,] holes = new bool[h, w];
             cloned.SetHoles(minX, minZ, holes);
-        }
-
-        static void BuildOrganicCavernFromFbx(Transform root, float entranceY, float undergroundFloorY)
-        {
-            var fbx = Resources.Load<GameObject>("Ashenmaw/Ashenmaw_CavernShell");
-            if (fbx)
-            {
-                var shell = Object.Instantiate(fbx, new Vector3(EntrancePos.x, entranceY, EntrancePos.z), Quaternion.identity, root);
-                shell.name = "Ashenmaw_OrganicCavern";
-                foreach (var mf in shell.GetComponentsInChildren<MeshFilter>(true))
-                {
-                    if (!mf.sharedMesh) continue;
-                    var mc = mf.gameObject.GetComponent<MeshCollider>();
-                    if (!mc) mc = mf.gameObject.AddComponent<MeshCollider>();
-                    mc.sharedMesh = mf.sharedMesh;
-                }
-                ApplyCavernMaterials(shell);
-            }
-
-            // Atmospheric point lighting inside the subterranean cavern (skipped in headless dedicated server)
-            if (!Application.isBatchMode)
-            {
-                AddCaveLight(root, "CaveLight_Mouth", new Vector3(EntrancePos.x, entranceY + 2.6f, EntrancePos.z + 2f), new Color(1.0f, 0.56f, 0.20f), 18f, 2.8f);
-                AddCaveLight(root, "CaveLight_Descent", new Vector3(EntrancePos.x + 1.2f, entranceY - 2.2f, EntrancePos.z + 14f), new Color(0.25f, 0.90f, 0.65f), 18f, 2.4f);
-                AddCaveLight(root, "CaveLight_Hearth", new Vector3(EntrancePos.x - 0.5f, undergroundFloorY + 3.2f, EntrancePos.z + 34f), new Color(1.0f, 0.50f, 0.16f), 22f, 3.2f);
-                AddCaveLight(root, "CaveLight_Sanctum", new Vector3(SanctumPos.x, undergroundFloorY + 4.8f, SanctumPos.z + 3f), new Color(0.20f, 0.95f, 0.68f), 28f, 3.8f);
-            }
         }
 
         static void BuildOutsideCamp(Transform root, float entranceY)
@@ -135,7 +180,7 @@ namespace Riftbound
             if (!Application.isBatchMode)
                 AddCaveLight(root, "Kaelen_CampLight", campPos + Vector3.up * 1.4f, new Color(1.0f, 0.54f, 0.16f), 14f, 2.4f);
 
-            // Warden Kaelen (Quest Giver for the 2-step Ashenmaw Cavern questline)
+            // Warden Kaelen cleanly positioned at the safe watch camp (Z=395)
             Vector3 npcPos = new Vector3(CampfirePos.x + 2.4f, SampleGround(CampfirePos + new Vector3(2.4f, 0f, 0.5f)), CampfirePos.z + 0.5f);
             var npcGo = new GameObject(QuestGiverName);
             npcGo.transform.SetParent(root, false);
@@ -147,13 +192,13 @@ namespace Riftbound
             var npc = npcGo.AddComponent<TownNPC>();
             npc.npcName = QuestGiverName;
             npc.roleTag = "Cavern Warden";
-            npc.greeting = "The Briarclaw Tribe broke into Ashenmaw Cavern beneath this ridge and roused Ursolak, the Ancient Bear Guardian. Walk straight down through the cave mouth into the earth.";
+            npc.greeting = "The Briarclaw Tribe broke into Ashenmaw Cavern inside the Wyrmcrest cliffside ahead and roused Ursolak, the Ancient Bear Guardian. Follow the stone apron straight into the cave mouth—no portal or loading screen awaits.";
 
             var pin = new GameObject("Ashenmaw Cavern map pin").AddComponent<SettlementWaystop>();
             pin.transform.SetParent(root, false);
             pin.transform.position = campPos + new Vector3(-2.5f, 0f, 1.0f);
             pin.displayName = "Ashenmaw Cavern";
-            pin.notice = "Ashenmaw Cavern — Seamless subterranean cavern carved beneath the northern ridge. Home to the Briarclaw Tribe and Ursolak, Ancient Bear Guardian.";
+            pin.notice = "Ashenmaw Cavern — Seamless mountain cavern carved into Wyrmcrest's western cliff. Home to the Briarclaw Tribe and Ursolak, Ancient Bear Guardian.";
         }
 
         static void SpawnTribeMember(Transform parent, PlayerController player, string id, string name, string race, string cls, Vector3 pos, bool ranged)
@@ -162,14 +207,14 @@ namespace Riftbound
             foreach (var ec in parent.GetComponentsInChildren<EnemyController>(true))
             {
                 if (ec.enemyId != id) continue;
-                ec.transform.position = pos + Vector3.up * 0.08f;
+                ec.SetHomePosition(pos + Vector3.up * 0.08f);
                 var stats = ec.GetComponent<Combatant>();
-                if (stats) { stats.ConfigureVitals(110, 1); stats.Restore(); }
+                if (stats) { stats.ConfigureVitals(115, 1); stats.Restore(); }
                 break;
             }
         }
 
-        static void SpawnBearGuardianBoss(Transform parent, PlayerController player, Vector3 pos)
+        static void SpawnBearGuardianBoss(Transform parent, PlayerController player, Vector3 pos, bool mirrorForward)
         {
             var root = new GameObject(BossName);
             root.SetActive(false);
@@ -183,8 +228,8 @@ namespace Riftbound
                 var vis = Object.Instantiate(bearFbx, root.transform);
                 vis.name = "BearGuardianVisual";
                 vis.transform.localPosition = Vector3.zero;
-                vis.transform.localRotation = Quaternion.identity;
-                vis.transform.localScale = Vector3.one * 1.18f;
+                vis.transform.localRotation = Quaternion.Euler(0f, mirrorForward ? 180f : 0f, 0f);
+                vis.transform.localScale = Vector3.one * 1.15f;
                 ApplyBearMaterials(vis);
                 vis.AddComponent<BearGuardianAnimator>();
             }
@@ -210,21 +255,44 @@ namespace Riftbound
             stats.Restore();
 
             root.SetActive(!player || !Application.isPlaying || !player.HasDefeated(BossId));
+            enemy.SetHomePosition(pos + Vector3.up * 0.08f, Quaternion.Euler(0f, 180f, 0f));
+        }
+
+        static Bounds MeasureBounds(GameObject go)
+        {
+            Physics.SyncTransforms();
+            var renderers = go.GetComponentsInChildren<MeshRenderer>(true);
+            if (renderers.Length == 0) return new Bounds(go.transform.position, Vector3.zero);
+            Bounds b = renderers[0].bounds;
+            for (int i = 1; i < renderers.Length; i++) b.Encapsulate(renderers[i].bounds);
+            return b;
         }
 
         static void ApplyCavernMaterials(GameObject shell)
         {
             Shader sh = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
             if (!sh) return;
-            var rockMat = new Material(sh) { color = new Color(0.18f, 0.19f, 0.21f) };
+            var basaltMat = new Material(sh) { color = new Color(0.19f, 0.21f, 0.24f) };
+            var slateMat = new Material(sh) { color = new Color(0.26f, 0.30f, 0.34f) };
+            var stoneMat = new Material(sh) { color = new Color(0.56f, 0.54f, 0.48f) };
+            var amberMat = new Material(sh) { color = new Color(1.0f, 0.65f, 0.24f) };
             var jadeMat = new Material(sh) { color = new Color(0.16f, 0.92f, 0.64f) };
-            if (jadeMat.HasProperty("_EmissionColor")) { jadeMat.EnableKeyword("_EMISSION"); jadeMat.SetColor("_EmissionColor", new Color(0.16f, 0.92f, 0.64f) * 2.2f); }
+            if (amberMat.HasProperty("_EmissionColor")) { amberMat.EnableKeyword("_EMISSION"); amberMat.SetColor("_EmissionColor", amberMat.color * 2.0f); }
+            if (jadeMat.HasProperty("_EmissionColor")) { jadeMat.EnableKeyword("_EMISSION"); jadeMat.SetColor("_EmissionColor", jadeMat.color * 2.2f); }
+
             foreach (var r in shell.GetComponentsInChildren<MeshRenderer>(true))
             {
                 var mats = r.sharedMaterials;
                 var replaced = new Material[mats.Length];
                 for (int i = 0; i < mats.Length; i++)
-                    replaced[i] = (mats[i] && mats[i].name.Contains("Jade")) ? jadeMat : rockMat;
+                {
+                    string n = mats[i] ? mats[i].name : "";
+                    if (n.Contains("Jade")) replaced[i] = jadeMat;
+                    else if (n.Contains("Amber")) replaced[i] = amberMat;
+                    else if (n.Contains("Pale")) replaced[i] = stoneMat;
+                    else if (n.Contains("Slate")) replaced[i] = slateMat;
+                    else replaced[i] = basaltMat;
+                }
                 r.sharedMaterials = replaced;
             }
         }
@@ -234,11 +302,11 @@ namespace Riftbound
             Shader sh = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
             if (!sh) return;
             var darkFur = new Material(sh) { color = new Color(0.17f, 0.13f, 0.10f) };
-            var maneFur = new Material(sh) { color = new Color(0.28f, 0.22f, 0.16f) };
-            var bone = new Material(sh) { color = new Color(0.84f, 0.80f, 0.70f) };
-            var iron = new Material(sh) { color = new Color(0.20f, 0.21f, 0.23f) };
+            var maneFur = new Material(sh) { color = new Color(0.32f, 0.22f, 0.15f) };
+            var bone = new Material(sh) { color = new Color(0.86f, 0.82f, 0.72f) };
+            var iron = new Material(sh) { color = new Color(0.20f, 0.21f, 0.25f) };
             var jade = new Material(sh) { color = new Color(0.18f, 0.95f, 0.66f) };
-            if (jade.HasProperty("_EmissionColor")) { jade.EnableKeyword("_EMISSION"); jade.SetColor("_EmissionColor", new Color(0.18f, 0.95f, 0.66f) * 2.4f); }
+            if (jade.HasProperty("_EmissionColor")) { jade.EnableKeyword("_EMISSION"); jade.SetColor("_EmissionColor", jade.color * 2.4f); }
 
             foreach (var r in bear.GetComponentsInChildren<MeshRenderer>(true))
             {
@@ -249,8 +317,8 @@ namespace Riftbound
                     string n = mats[i] ? mats[i].name : "";
                     if (n.Contains("Jade")) replaced[i] = jade;
                     else if (n.Contains("Bone")) replaced[i] = bone;
-                    else if (n.Contains("Iron")) replaced[i] = iron;
-                    else if (n.Contains("Mane")) replaced[i] = maneFur;
+                    else if (n.Contains("Black Iron")) replaced[i] = iron;
+                    else if (n.Contains("Oak")) replaced[i] = maneFur;
                     else replaced[i] = darkFur;
                 }
                 r.sharedMaterials = replaced;
@@ -289,11 +357,13 @@ namespace Riftbound
     {
         EnemyController enemy;
         Vector3 baseLocalPos;
+        Quaternion baseLocalRot;
 
         void Awake()
         {
             enemy = GetComponentInParent<EnemyController>();
             baseLocalPos = transform.localPosition;
+            baseLocalRot = transform.localRotation;
         }
 
         void Update()
@@ -305,7 +375,7 @@ namespace Riftbound
             float pitch = chasing ? Mathf.Sin(t * speed * 0.5f) * 7.5f : Mathf.Sin(t * 1.6f) * 2.0f;
             float roll = chasing ? Mathf.Cos(t * speed) * 4.5f : 0f;
             transform.localPosition = baseLocalPos + new Vector3(0f, Mathf.Abs(bob), 0f);
-            transform.localRotation = Quaternion.Euler(pitch, 0f, roll);
+            transform.localRotation = baseLocalRot * Quaternion.Euler(pitch, 0f, roll);
         }
     }
 }

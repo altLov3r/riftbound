@@ -101,9 +101,17 @@ namespace Riftbound.Editor
             notice.displayName = "Pinewatch Relay";
             notice.notice = "Pinewatch Relay. The wind snapped the east signal line. Halen is fitting a replacement at the shelter.";
             AddWatchkeeper(root.transform, terrains);
+            AddTownAdditions(root.transform, terrains);
             AddEnvironmentalClues(root.transform, terrains, deck);
             AddCivilianWalkers(root.transform, terrains);
             return root;
+        }
+
+        static void AddTownAdditions(Transform parent, Terrain[] terrains)
+        {
+            FrontierSitesPreviewBuild.PlaceKitPrefab(parent, "Timber_Cottage", -231f, 413f, 142f, terrains, 7.6f, 7.0f);
+            FrontierSitesPreviewBuild.PlaceFbx(parent, "EmberwatchCivicSquare/Emberwatch_MarketWell.fbx", "PW_Well", -222.5f, 412.5f, 0f, terrains, footingSize: 2.8f);
+            FrontierSitesPreviewBuild.PlaceFbx(parent, "VillageLandmarks/Emberwatch_SupplyWagon.fbx", "PW_Wagon", -218.5f, 385.5f, 48f, terrains, footingSize: 0f);
         }
 
         static GameObject Place(Transform parent, string name, float x, float z, float yaw,

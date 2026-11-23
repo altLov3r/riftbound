@@ -178,6 +178,73 @@ namespace Riftbound
             });
 
             // ==========================================
+            // GRAND FRONTIER EXPEDITION (7-STEP WORLD CIRCUIT)
+            // ==========================================
+            Add(new QuestDef
+            {
+                id = "expedition_whisperwood", giverNpc = FrontierExpeditionHerald.NpcName,
+                title = "Expedition: Whisperwood Market", faction = "Any", zone = "Emberwatch Outpost",
+                description = "Follow the Greenhollow road north to the bustling crossroads market town of Whisperwood Exchange and deliver Herald Veyra's manifest to Quartermaster Brev.",
+                targetType = "talk_npc", targetId = "Quartermaster Brev", targetName = "Speak with Quartermaster Brev",
+                requiredCount = 1, rewardGold = 45, rewardXP = 90,
+                targetLocation = new Vector3(35f, 9f, 250f), nextQuestId = "expedition_pinewatch"
+            });
+            Add(new QuestDef
+            {
+                id = "expedition_pinewatch", giverNpc = "Quartermaster Brev",
+                title = "Expedition: Pinewatch Signal", faction = "Any", zone = "Whisperwood Exchange",
+                description = "Head northwest through Greenhollow ridge to Pinewatch Relay and report to Watchkeeper Halen to investigate the snapped east signal line.",
+                targetType = "talk_npc", targetId = "Watchkeeper Halen", targetName = "Speak with Watchkeeper Halen",
+                requiredCount = 1, rewardGold = 55, rewardXP = 110,
+                prerequisiteQuestId = "expedition_whisperwood", targetLocation = new Vector3(-223f, 15f, 400f), nextQuestId = "pinewatch_clear_woods"
+            });
+            Add(new QuestDef
+            {
+                id = "expedition_ashenmaw", giverNpc = "Watchkeeper Halen",
+                title = "Expedition: The Mountain Cavern", faction = "Any", zone = "Pinewatch Relay",
+                description = "With Warchief Grimgnaw fallen, ride east to the Wyrmcrest foothills and meet Warden Kaelen outside the mountain mouth of Ashenmaw Cavern.",
+                targetType = "talk_npc", targetId = AshenmawCavernZone.QuestGiverName, targetName = "Speak with Warden Kaelen",
+                requiredCount = 1, rewardGold = 65, rewardXP = 130,
+                prerequisiteQuestId = "pinewatch_warchief_boss", targetLocation = AshenmawCavernZone.CampfirePos, nextQuestId = "ashenmaw_tribe_cull"
+            });
+            Add(new QuestDef
+            {
+                id = "expedition_sunstone", giverNpc = AshenmawCavernZone.QuestGiverName,
+                title = "Expedition: Sunstone Abbey", faction = "Any", zone = "Ashenmaw Cavern",
+                description = "Ursolak's spirit rests easy. Carry Kaelen's seal far south across the central plains to Brother Aldric's watchfire outside ruined Sunstone Abbey.",
+                targetType = "talk_npc", targetId = SunstoneAbbeyZone.QuestGiverName, targetName = "Speak with Brother Aldric",
+                requiredCount = 1, rewardGold = 75, rewardXP = 150,
+                prerequisiteQuestId = "ashenmaw_bear_guardian", targetLocation = SunstoneAbbeyZone.CampPos, nextQuestId = "sunstone_cultist_cull"
+            });
+            Add(new QuestDef
+            {
+                id = "expedition_cinderroad", giverNpc = SunstoneAbbeyZone.QuestGiverName,
+                title = "Expedition: Cinderroad Ironworks", faction = "Any", zone = "Sunstone Abbey",
+                description = "With Arch-Inquisitor Malrik defeated, follow the southeastern Emberford spur east to Foreman Darek at Cinderroad Ironworks.",
+                targetType = "talk_npc", targetId = "Foreman Darek", targetName = "Speak with Foreman Darek",
+                requiredCount = 1, rewardGold = 80, rewardXP = 160,
+                prerequisiteQuestId = "sunstone_inquisitor_boss", targetLocation = new Vector3(262f, 14f, -55f), nextQuestId = "expedition_ironmaw"
+            });
+            Add(new QuestDef
+            {
+                id = "expedition_ironmaw", giverNpc = "Foreman Darek",
+                title = "Expedition: Ironmaw Quarry", faction = "Any", zone = "Cinderroad Ironworks",
+                description = "Head north along the far-eastern frontier to Overseer Rusk's overlook camp outside Ironmaw Quarry and aid him against Ironjaw Krag.",
+                targetType = "talk_npc", targetId = IronmawQuarryZone.QuestGiverName, targetName = "Speak with Overseer Rusk",
+                requiredCount = 1, rewardGold = 85, rewardXP = 175,
+                prerequisiteQuestId = "expedition_cinderroad", targetLocation = IronmawQuarryZone.CampPos, nextQuestId = "ironmaw_outlaw_boss"
+            });
+            Add(new QuestDef
+            {
+                id = "expedition_thornwatch", giverNpc = IronmawQuarryZone.QuestGiverName,
+                title = "Expedition: Thornwatch Citadel", faction = "Any", zone = "Ironmaw Quarry",
+                description = "Cross the southern valley all the way to Thornwatch Citadel in the southwest corner and present the completed Frontier Expedition ledger to Captain Vaelen.",
+                targetType = "talk_npc", targetId = "Captain Vaelen", targetName = "Report to Captain Vaelen",
+                requiredCount = 1, rewardGold = 200, rewardXP = 350, rewardItem = "worldbreaker-maul",
+                prerequisiteQuestId = "ironmaw_outlaw_boss", targetLocation = new Vector3(-275f, 14f, -110f)
+            });
+
+            // ==========================================
             // IRONMAW QUARRY — FAR-EAST OUTLAW BOUNTY
             // ==========================================
             Add(new QuestDef

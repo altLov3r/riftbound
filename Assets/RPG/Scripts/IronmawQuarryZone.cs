@@ -15,8 +15,8 @@ namespace Riftbound
         public const string BossName = "Ironjaw Krag";
         public const string BossChestId = "ironmaw-vault-chest";
 
-        public static readonly Vector3 CampPos = new Vector3(356f, 0f, 90f);
-        public static readonly Vector3 QuarryPos = new Vector3(385f, 0f, 90f);
+        public static readonly Vector3 CampPos = new Vector3(338f, 0f, 90f);
+        public static readonly Vector3 QuarryPos = new Vector3(390f, 0f, 90f);
 
         public static void Ensure()
         {

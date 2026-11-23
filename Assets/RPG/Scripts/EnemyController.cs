@@ -72,6 +72,15 @@ namespace Riftbound
         public bool IsChasing => wasChasing;
         public Vector3 HomePosition => home;
         public event System.Action OnEvadeReset;
+        public void SetHomePosition(Vector3 pos, Quaternion? rot = null)
+        {
+            Initialize();
+            home = pos;
+            if (rot.HasValue) homeRotation = rot.Value;
+            if (motor) motor.enabled = false;
+            transform.SetPositionAndRotation(home, homeRotation);
+            if (motor) motor.enabled = true;
+        }
         void Awake() { Initialize(); }
         void Initialize()
         {

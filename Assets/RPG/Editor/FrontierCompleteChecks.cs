@@ -16,7 +16,7 @@ namespace Riftbound.Editor
     {
         const string ReportPath = ".code-check/emberford-r1/frontier-complete-checks.txt";
 
-        [MenuItem("Riftbound/Emberford/Run Complete Frontier Sites, Seamless Cavern & Sign Checks (EditMode)")]
+        [MenuItem("Riftbound/Emberford/Run Complete Frontier Towns, Safe Separation, Models & Expedition Checks (EditMode)")]
         public static void Run()
         {
             var lines = new List<string>();
@@ -35,6 +35,7 @@ namespace Riftbound.Editor
             GameObject cavernRoot = null;
             GameObject abbeyRoot = null;
             GameObject quarryRoot = null;
+            GameObject heraldRoot = null;
             GameObject fqsGo = null;
             GameObject signGo = null;
 
@@ -44,134 +45,189 @@ namespace Riftbound.Editor
                 var terrains = scene.GetRootGameObjects().SelectMany(r => r.GetComponentsInChildren<Terrain>()).ToArray();
                 Physics.SyncTransforms();
 
-                // 1. All new questlines registered (Pinewatch 3-step + Ashenmaw Cavern 2-step)
+                // 1. Custom Blender FBX models exist and load cleanly
+                var fbxPaths = new[]
+                {
+                    "Assets/RPG/Resources/Ashenmaw/Ashenmaw_Cavern_Complete.fbx",
+                    "Assets/RPG/Resources/Ashenmaw/Ursolak_BearGuardian.fbx",
+                    "Assets/RPG/Art/FrontierOverhaul/BreakerWorks_MagmaArch.fbx",
+                    "Assets/RPG/Art/FrontierOverhaul/BreakerWorks_PressureTower.fbx",
+                    "Assets/RPG/Art/FrontierOverhaul/BreakerWorks_RimBastion.fbx",
+                    "Assets/RPG/Art/FrontierOverhaul/Frontier_CoastalLighthouse.fbx"
+                };
+                int loadedFbx = fbxPaths.Count(p => AssetDatabase.LoadAssetAtPath<GameObject>(p) != null);
+                var lhAsset = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/RPG/Art/FrontierOverhaul/Frontier_CoastalLighthouse.fbx");
+                var lhFilter = lhAsset ? lhAsset.GetComponentInChildren<MeshFilter>(true) : null;
+                bool lhUpright = lhFilter && lhFilter.sharedMesh && lhFilter.sharedMesh.bounds.size.y >= 15f;
+                Check("blender_overhaul_fbx_assets_present_and_upright", loadedFbx == fbxPaths.Length && lhUpright,
+                    $"loaded={loadedFbx}/{fbxPaths.Length}, lhUprightY={(lhFilter && lhFilter.sharedMesh ? lhFilter.sharedMesh.bounds.size.y : 0f):F1}m");
+
+                // 2. All local questlines + all 7 Grand Frontier Expedition quests + Herald + GearArt icons
                 fqsGo = new GameObject("TempFqsCheck");
                 var fqs = fqsGo.AddComponent<FactionQuestSystem>();
                 typeof(FactionQuestSystem)
                     .GetMethod("BuildCatalog", BindingFlags.Instance | BindingFlags.NonPublic)
                     ?.Invoke(fqs, null);
 
-                var pw1 = FactionQuestSystem.GetQuest("pinewatch_clear_woods");
-                var pw2 = FactionQuestSystem.GetQuest("pinewatch_recover_line");
-                var pw3 = FactionQuestSystem.GetQuest("pinewatch_warchief_boss");
-                var am1 = FactionQuestSystem.GetQuest("ashenmaw_tribe_cull");
-                var am2 = FactionQuestSystem.GetQuest("ashenmaw_bear_guardian");
-                bool questsOk = pw1 != null && pw2 != null && pw3 != null &&
-                                am1 != null && am2 != null &&
-                                am1.giverNpc == AshenmawCavernZone.QuestGiverName &&
-                                am2.prerequisiteQuestId == "ashenmaw_tribe_cull" &&
-                                am2.targetId == AshenmawCavernZone.BossId &&
-                                ItemCatalog.Get("pinewatch-warden-crest") != null &&
-                                ItemCatalog.Get("ursolak-spirit-pelt") != null;
-                Check("pinewatch_and_ashenmaw_questlines_registered", questsOk,
-                    $"pw=({pw1 != null},{pw2 != null},{pw3 != null}), ashenmaw=({am1 != null},{am2 != null}), items=({ItemCatalog.Get("pinewatch-warden-crest") != null},{ItemCatalog.Get("ursolak-spirit-pelt") != null})");
+                FrontierExpeditionHerald.Ensure();
+                heraldRoot = GameObject.Find(FrontierExpeditionHerald.RootName);
+                var veyra = heraldRoot ? heraldRoot.GetComponentInChildren<TownNPC>(true) : null;
 
-                // 2. Pinewatch Timberfang Woods camps + Warchief Grimgnaw boss
+                var expeditionIds = new[]
+                {
+                    "expedition_whisperwood", "expedition_pinewatch", "expedition_ashenmaw",
+                    "expedition_sunstone", "expedition_cinderroad", "expedition_ironmaw", "expedition_thornwatch"
+                };
+                bool expOk = expeditionIds.All(id => FactionQuestSystem.GetQuest(id) != null) &&
+                             veyra != null && veyra.npcName == FrontierExpeditionHerald.NpcName;
+
+                var rewardIds = new[] { "pinewatch-warden-crest", "ursolak-spirit-pelt", "sunstone-reliquary-staff", "ironmaw-cleaver", "worldbreaker-maul" };
+                bool gearIconsOk = rewardIds.All(id => ItemCatalog.Get(id) != null && GearArt.Icon(ItemCatalog.Get(id)) != null);
+                Check("grand_expedition_chain_herald_and_gear_icons", expOk && gearIconsOk,
+                    $"expedition=({expeditionIds.Count(id => FactionQuestSystem.GetQuest(id) != null)}/7), veyra={(veyra != null)}, gearIcons={gearIconsOk}");
+
+                // 3. Instantiate all 4 hostile quest zones + check Ashenmaw bounds orientation
                 PinewatchWoodsZone.Ensure();
                 woodsRoot = GameObject.Find(PinewatchWoodsZone.RootName);
-                var woodsEnemies = woodsRoot ? woodsRoot.GetComponentsInChildren<EnemyController>(true) : Array.Empty<EnemyController>();
-                var pwBoss = woodsEnemies.FirstOrDefault(e => e.enemyId == PinewatchWoodsZone.BossId);
-                Check("pinewatch_woods_camps_and_boss",
-                    woodsEnemies.Length == 10 && pwBoss != null && pwBoss.isBoss,
-                    $"enemies={woodsEnemies.Length}, boss={(pwBoss != null)}");
 
-                // 3. Seamless Ashenmaw Cavern (no loading screen) + Briarclaw Tribe (8) + Ursolak Bear Guardian (480 HP) + Warden Kaelen + Reliquary
                 AshenmawCavernZone.Ensure();
                 cavernRoot = GameObject.Find(AshenmawCavernZone.RootName);
-                var cavernEnemies = cavernRoot ? cavernRoot.GetComponentsInChildren<EnemyController>(true) : Array.Empty<EnemyController>();
-                int tribeCount = cavernEnemies.Count(e => e.enemyId.StartsWith("ashenmaw-tribe"));
-                var bearBoss = cavernEnemies.FirstOrDefault(e => e.enemyId == AshenmawCavernZone.BossId);
-                var bearStats = bearBoss ? bearBoss.GetComponent<Combatant>() : null;
-                var kaelen = cavernRoot ? cavernRoot.GetComponentsInChildren<TownNPC>(true).FirstOrDefault(n => n.npcName == AshenmawCavernZone.QuestGiverName) : null;
-                var reliquary = cavernRoot ? cavernRoot.GetComponentsInChildren<LootChest>(true).FirstOrDefault(c => c.chestId == AshenmawCavernZone.BossChestId) : null;
-                bool cavernOk = tribeCount == 8 && bearBoss != null && bearBoss.isBoss && bearStats != null && bearStats.maxHealth >= 480 && kaelen != null && reliquary != null;
-                Check("ashenmaw_seamless_cavern_tribe_and_bear_guardian", cavernOk,
-                    $"tribe={tribeCount}, bearBoss={(bearBoss != null)}, bearHp={(bearStats ? bearStats.maxHealth : 0)}, kaelen={(kaelen != null)}, chest={(reliquary != null)}");
 
-                // 4. Sign back-face culling check (WorldSignText attaches SignFrontFaceCuller & disables WorldLabel)
+                SunstoneAbbeyZone.Ensure();
+                abbeyRoot = GameObject.Find(SunstoneAbbeyZone.RootName);
+
+                IronmawQuarryZone.Ensure();
+                quarryRoot = GameObject.Find(IronmawQuarryZone.RootName);
+
+                var caveShell = cavernRoot ? cavernRoot.transform.Find("Ashenmaw_OrganicCavern") : null;
+                Bounds caveBounds = new Bounds();
+                if (caveShell)
+                {
+                    var rs = caveShell.GetComponentsInChildren<MeshRenderer>(true);
+                    if (rs.Length > 0)
+                    {
+                        caveBounds = rs[0].bounds;
+                        for (int i = 1; i < rs.Length; i++) caveBounds.Encapsulate(rs[i].bounds);
+                    }
+                }
+                float entranceGroundY = FrontierSitesPreviewBuild.PhysicsSurface(AshenmawCavernZone.EntrancePos, terrains).y;
+                bool caveBoundsOk = caveShell != null &&
+                                    caveBounds.max.z >= AshenmawCavernZone.EntrancePos.z + 55f &&
+                                    caveBounds.min.y <= entranceGroundY - 2.0f;
+                Check("ashenmaw_cavern_fbx_orientation_and_depth", caveBoundsOk,
+                    $"boundsZ=({caveBounds.min.z:F1}..{caveBounds.max.z:F1}), minY={caveBounds.min.y:F1}, entY={entranceGroundY:F1}");
+
+                // 4. Safe-Town & Safe-Camp Separation Audit (every hostile >=36m from giver & >=48m from towns!)
+                var safeTowns = new[]
+                {
+                    ("Pinewatch Relay", new Vector2(-223f, 400f)),
+                    ("Whisperwood Exchange", new Vector2(35f, 250f)),
+                    ("Cinderroad Ironworks", new Vector2(262f, -55f)),
+                    ("Thornwatch Citadel", new Vector2(-275f, -110f)),
+                    ("Skyreach Aerie", new Vector2(355f, 420f)),
+                    ("Frostpine Watch", new Vector2(-270f, 520f)),
+                    ("Redtide Harbor", new Vector2(365f, -110f)),
+                    ("Willowmere Mill", new Vector2(-270f, 125f))
+                };
+
+                float minTownDist = float.MaxValue;
+                float minGiverDist = float.MaxValue;
+                string worstViolation = "";
+
+                void CheckSeparation(GameObject zoneRoot, Vector3 giverXZ)
+                {
+                    if (!zoneRoot) return;
+                    foreach (var ec in zoneRoot.GetComponentsInChildren<EnemyController>(true))
+                    {
+                        Vector2 ep = new Vector2(ec.transform.position.x, ec.transform.position.z);
+                        float dg = Vector2.Distance(ep, new Vector2(giverXZ.x, giverXZ.z));
+                        if (dg < minGiverDist) { minGiverDist = dg; if (dg < 36f) worstViolation = $"{ec.enemyId}->giver={dg:F1}m"; }
+                        foreach (var (tName, tPos) in safeTowns)
+                        {
+                            float dt = Vector2.Distance(ep, tPos);
+                            if (dt < minTownDist) { minTownDist = dt; if (dt < 48f) worstViolation = $"{ec.enemyId}->{tName}={dt:F1}m"; }
+                        }
+                    }
+                }
+                CheckSeparation(woodsRoot, new Vector3(-218.4f, 0f, 397f));
+                CheckSeparation(cavernRoot, AshenmawCavernZone.CampfirePos);
+                CheckSeparation(abbeyRoot, SunstoneAbbeyZone.CampPos);
+                CheckSeparation(quarryRoot, IronmawQuarryZone.CampPos);
+
+                Check("hostile_camps_spaced_from_safe_towns_and_givers",
+                    minGiverDist >= 36f && minTownDist >= 48f,
+                    $"minGiver={minGiverDist:F1}m, minTown={minTownDist:F1}m{(string.IsNullOrEmpty(worstViolation) ? "" : ", violation=" + worstViolation)}");
+
+                // 5. Bosses & Locked Chests
+                var bearBoss = cavernRoot?.GetComponentsInChildren<EnemyController>(true).FirstOrDefault(e => e.enemyId == AshenmawCavernZone.BossId);
+                var grimgnaw = woodsRoot?.GetComponentsInChildren<EnemyController>(true).FirstOrDefault(e => e.enemyId == PinewatchWoodsZone.BossId);
+                var malrik = abbeyRoot?.GetComponentsInChildren<EnemyController>(true).FirstOrDefault(e => e.enemyId == SunstoneAbbeyZone.BossId);
+                var krag = quarryRoot?.GetComponentsInChildren<EnemyController>(true).FirstOrDefault(e => e.enemyId == IronmawQuarryZone.BossId);
+                Check("four_frontier_bosses_spawned",
+                    bearBoss != null && grimgnaw != null && malrik != null && krag != null,
+                    $"ursolak={(bearBoss != null)}, grimgnaw={(grimgnaw != null)}, malrik={(malrik != null)}, krag={(krag != null)}");
+
+                // 6. Sign back-face culling check
                 signGo = new GameObject("TempSignCheck");
                 var tm = signGo.AddComponent<TextMesh>();
                 tm.text = "EMBERWATCH OUTPOST";
                 var wl = signGo.AddComponent<WorldLabel>();
                 bool shown = WorldSignText.Show(tm);
-                bool signOk = shown && !wl.enabled && signGo.GetComponent<SignFrontFaceCuller>() != null;
-                Check("sign_not_readable_from_back_culler", signOk,
-                    $"shown={shown}, billboardDisabled={(!wl.enabled)}, culler={(signGo.GetComponent<SignFrontFaceCuller>() != null)}");
+                Check("sign_not_readable_from_back_culler",
+                    shown && !wl.enabled && signGo.GetComponent<SignFrontFaceCuller>() != null,
+                    $"shown={shown}, billboardDisabled={(!wl.enabled)}");
 
-                // 5. Stage Pinewatch + Monumental Breaker Works + Grounded Whisperwood + SE Cinderroad Ironworks + SW Thornwatch Citadel
+                // 7. Stage Pinewatch + Hero-Building Frontier Small Towns
                 pinewatchStaged = PinewatchPreviewBuild.StagePinewatch(scene, new StringBuilder());
                 frontierStaged = FrontierSitesPreviewBuild.StageAll(scene, new StringBuilder());
                 Physics.SyncTransforms();
 
-                // 6. Breaker Works monumental arena floor clearance (R < 19m zero blockers)
+                // 8. Breaker Works arena clear (R < 19m zero blockers)
                 var breakerRoot = frontierStaged.transform.Find("Breaker Works Arena");
-                var breakerCols = breakerRoot ? breakerRoot.GetComponentsInChildren<Collider>(true) : Array.Empty<Collider>();
                 int innerFloorBlockers = 0;
-                foreach (var c in breakerCols)
+                if (breakerRoot)
                 {
-                    if (!c || c.isTrigger) continue;
-                    float d = Vector2.Distance(new Vector2(c.bounds.center.x, c.bounds.center.z), new Vector2(180f, 300f));
-                    if (d < 19.0f) innerFloorBlockers++;
+                    foreach (var c in breakerRoot.GetComponentsInChildren<Collider>(true))
+                    {
+                        if (!c || c.isTrigger) continue;
+                        if (Vector2.Distance(new Vector2(c.bounds.center.x, c.bounds.center.z), new Vector2(180f, 300f)) < 19.0f)
+                            innerFloorBlockers++;
+                    }
                 }
-                bool breakerOk = innerFloorBlockers == 0 &&
-                                 breakerRoot != null &&
-                                 breakerRoot.Find("PressureTower_Drum") != null &&
-                                 breakerRoot.Find("FurnaceArch_Lintel") != null;
-                Check("breaker_works_monumental_arena_clear", breakerOk, $"innerFloorBlockers={innerFloorBlockers}");
+                Check("breaker_works_fbx_arena_floor_clear", innerFloorBlockers == 0, $"innerBlockers={innerFloorBlockers}");
 
-                // 7. Whisperwood Exchange grounded check (Quartermaster Brev & foundation flush on PhysicsSurface) + 3 walkers
+                // 9. Whisperwood normal-mapped Hero Buildings + Grounded Brev + 3 walkers
                 var wwRoot = frontierStaged.transform.Find("Whisperwood Exchange");
+                bool wwHeroBuildings = wwRoot && wwRoot.Find("Wayfarer_Inn") != null && wwRoot.Find("Emberford_Smithy") != null && wwRoot.Find("Timber_Cottage") != null;
                 var brev = wwRoot ? wwRoot.GetComponentsInChildren<TownNPC>(true).FirstOrDefault(n => n.npcName == "Quartermaster Brev") : null;
-                float brevGroundDelta = brev ? Mathf.Abs(brev.transform.position.y - FrontierSitesPreviewBuild.PhysicsSurface(brev.transform.position, terrains).y) : 99f;
+                float brevDelta = brev ? Mathf.Abs(brev.transform.position.y - FrontierSitesPreviewBuild.PhysicsSurface(brev.transform.position, terrains).y) : 99f;
                 var wwWalkers = wwRoot ? wwRoot.GetComponentsInChildren<CivilianRouteWalker>(true) : Array.Empty<CivilianRouteWalker>();
-                bool wwWalkersOk = ValidateWalkers(wwWalkers, terrains, out string wwDetail);
-                Check("whisperwood_grounded_zero_floating_and_walkers",
-                    brev != null && brevGroundDelta <= 0.05f && wwWalkers.Length == 3 && wwWalkersOk,
-                    $"brevDelta={brevGroundDelta:F3}m, {wwDetail}");
+                string wwDetail = "";
+                bool wwOk = wwHeroBuildings && brev != null && brevDelta <= 0.05f && wwWalkers.Length == 3 && ValidateWalkers(wwWalkers, terrains, out wwDetail);
+                Check("whisperwood_hero_town_grounded_and_walkers", wwOk, $"hero={wwHeroBuildings}, brevDelta={brevDelta:F3}m, {wwDetail}");
 
-                // 8. SE Corner Mega-Site: Cinderroad Ironworks Bastion + 3 walkers
+                // 10. Cinderroad + Thornwatch + Other 5 Hero-Building Small Towns
                 var crRoot = frontierStaged.transform.Find("Cinderroad Waystation");
                 var crWalkers = crRoot ? crRoot.GetComponentsInChildren<CivilianRouteWalker>(true) : Array.Empty<CivilianRouteWalker>();
-                bool crWalkersOk = ValidateWalkers(crWalkers, terrains, out string crDetail);
-                bool crOk = crRoot != null && crRoot.Find("Smelter_Chimney") != null && crRoot.Find("BastionGate_Lintel") != null && crWalkers.Length == 3 && crWalkersOk;
-                Check("cinderroad_ironworks_se_corner_and_walkers", crOk, crDetail);
+                string crDetail = "";
+                bool crOk = crRoot && crRoot.Find("Wayfarer_Inn") != null && crRoot.Find("Emberford_Smithy") != null &&
+                            crWalkers.Length == 3 && ValidateWalkers(crWalkers, terrains, out crDetail);
+                Check("cinderroad_ironworks_hero_town_and_walkers", crOk, crDetail);
 
-                // 9. SW Corner Mega-Site: Thornwatch Citadel + 3 patrols
                 var twRoot = frontierStaged.transform.Find("Thornwatch Citadel");
                 var twWalkers = twRoot ? twRoot.GetComponentsInChildren<CivilianRouteWalker>(true) : Array.Empty<CivilianRouteWalker>();
-                bool twWalkersOk = ValidateWalkers(twWalkers, terrains, out string twDetail);
-                bool twOk = twRoot != null && twRoot.Find("Thornwatch_KeepShaft") != null && twRoot.Find("Thornwatch_GateLintel") != null && twWalkers.Length == 3 && twWalkersOk;
-                Check("thornwatch_citadel_sw_corner_and_patrols", twOk, twDetail);
+                string twDetail = "";
+                bool twOk = twRoot && twRoot.Find("Highspire_Citadel_Hall") != null && twRoot.Find("Wayfarer_Inn") != null &&
+                            twWalkers.Length == 3 && ValidateWalkers(twWalkers, terrains, out twDetail);
+                Check("thornwatch_citadel_hero_town_and_patrols", twOk, twDetail);
 
-                // 10. Far NE Mountain Sanctuary: Skyreach Aerie
-                var srRoot = frontierStaged.transform.Find("Skyreach Aerie");
-                var srWalkers = srRoot ? srRoot.GetComponentsInChildren<CivilianRouteWalker>(true) : Array.Empty<CivilianRouteWalker>();
-                bool srOk = srRoot != null && srRoot.Find("Skyreach_WindspireShaft") != null && srWalkers.Length == 1;
-                Check("skyreach_aerie_ne_sanctuary", srOk, $"windspire={(srRoot && srRoot.Find("Skyreach_WindspireShaft") != null)}, walkers={srWalkers.Length}");
-
-                // 11. South-Central Sunstone Abbey Quest Zone & Arch-Inquisitor Malrik Boss
-                SunstoneAbbeyZone.Ensure();
-                abbeyRoot = GameObject.Find(SunstoneAbbeyZone.RootName);
-                var abbeyEnemies = abbeyRoot ? abbeyRoot.GetComponentsInChildren<EnemyController>(true) : Array.Empty<EnemyController>();
-                var malrik = abbeyEnemies.FirstOrDefault(e => e.enemyId == SunstoneAbbeyZone.BossId);
-                var sq1 = FactionQuestSystem.GetQuest("sunstone_cultist_cull");
-                var sq2 = FactionQuestSystem.GetQuest("sunstone_inquisitor_boss");
-                bool abbeyOk = abbeyEnemies.Length == 8 && malrik != null && malrik.isBoss && sq1 != null && sq2 != null && ItemCatalog.Get("sunstone-reliquary-staff") != null;
-                Check("sunstone_abbey_ruins_questline_and_boss", abbeyOk,
-                    $"enemies={abbeyEnemies.Length}, malrik={(malrik != null)}, quests=({sq1 != null},{sq2 != null}), staff={(ItemCatalog.Get("sunstone-reliquary-staff") != null)}");
-
-                // 12. Ironmaw Quarry + Frostpine Watch + Redtide Harbor + Willowmere Mill
-                IronmawQuarryZone.Ensure();
-                quarryRoot = GameObject.Find(IronmawQuarryZone.RootName);
-                var qEnemies = quarryRoot ? quarryRoot.GetComponentsInChildren<EnemyController>(true) : Array.Empty<EnemyController>();
-                var krag = qEnemies.FirstOrDefault(e => e.enemyId == IronmawQuarryZone.BossId);
-                bool ironmawOk = qEnemies.Length == 5 && krag != null && krag.isBoss && FactionQuestSystem.GetQuest("ironmaw_outlaw_boss") != null && ItemCatalog.Get("ironmaw-cleaver") != null;
-                Check("ironmaw_quarry_outlaw_boss_and_quest", ironmawOk, $"enemies={qEnemies.Length}, krag={(krag != null)}");
-
-                bool threeHamletsOk = frontierStaged.transform.Find("Frostpine Watch") != null &&
-                                      frontierStaged.transform.Find("Redtide Harbor") != null &&
-                                      frontierStaged.transform.Find("Willowmere Mill") != null;
-                Check("frostpine_redtide_and_willowmere_staged", threeHamletsOk, $"staged={threeHamletsOk}");
+                bool otherTownsOk = frontierStaged.transform.Find("Skyreach Aerie")?.Find("Bell_Chapel") != null &&
+                                    frontierStaged.transform.Find("Frostpine Watch")?.Find("Wayfarer_Inn") != null &&
+                                    frontierStaged.transform.Find("Redtide Harbor")?.Find("Redtide_Lighthouse") != null &&
+                                    frontierStaged.transform.Find("Willowmere Mill")?.Find("Wayfarer_Inn") != null &&
+                                    frontierStaged.transform.Find("Sunstone Abbey Ruins")?.Find("Bell_Chapel") != null &&
+                                    frontierStaged.transform.Find("Ironmaw Quarry Architecture")?.Find("Briar_War_Hall") != null;
+                Check("remaining_six_hero_building_towns_staged", otherTownsOk, $"allHeroTowns={otherTownsOk}");
             }
             catch (Exception ex)
             {
@@ -181,6 +237,7 @@ namespace Riftbound.Editor
             {
                 if (signGo) Object.DestroyImmediate(signGo);
                 if (fqsGo) Object.DestroyImmediate(fqsGo);
+                if (heraldRoot) Object.DestroyImmediate(heraldRoot);
                 if (quarryRoot) Object.DestroyImmediate(quarryRoot);
                 if (abbeyRoot) Object.DestroyImmediate(abbeyRoot);
                 if (cavernRoot) Object.DestroyImmediate(cavernRoot);

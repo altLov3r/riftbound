@@ -14,9 +14,9 @@ namespace Riftbound
         public const string BossName = "Warchief Grimgnaw";
         public const string BossChestId = "pinewatch-boss-chest";
 
-        public static readonly Vector3 Camp1Position = new Vector3(-248f, 0f, 410f);
-        public static readonly Vector3 Camp2Position = new Vector3(-268f, 0f, 430f);
-        public static readonly Vector3 BossPosition = new Vector3(-286f, 0f, 450f);
+        public static readonly Vector3 Camp1Position = new Vector3(-278f, 0f, 412f);
+        public static readonly Vector3 Camp2Position = new Vector3(-295f, 0f, 438f);
+        public static readonly Vector3 BossPosition = new Vector3(-306f, 0f, 466f);
 
         public static void Ensure()
         {

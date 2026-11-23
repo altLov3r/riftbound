@@ -3,11 +3,11 @@ using UnityEngine;
 
 namespace Riftbound
 {
-    internal static class GearArt
+    public static class GearArt
     {
         static readonly Dictionary<string, Texture2D> Icons = new();
 
-        internal static string ResolveArtId(string id) => id switch
+        public static string ResolveArtId(string id) => id switch
         {
             "pinewatch-warden-crest" => "emberwatch-sigil",
             "ursolak-spirit-pelt" => "ember-drake-scale",
@@ -16,7 +16,7 @@ namespace Riftbound
             _ => id
         };
 
-        internal static Texture2D Icon(GearItem item)
+        public static Texture2D Icon(GearItem item)
         {
             if (item == null) return null;
             if (!Icons.TryGetValue(item.id, out var icon))

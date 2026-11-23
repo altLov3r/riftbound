@@ -44,6 +44,7 @@ namespace Riftbound
             AshenmawCavernZone.Ensure();
             SunstoneAbbeyZone.Ensure();
             IronmawQuarryZone.Ensure();
+            FrontierExpeditionHerald.Ensure();
             if (player) WesternRoadCamps.Ensure(player);
             RoadPatrolGuard.Ensure();
             if (!ActionBarSystem.Instance && !GetComponent<ActionBarSystem>()) gameObject.AddComponent<ActionBarSystem>();

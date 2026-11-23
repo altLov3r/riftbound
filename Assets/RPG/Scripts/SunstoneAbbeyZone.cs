@@ -15,9 +15,9 @@ namespace Riftbound
         public const string BossName = "Arch-Inquisitor Malrik";
         public const string BossChestId = "sunstone-abbey-chest";
 
-        public static readonly Vector3 CampPos = new Vector3(115f, 0f, -86f);
+        public static readonly Vector3 CampPos = new Vector3(115f, 0f, -68f);
         public static readonly Vector3 NavePos = new Vector3(115f, 0f, -110f);
-        public static readonly Vector3 AltarPos = new Vector3(115f, 0f, -128f);
+        public static readonly Vector3 AltarPos = new Vector3(115f, 0f, -132f);
 
         public static void Ensure()
         {
