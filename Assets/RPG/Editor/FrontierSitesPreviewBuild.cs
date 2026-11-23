@@ -10,14 +10,12 @@ using Object = UnityEngine.Object;
 namespace Riftbound.Editor
 {
     /// <summary>
-    /// Stages all Frontier landmarks & strongholds in memory during build/verification (zero authored scene/terrain edits):
-    /// 1. Breaker Works Arena (180, 300): Monumental multi-tier volcanic raid amphitheater for Gorgonax.
-    /// 2. Whisperwood Exchange (35, 250): Deeply grounded roadside trade exchange + 3 civilian routes.
-    /// 3. Cinderroad Ironworks Bastion (262, -55): Major SE Quarry & Smelter Fortress + 3 civilian routes.
-    /// 4. Thornwatch Citadel (-275, -110): Major SW Frontier Lighthouse Keep & Garrison Courtyard + 3 patrols.
+    /// Stages dense, lived-in Frontier Small Towns & Landmarks using Riftbound's authored Blender FBX kits
+    /// (zero primitive-cube placeholder buildings, zero authored scene/terrain edits, zero floating).
     /// </summary>
     public static class FrontierSitesPreviewBuild
     {
+        const string ArtRoot = "Assets/RPG/Art/";
         const string Materials = "Assets/RPG/ProceduralKit/Materials/";
 
         public static readonly Vector3 BreakerWorksCenter = new Vector3(180f, 0f, 300f);
@@ -39,653 +37,427 @@ namespace Riftbound.Editor
             SceneManager.MoveGameObjectToScene(root, scene);
 
             StageBreakerWorks(root.transform, terrains, report);
-            StageWhisperwoodExchange(root.transform, terrains, report);
-            StageCinderroadIronworks(root.transform, terrains, report);
-            StageThornwatchCitadel(root.transform, terrains, report);
-            StageSkyreachAerie(root.transform, terrains, report);
+            StageWhisperwoodTown(root.transform, terrains, report);
+            StageCinderroadTown(root.transform, terrains, report);
+            StageThornwatchTown(root.transform, terrains, report);
+            StageSkyreachTown(root.transform, terrains, report);
             StageSunstoneAbbeyRuins(root.transform, terrains, report);
             StageIronmawQuarry(root.transform, terrains, report);
-            StageFrostpineWatch(root.transform, terrains, report);
-            StageRedtideHarbor(root.transform, terrains, report);
-            StageWillowmereMill(root.transform, terrains, report);
+            StageFrostpineTown(root.transform, terrains, report);
+            StageRedtideHarborTown(root.transform, terrains, report);
+            StageWillowmereHamlet(root.transform, terrains, report);
 
             return root;
         }
 
         // =========================================================================
-        // 1. BREAKER WORKS — MONUMENTAL GORGONAX RAID AMPHITHEATER (180, 300)
+        // 1. BREAKER WORKS — GORGONAX VOLCANIC RAID AMPHITHEATER (180, 300)
         // =========================================================================
         static void StageBreakerWorks(Transform parent, Terrain[] terrains, StringBuilder report)
         {
             var root = new GameObject("Breaker Works Arena");
             root.transform.SetParent(parent, false);
 
-            // Inner combat floor (R <= 19.5m): 100% snag-free! Flush non-colliding obsidian ring & glowing lava fissures
-            for (int i = 0; i < 20; i++)
-            {
-                float rad = i * Mathf.PI * 2f / 20f;
-                Vector3 p = BreakerWorksCenter + new Vector3(Mathf.Cos(rad) * 19.6f, 0f, Mathf.Sin(rad) * 19.6f);
-                var slab = Part(root.transform, $"ArenaFloorInlay_{i}", PhysicsSurface(p, terrains) + Vector3.up * 0.04f,
-                    new Vector3(4.6f, 0.14f, 1.3f), "Basalt", collider: false);
-                slab.transform.rotation = Quaternion.Euler(0f, -rad * Mathf.Rad2Deg + 90f, 0f);
+            // Grand SE Furnace Archway at (198, 279) using real GorKresh_ForgeArch.fbx
+            PlaceFbx(root.transform, "GorKreshForgeCourt/GorKresh_ForgeArch.fbx", "FurnaceArch_Lintel", 198f, 279f, -42f, terrains, scale: 1.55f, footingSize: 0f);
+            // NW Gate Archway at (164, 316)
+            PlaceFbx(root.transform, "GorKreshForgeCourt/GorKresh_ForgeArch.fbx", "NWGate_Arch", 164f, 316f, 135f, terrains, scale: 1.35f, footingSize: 0f);
 
-                if (i % 5 == 0)
-                {
-                    Vector3 fissureMid = BreakerWorksCenter + new Vector3(Mathf.Cos(rad) * 12.5f, 0f, Mathf.Sin(rad) * 12.5f);
-                    var fissure = Part(root.transform, $"LavaFissure_{i}", PhysicsSurface(fissureMid, terrains) + Vector3.up * 0.03f,
-                        new Vector3(0.45f, 0.08f, 9.0f), "Ember Edge", collider: false);
-                    fissure.transform.rotation = Quaternion.Euler(0f, -rad * Mathf.Rad2Deg + 90f, 0f);
-                }
-            }
+            // Ruined Pressure Tower & Industrial Kilns on NE Rim (204, 322, R ~ 32.5m)
+            PlaceFbx(root.transform, "BloodrockLookout/Bloodrock_VistaLookout.fbx", "PressureTower_Drum", 204f, 322f, -135f, terrains, scale: 1.65f, footingSize: 6.5f);
+            PlaceFbx(root.transform, "RustwaterSalvageYard/Rustwater_DrumFrame.fbx", "PressureTower_Frame", 208f, 318f, -120f, terrains, scale: 1.35f, footingSize: 0f);
+            PlaceFbx(root.transform, "GorKreshForgeCourt/GorKresh_KilnFurnace.fbx", "RimKiln_NE", 198f, 324f, 20f, terrains, scale: 1.3f, footingSize: 4.5f);
 
-            // Stepped Multi-Tier Obsidian Amphitheater Rim (R = 24.5m..27.5m), deeply skirted into crater slope
-            for (int i = 0; i < 16; i++)
+            // Volcanic Forge Kilns & Banners ringing the outer rim (R = 25..27m, keeping R <= 19m floor 100% clear!)
+            for (int i = 0; i < 10; i++)
             {
-                float deg = i * 22.5f;
-                // Keep SE Furnace Gatehouse (~305..338 deg) and NW Viaduct Gate (~122..154 deg) wide open
-                if ((deg >= 300f && deg <= 340f) || (deg >= 120f && deg <= 156f)) continue;
+                float deg = i * 36f;
+                if ((deg >= 295f && deg <= 340f) || (deg >= 120f && deg <= 155f)) continue;
                 float rad = deg * Mathf.Deg2Rad;
-                Vector3 pInner = BreakerWorksCenter + new Vector3(Mathf.Cos(rad) * 24.2f, 0f, Mathf.Sin(rad) * 24.2f);
-                Vector3 pOuter = BreakerWorksCenter + new Vector3(Mathf.Cos(rad) * 27.2f, 0f, Mathf.Sin(rad) * 27.2f);
-                Vector3 gIn = PhysicsSurface(pInner, terrains);
-                Vector3 gOut = PhysicsSurface(pOuter, terrains);
-                Quaternion rot = Quaternion.Euler(0f, -deg + 90f, 0f);
-
-                // Lower rim wall deeply anchored 3.5m below surface
-                var lowWall = Part(root.transform, $"AmphitheaterTier1_{i}", gIn + Vector3.up * 0.1f,
-                    new Vector3(7.2f, 6.4f, 1.8f), "Basalt", collider: true);
-                lowWall.transform.rotation = rot;
-
-                // Upper stepped amphitheater wall
-                var highWall = Part(root.transform, $"AmphitheaterTier2_{i}", gOut + Vector3.up * 1.4f,
-                    new Vector3(7.8f, 8.2f, 2.2f), "Slate", collider: true);
-                highWall.transform.rotation = rot;
-
-                // Towering Iron Forge Braziers & Chain Monoliths every 2nd segment
+                float rx = 180f + Mathf.Cos(rad) * 26.0f;
+                float rz = 300f + Mathf.Sin(rad) * 26.0f;
                 if (i % 2 == 0)
-                {
-                    Part(root.transform, $"ForgeMonolith_{i}", gIn + Vector3.up * 2.4f,
-                        new Vector3(1.5f, 8.4f, 1.5f), "Black Iron", collider: true);
-                    Part(root.transform, $"ForgeBrazierBowl_{i}", gIn + Vector3.up * 6.8f,
-                        new Vector3(2.1f, 0.7f, 2.1f), "Red Iron", collider: false);
-                    Part(root.transform, $"ForgeBrazierFlame_{i}", gIn + Vector3.up * 7.6f,
-                        new Vector3(1.3f, 1.1f, 1.3f), "Amber", collider: false);
-                }
+                    PlaceFbx(root.transform, "GorKreshForgeCourt/GorKresh_KilnFurnace.fbx", $"RimKiln_{i}", rx, rz, -deg + 90f, terrains, scale: 1.15f, footingSize: 4.0f);
+                else
+                    PlaceFbx(root.transform, "BloodrockLookout/Bloodrock_OutpostBanner.fbx", $"RimBanner_{i}", rx, rz, -deg + 90f, terrains, scale: 1.35f, footingSize: 0f, addColliders: false);
             }
 
-            // Grand SE Furnace Gatehouse at (198, 279) — >= 6.4m wide x 5.8m tall mounted clearance
-            Vector3 archCenter = new Vector3(198f, 0f, 279f);
-            Quaternion archRot = Quaternion.Euler(0f, -42f, 0f);
-            Vector3 gL = PhysicsSurface(archCenter + archRot * new Vector3(-4.2f, 0f, 0f), terrains);
-            Vector3 gR = PhysicsSurface(archCenter + archRot * new Vector3(4.2f, 0f, 0f), terrains);
-            float archTopY = Mathf.Max(gL.y, gR.y) + 6.4f;
+            // Quiet Rim Bypass Trail lanterns (>= 42m from Gorgonax)
+            Vector3[] bypass = { new(140, 0, 344), new(160, 0, 347), new(180, 0, 346), new(205, 0, 340), new(224, 0, 332), new(230, 0, 260) };
+            for (int i = 0; i < bypass.Length; i++)
+                PlaceFbx(root.transform, "VillageLandmarks/Greenhollow_TrailLantern.fbx", $"BreakerBypass_Lantern_{i}", bypass[i].x, bypass[i].z, 0f, terrains, footingSize: 0f, addColliders: false);
 
-            var pL = Part(root.transform, "FurnaceArch_LeftTower", new Vector3(gL.x, gL.y + 2.8f, gL.z), new Vector3(2.4f, 10.6f, 2.6f), "Basalt", collider: true);
-            var pR = Part(root.transform, "FurnaceArch_RightTower", new Vector3(gR.x, gR.y + 2.8f, gR.z), new Vector3(2.4f, 10.6f, 2.6f), "Basalt", collider: true);
-            pL.transform.rotation = archRot;
-            pR.transform.rotation = archRot;
-            Part(root.transform, "FurnaceArch_LeftFlame", new Vector3(gL.x, gL.y + 8.5f, gL.z), new Vector3(1.4f, 1.2f, 1.4f), "Amber", collider: false);
-            Part(root.transform, "FurnaceArch_RightFlame", new Vector3(gR.x, gR.y + 8.5f, gR.z), new Vector3(1.4f, 1.2f, 1.4f), "Amber", collider: false);
-
-            var lintel = Part(root.transform, "FurnaceArch_Lintel", new Vector3(archCenter.x, archTopY, archCenter.z), new Vector3(11.4f, 1.5f, 2.4f), "Black Iron", collider: true);
-            lintel.transform.rotation = archRot;
-            var crest = Part(root.transform, "FurnaceArch_EmberCrest", new Vector3(archCenter.x, archTopY + 1.0f, archCenter.z), new Vector3(4.8f, 0.7f, 1.0f), "Ember Edge", collider: false);
-            crest.transform.rotation = archRot;
-
-            // NW Broken Viaduct Gate Piers at (164, 316)
-            Vector3 nwCenter = new Vector3(164f, 0f, 316f);
-            Quaternion nwRot = Quaternion.Euler(0f, -45f, 0f);
-            Vector3 nwL = PhysicsSurface(nwCenter + nwRot * new Vector3(-4.0f, 0f, 0f), terrains);
-            Vector3 nwR = PhysicsSurface(nwCenter + nwRot * new Vector3(4.0f, 0f, 0f), terrains);
-            Part(root.transform, "NWGate_PierL", nwL + Vector3.up * 2.2f, new Vector3(2.0f, 8.0f, 2.0f), "Basalt", collider: true);
-            Part(root.transform, "NWGate_PierR", nwR + Vector3.up * 2.2f, new Vector3(2.0f, 8.0f, 2.0f), "Basalt", collider: true);
-
-            // Monumental Ruined Pressure Tower on NE rim (204, 322), R ~ 32.5m (14m tall, deeply skirted)
-            Vector3 towerPos = PhysicsSurface(new Vector3(204f, 0f, 322f), terrains);
-            Part(root.transform, "PressureTower_Base", towerPos + Vector3.up * 1.4f, new Vector3(7.4f, 7.6f, 7.4f), "Basalt", collider: true);
-            Part(root.transform, "PressureTower_Drum", towerPos + Vector3.up * 7.4f, new Vector3(5.2f, 5.8f, 5.2f), "Black Iron", collider: true);
-            Part(root.transform, "PressureTower_Crown", towerPos + Vector3.up * 11.4f, new Vector3(6.2f, 2.4f, 6.2f), "Red Iron", collider: true);
-            Part(root.transform, "PressureTower_EmberCore", towerPos + Vector3.up * 13.0f, new Vector3(2.8f, 1.8f, 2.8f), "Amber", collider: false);
-            for (int b = 0; b < 4; b++)
-            {
-                float bRad = b * Mathf.PI * 0.5f + Mathf.PI * 0.25f;
-                Vector3 bOff = new Vector3(Mathf.Cos(bRad) * 3.4f, 4.8f, Mathf.Sin(bRad) * 3.4f);
-                var rib = Part(root.transform, $"PressureTower_Rib_{b}", towerPos + bOff, new Vector3(1.0f, 9.2f, 1.4f), "Steel", collider: false);
-                rib.transform.rotation = Quaternion.Euler(0f, -bRad * Mathf.Rad2Deg, 0f);
-            }
-
-            // Quiet Rim Bypass Trail lanterns (>= 42m from Gorgonax (180, 302))
-            Vector3[] bypassMarkers =
-            {
-                new Vector3(140f, 0f, 344f),
-                new Vector3(160f, 0f, 347f),
-                new Vector3(180f, 0f, 346f),
-                new Vector3(205f, 0f, 340f),
-                new Vector3(224f, 0f, 332f),
-                new Vector3(230f, 0f, 260f)
-            };
-            for (int i = 0; i < bypassMarkers.Length; i++)
-                AddTrailLantern(root.transform, $"BreakerBypass_Lantern_{i}", bypassMarkers[i], terrains);
-
-            var pin = new GameObject("Breaker Works map pin").AddComponent<SettlementWaystop>();
-            pin.transform.SetParent(root.transform, false);
-            pin.transform.position = PhysicsSurface(new Vector3(206f, 0f, 272f), terrains);
-            pin.displayName = "Breaker Works";
-            pin.notice = "Breaker Works Amphitheater. Gorgonax rules the molten basalt floor below. Enter through the SE Furnace Gatehouse or follow the outer rim lanterns to bypass.";
-
-            report.AppendLine("Staged Monumental Breaker Works Amphitheater at (180,300).");
+            AddWaystop(root.transform, "Breaker Works", new Vector3(206f, 0f, 272f),
+                "Breaker Works Crater. Gorgonax holds the open basalt floor below. Enter through the SE Forge Arch or follow the outer rim lanterns.", terrains);
+            report.AppendLine("Staged FBX Breaker Works Arena.");
         }
 
         // =========================================================================
-        // 2. WHISPERWOOD EXCHANGE (35, 250) — 100% GROUNDED WITH DEEP FOUNDATION
+        // 2. WHISPERWOOD EXCHANGE SMALL TOWN (35, 250)
         // =========================================================================
-        static void StageWhisperwoodExchange(Transform parent, Terrain[] terrains, StringBuilder report)
+        static void StageWhisperwoodTown(Transform parent, Terrain[] terrains, StringBuilder report)
         {
             var root = new GameObject("Whisperwood Exchange");
             root.transform.SetParent(parent, false);
 
-            // Sample all 4 corners + center via active TerrainCollider raycast so NOTHING floats!
-            float deckTopY = BuildGroundedFoundation(root.transform, "Exchange_Foundation", WhisperwoodCenter, 7.6f, 5.4f, 0.28f, "Limestone", terrains);
-            Vector3 c = new Vector3(WhisperwoodCenter.x, deckTopY, WhisperwoodCenter.z);
+            // Real FBX town square: Market Hall, Inn, Loading Shed, Town Well, Supply Wagon, Honey Stand, Herb Beds, Horse
+            PlaceFbx(root.transform, "EmberwatchCivicSquare/Emberwatch_MarketShelter.fbx", "WW_MarketHall", 35f, 250f, 0f, terrains, footingSize: 6.8f);
+            PlaceFbx(root.transform, "EmberwatchCivicSquare/Emberwatch_HearthInn.fbx", "WW_HearthInn", 45f, 258f, -110f, terrains, footingSize: 7.5f);
+            PlaceFbx(root.transform, "VillageLandmarks/Emberwatch_LoadingShed.fbx", "WW_CargoShed", 26f, 256f, 75f, terrains, footingSize: 5.2f);
+            PlaceFbx(root.transform, "EmberwatchCivicSquare/Emberwatch_MarketWell.fbx", "WW_TownWell", 35f, 240f, 0f, terrains, footingSize: 2.8f);
+            PlaceFbx(root.transform, "VillageLandmarks/Emberwatch_SupplyWagon.fbx", "WW_SupplyWagon", 27f, 245f, 25f, terrains, footingSize: 0f);
+            PlaceFbx(root.transform, "VillageLandmarks/Greenhollow_HoneyStand.fbx", "WW_HoneyStand", 43f, 242f, -40f, terrains, footingSize: 3.2f);
+            PlaceFbx(root.transform, "VillageLandmarks/Emberwatch_HerbBeds.fbx", "WW_HerbBeds", 39f, 237f, 0f, terrains, footingSize: 0f, addColliders: false);
+            PlaceFbx(root.transform, "VillageLandmarks/Emberwatch_RoofedNoticeBoard.fbx", "WW_NoticeBoard", 30.5f, 249.5f, 90f, terrains, footingSize: 0f);
+            PlaceFbx(root.transform, "Animals/Horse.fbx", "WW_WagonHorse", 24.5f, 242.5f, 35f, terrains, scale: 1.0f, footingSize: 0f, addColliders: false);
 
-            // Timber deck planks + canopy posts anchored straight into the solid deck
-            Part(root.transform, "Exchange_Deck", c + Vector3.up * 0.08f, new Vector3(7.4f, 0.18f, 5.2f), "Oak", collider: true);
-            Part(root.transform, "Exchange_PostNW", c + new Vector3(-3.2f, 2.3f, 2.2f), new Vector3(0.38f, 4.6f, 0.38f), "Dark Wood", collider: true);
-            Part(root.transform, "Exchange_PostNE", c + new Vector3(3.2f, 2.3f, 2.2f), new Vector3(0.38f, 4.6f, 0.38f), "Dark Wood", collider: true);
-            Part(root.transform, "Exchange_PostSW", c + new Vector3(-3.2f, 2.1f, -2.2f), new Vector3(0.38f, 4.2f, 0.38f), "Dark Wood", collider: true);
-            Part(root.transform, "Exchange_PostSE", c + new Vector3(3.2f, 2.1f, -2.2f), new Vector3(0.38f, 4.2f, 0.38f), "Dark Wood", collider: true);
-            var roofA = Part(root.transform, "Exchange_CanopyWest", c + new Vector3(-1.7f, 4.6f, 0f), new Vector3(4.2f, 0.16f, 5.8f), "Linen", collider: false);
-            roofA.transform.rotation = Quaternion.Euler(0f, 0f, 14f);
-            var roofB = Part(root.transform, "Exchange_CanopyEast", c + new Vector3(1.7f, 4.6f, 0f), new Vector3(4.2f, 0.16f, 5.8f), "Banner Teal", collider: false);
-            roofB.transform.rotation = Quaternion.Euler(0f, 0f, -14f);
-            Part(root.transform, "Exchange_Counter", c + new Vector3(0f, 0.65f, 1.3f), new Vector3(5.2f, 0.95f, 0.85f), "Oak Edge", collider: true);
+            PlaceFbx(root.transform, "VillageLandmarks/Greenhollow_TrailLantern.fbx", "WW_LanternA", 4f, 247f, 0f, terrains, footingSize: 0f, addColliders: false);
+            PlaceFbx(root.transform, "VillageLandmarks/Greenhollow_TrailLantern.fbx", "WW_LanternB", 19f, 248f, 0f, terrains, footingSize: 0f, addColliders: false);
+            PlaceFbx(root.transform, "VillageLandmarks/Greenhollow_TrailLantern.fbx", "WW_LanternC", 31f, 255f, 0f, terrains, footingSize: 0f, addColliders: false);
 
-            // Grounded cargo bundles & quarry ballast crates (each sunk slightly into terrain so zero gaps)
-            for (int i = 0; i < 4; i++)
-            {
-                Vector3 bp = PhysicsSurface(new Vector3(39.4f, 0f, 248.4f + i * 0.9f), terrains);
-                Part(root.transform, $"CedarBundle_{i}", bp + Vector3.up * 0.25f, new Vector3(1.5f, 0.65f, 0.65f), "Oak", collider: true);
-            }
-            Vector3 crateA = PhysicsSurface(new Vector3(30.4f, 0f, 247.0f), terrains);
-            Vector3 crateB = PhysicsSurface(new Vector3(31.7f, 0f, 246.8f), terrains);
-            Part(root.transform, "QuarryBallastCrateA", crateA + Vector3.up * 0.35f, new Vector3(1.1f, 1.0f, 1.1f), "Red Iron", collider: true);
-            Part(root.transform, "QuarryBallastCrateB", crateB + Vector3.up * 0.32f, new Vector3(1.0f, 0.95f, 1.0f), "Slate", collider: true);
+            AddTownNpc(root.transform, "Quartermaster Brev", "Whisperwood Exchange", "Human", "Warrior", new Vector3(34.5f, 0f, 253.8f),
+                "Welcome to Whisperwood Exchange! Cedar from Pinewatch and stone from Cinderroad meet right here at our market square.", terrains);
+            AddTownNpc(root.transform, "Innkeeper Talia", "Whisperwood Inn", "Human", "Mage", new Vector3(41.5f, 0f, 256.5f),
+                "Warm cider and fresh bread inside the hearth inn, traveler. Plenty of couriers resting between Greenhollow and Emberford.", terrains);
 
-            // Deeply grounded 6m Stone & Timber Divider Wall
-            float wallTopY = BuildGroundedFoundation(root.transform, "Exchange_DividerWall", new Vector3(26.5f, 0f, 249.5f), 0.70f, 6.2f, 1.25f, "Limestone", terrains);
-            Part(root.transform, "Exchange_DividerCap", new Vector3(26.5f, wallTopY + 0.08f, 249.5f), new Vector3(0.84f, 0.16f, 6.4f), "Dark Wood", collider: false);
-
-            // Pullout trail lanterns
-            AddTrailLantern(root.transform, "Whisperwood_PulloutLanternA", new Vector3(4f, 0f, 247f), terrains);
-            AddTrailLantern(root.transform, "Whisperwood_PulloutLanternB", new Vector3(19f, 0f, 248f), terrains);
-            AddTrailLantern(root.transform, "Whisperwood_PulloutLanternC", new Vector3(29f, 0f, 255f), terrains);
-
-            // Grounded Sightline Rest Bench
-            Vector3 benchPos = PhysicsSurface(new Vector3(29.5f, 0f, 242.5f), terrains);
-            Part(root.transform, "Exchange_RestBench", benchPos + Vector3.up * 0.22f, new Vector3(2.2f, 0.70f, 0.65f), "Oak", collider: true);
-
-            // Quartermaster Brev standing squarely on the ground beside the stall counter
-            AddTownNpc(root.transform, "Quartermaster Brev", "Whisperwood Exchange", "Human", "Warrior",
-                new Vector3(34.5f, 0f, 253.8f),
-                "Four cedar bundles arrived from Pinewatch, two short of the tally. Quarry ballast from Cinderroad is already stacked by the divider.",
-                terrains);
-
-            var pin = new GameObject("Whisperwood Exchange map pin").AddComponent<SettlementWaystop>();
-            pin.transform.SetParent(root.transform, false);
-            pin.transform.position = PhysicsSurface(new Vector3(30.5f, 0f, 249.5f), terrains);
-            pin.displayName = "Whisperwood Exchange";
-            pin.notice = "Whisperwood Exchange Tally Board: 4 of 6 cedar bundles received from Pinewatch Relay; red-dust ballast crates cleared for Cinderroad return.";
+            AddWaystop(root.transform, "Whisperwood Exchange", new Vector3(30.5f, 0f, 249.5f),
+                "Whisperwood Exchange — Bustling crossroads market town linking Pinewatch Relay, Greenhollow Post, and Cinderroad Ironworks.", terrains);
 
             AddCivilianWalker(root.transform, "Whisperwood Exchange Porter", "Human", "Warrior", 1.35f, 2.2f, terrains, new[]
             {
-                new Vector3(31.5f, 0f, 242.5f),
-                new Vector3(37.5f, 0f, 242.5f),
-                new Vector3(37.5f, 0f, 244.8f),
-                new Vector3(31.5f, 0f, 244.8f)
+                new Vector3(31.5f, 0f, 242.5f), new Vector3(37.5f, 0f, 242.5f), new Vector3(37.5f, 0f, 244.8f), new Vector3(31.5f, 0f, 244.8f)
             });
             AddCivilianWalker(root.transform, "Whisperwood Waiting Courier", "Human", "Rogue", 1.45f, 2.0f, terrains, new[]
             {
-                new Vector3(30.0f, 0f, 255.0f),
-                new Vector3(38.0f, 0f, 255.5f),
-                new Vector3(39.0f, 0f, 257.5f),
-                new Vector3(31.0f, 0f, 257.0f)
+                new Vector3(30.0f, 0f, 255.0f), new Vector3(38.0f, 0f, 255.5f), new Vector3(39.0f, 0f, 257.5f), new Vector3(31.0f, 0f, 257.0f)
             });
             AddCivilianWalker(root.transform, "Whisperwood Treeline Scout", "Human", "Rogue", 1.40f, 2.4f, terrains, new[]
             {
-                new Vector3(41.2f, 0f, 245.5f),
-                new Vector3(43.2f, 0f, 247.5f),
-                new Vector3(43.6f, 0f, 250.5f),
-                new Vector3(43.2f, 0f, 253.5f),
-                new Vector3(41.2f, 0f, 252.0f),
-                new Vector3(41.0f, 0f, 248.5f)
+                new Vector3(41.2f, 0f, 245.5f), new Vector3(43.2f, 0f, 247.5f), new Vector3(43.6f, 0f, 250.5f),
+                new Vector3(43.2f, 0f, 253.5f), new Vector3(41.2f, 0f, 252.0f), new Vector3(41.0f, 0f, 248.5f)
             });
 
-            report.AppendLine("Staged Grounded Whisperwood Exchange at (35,250).");
+            report.AppendLine("Staged Whisperwood Exchange Small Town.");
         }
 
         // =========================================================================
-        // 3. SE CORNER MEGA-SITE — CINDERROAD IRONWORKS BASTION (262, -55)
+        // 3. SE CORNER SMALL TOWN — CINDERROAD IRONWORKS (262, -55)
         // =========================================================================
-        static void StageCinderroadIronworks(Transform parent, Terrain[] terrains, StringBuilder report)
+        static void StageCinderroadTown(Transform parent, Terrain[] terrains, StringBuilder report)
         {
             var root = new GameObject("Cinderroad Waystation");
             root.transform.SetParent(parent, false);
 
-            // Massive Stone Loading Quay + 14m Twin-Mast Gantry Crane at (262, -55)
-            float quayTop = BuildGroundedFoundation(root.transform, "Ironworks_QuayDeck", CinderroadCenter, 10.5f, 8.2f, 0.65f, "Limestone", terrains);
-            Vector3 craneBase = new Vector3(CinderroadCenter.x, quayTop, CinderroadCenter.z);
-            Part(root.transform, "FreightCrane_MastA", craneBase + new Vector3(-1.4f, 6.8f, 0f), new Vector3(0.80f, 13.8f, 0.80f), "Dark Wood", collider: true);
-            Part(root.transform, "FreightCrane_MastB", craneBase + new Vector3(1.4f, 6.8f, 0f), new Vector3(0.80f, 13.8f, 0.80f), "Dark Wood", collider: true);
-            Part(root.transform, "FreightCrane_Crossbeam", craneBase + new Vector3(0f, 12.2f, 0f), new Vector3(4.2f, 0.75f, 1.1f), "Black Iron", collider: false);
-            var boom = Part(root.transform, "FreightCrane_Boom", craneBase + new Vector3(2.8f, 12.8f, 1.2f), new Vector3(9.4f, 0.65f, 0.65f), "Black Iron", collider: false);
-            boom.transform.rotation = Quaternion.Euler(0f, -18f, 14f);
-            Part(root.transform, "FreightCrane_Counterweight", craneBase + new Vector3(-2.4f, 10.6f, -0.5f), new Vector3(1.8f, 1.8f, 1.8f), "Slate", collider: false);
-            Part(root.transform, "FreightCrane_Cable", craneBase + new Vector3(6.2f, 8.6f, 2.1f), new Vector3(0.14f, 8.8f, 0.14f), "Iron", collider: false);
-            Part(root.transform, "FreightCrane_QuarrySlab", craneBase + new Vector3(6.2f, 3.8f, 2.1f), new Vector3(2.2f, 1.6f, 2.2f), "Slate Edge", collider: false);
+            // Real FBX industrial frontier town
+            PlaceFbx(root.transform, "RustwaterSalvageYard/Rustwater_SalvageCrane.fbx", "FreightCrane_Boom", 262f, -55f, -18f, terrains, scale: 1.25f, footingSize: 5.5f);
+            PlaceFbx(root.transform, "RustwaterSalvageYard/Rustwater_SortingWorkshop.fbx", "Storehouse_Walls", 248f, -55f, 15f, terrains, footingSize: 7.5f);
+            PlaceFbx(root.transform, "GorKreshForgeCourt/GorKresh_KilnFurnace.fbx", "Smelter_Chimney", 246f, -64f, 0f, terrains, scale: 1.35f, footingSize: 5.2f);
+            PlaceFbx(root.transform, "GorKreshForgeCourt/GorKresh_AnvilStation.fbx", "Ironworks_Anvil", 254f, -61f, 30f, terrains, footingSize: 0f);
+            PlaceFbx(root.transform, "GorKreshForgeCourt/GorKresh_ForgeArch.fbx", "BastionGate_Lintel", 254f, -41.5f, 0f, terrains, scale: 1.25f, footingSize: 0f);
+            PlaceFbx(root.transform, "EmberwatchCivicSquare/Emberwatch_HearthInn.fbx", "Ironworks_Inn", 271f, -45f, -150f, terrains, footingSize: 7.5f);
+            PlaceFbx(root.transform, "EmberwatchCivicSquare/Emberwatch_MarketShelter.fbx", "Ironworks_Market", 264f, -64f, 180f, terrains, footingSize: 6.0f);
+            PlaceFbx(root.transform, "BloodrockLookout/Bloodrock_VistaLookout.fbx", "SignalBeacon_Tower", 276f, -63f, -45f, terrains, scale: 1.3f, footingSize: 5.0f);
+            PlaceFbx(root.transform, "VillageLandmarks/Emberwatch_SupplyWagon.fbx", "Ironworks_Wagon", 256f, -52f, 70f, terrains, footingSize: 0f);
+            PlaceFbx(root.transform, "RustwaterSalvageYard/Rustwater_SortedScrapBins.fbx", "Ironworks_Bins", 269f, -58f, 0f, terrains, footingSize: 0f);
 
-            // Grand Smelter Hall & 13m Foundry Chimney at (249, -54)
-            float smelterTop = BuildGroundedFoundation(root.transform, "Storehouse_Base", new Vector3(249f, 0f, -54f), 9.6f, 7.2f, 0.45f, "Limestone", terrains);
-            Vector3 sp = new Vector3(249f, smelterTop, -54f);
-            Part(root.transform, "Storehouse_Walls", sp + Vector3.up * 2.4f, new Vector3(8.8f, 4.8f, 6.4f), "Basalt", collider: true);
-            var sRoofA = Part(root.transform, "Storehouse_RoofNorth", sp + new Vector3(0f, 5.4f, 1.7f), new Vector3(9.8f, 0.30f, 4.4f), "Slate", collider: false);
-            sRoofA.transform.rotation = Quaternion.Euler(22f, 0f, 0f);
-            var sRoofB = Part(root.transform, "Storehouse_RoofSouth", sp + new Vector3(0f, 5.4f, -1.7f), new Vector3(9.8f, 0.30f, 4.4f), "Slate", collider: false);
-            sRoofB.transform.rotation = Quaternion.Euler(-22f, 0f, 0f);
-            // 13m Foundry Chimney + glowing furnace mouth
-            Part(root.transform, "Smelter_Chimney", sp + new Vector3(-3.2f, 6.6f, -1.8f), new Vector3(2.4f, 13.2f, 2.4f), "Black Iron", collider: true);
-            Part(root.transform, "Smelter_ChimneyGlow", sp + new Vector3(-3.2f, 13.4f, -1.8f), new Vector3(1.5f, 0.7f, 1.5f), "Ember Edge", collider: false);
-            Part(root.transform, "Smelter_FurnaceMouth", sp + new Vector3(0f, 1.2f, 3.25f), new Vector3(2.6f, 2.2f, 0.35f), "Amber", collider: false);
+            Vector3[] spur = { new(86, 0, -36), new(130, 0, -34), new(175, 0, -36), new(220, 0, -41), new(254, 0, -45) };
+            for (int i = 0; i < spur.Length; i++)
+                PlaceFbx(root.transform, "VillageLandmarks/Greenhollow_TrailLantern.fbx", $"EmberfordSpur_Lantern_{i}", spur[i].x, spur[i].z, 0f, terrains, footingSize: 0f, addColliders: false);
 
-            // Fortified Gatehouse & Stone Palisade flanking the Emberford approach
-            BuildGroundedFoundation(root.transform, "BastionGate_TowerL", new Vector3(250f, 0f, -42.5f), 2.8f, 2.8f, 5.6f, "Limestone", terrains);
-            BuildGroundedFoundation(root.transform, "BastionGate_TowerR", new Vector3(258f, 0f, -42.5f), 2.8f, 2.8f, 5.6f, "Limestone", terrains);
-            float gateH = Mathf.Max(PhysicsSurface(new Vector3(250f, 0f, -42.5f), terrains).y, PhysicsSurface(new Vector3(258f, 0f, -42.5f), terrains).y) + 5.2f;
-            Part(root.transform, "BastionGate_Lintel", new Vector3(254f, gateH, -42.5f), new Vector3(10.8f, 1.2f, 2.2f), "Dark Wood", collider: true);
-            Part(root.transform, "BastionGate_Banner", new Vector3(254f, gateH - 1.2f, -41.3f), new Vector3(2.2f, 2.4f, 0.14f), "Banner Red", collider: false);
+            AddTownNpc(root.transform, "Foreman Darek", "Cinderroad Ironworks", "Human", "Warrior", new Vector3(256.8f, 0f, -49.5f),
+                "Cinderroad Ironworks has grown into a full foundry town! Smelter, crane, tavern, and market—all feeding the Emberford spur.", terrains);
+            AddTownNpc(root.transform, "Blacksmith Torin", "Ironworks Smithy", "Dwarf", "Warrior", new Vector3(253.0f, 0f, -59.5f),
+                "Best tempered steel in the southeast! Pull up by the kiln if you need your blade checked.", terrains);
 
-            // 10m Uphill Signal Lighthouse Beacon at (274, -63)
-            float beaconBaseTop = BuildGroundedFoundation(root.transform, "SignalBeacon_Base", new Vector3(274f, 0f, -63f), 4.6f, 4.6f, 2.8f, "Pale Stone", terrains);
-            Vector3 bp = new Vector3(274f, beaconBaseTop, -63f);
-            Part(root.transform, "SignalBeacon_Tower", bp + Vector3.up * 3.4f, new Vector3(2.8f, 6.8f, 2.8f), "Black Iron", collider: true);
-            Part(root.transform, "SignalBeacon_Flame", bp + Vector3.up * 7.4f, new Vector3(1.9f, 1.5f, 1.9f), "Amber", collider: false);
-
-            // Emberford Contour Spur trail lanterns
-            Vector3[] spurLanterns =
-            {
-                new Vector3(86f, 0f, -36f),
-                new Vector3(130f, 0f, -34f),
-                new Vector3(175f, 0f, -36f),
-                new Vector3(220f, 0f, -41f),
-                new Vector3(254f, 0f, -46f)
-            };
-            for (int i = 0; i < spurLanterns.Length; i++)
-                AddTrailLantern(root.transform, $"EmberfordSpur_Lantern_{i}", spurLanterns[i], terrains);
-
-            AddTownNpc(root.transform, "Foreman Darek", "Cinderroad Ironworks", "Human", "Warrior",
-                new Vector3(256.8f, 0f, -49.5f),
-                "Welcome to Cinderroad Ironworks! Our smelter feeds the frontier, and the gantry hauls quarry stone straight onto the Emberford spur.",
-                terrains);
-
-            var pin = new GameObject("Cinderroad Waystation map pin").AddComponent<SettlementWaystop>();
-            pin.transform.SetParent(root.transform, false);
-            pin.transform.position = PhysicsSurface(new Vector3(258f, 0f, -48f), terrains);
-            pin.displayName = "Cinderroad Ironworks";
-            pin.notice = "Cinderroad Ironworks Bastion: Quarry freight crane, grand smelter hall, and uphill signal lighthouse guarding the southeast frontier.";
+            AddWaystop(root.transform, "Cinderroad Ironworks", new Vector3(258f, 0f, -48f),
+                "Cinderroad Ironworks — Southeast foundry town with smelter hall, freight crane, tavern, and market square.", terrains);
 
             AddCivilianWalker(root.transform, "Cinderroad Wagon Inspector", "Human", "Warrior", 1.35f, 2.2f, terrains, new[]
             {
-                new Vector3(258.5f, 0f, -45.5f),
-                new Vector3(265.0f, 0f, -46.0f),
-                new Vector3(265.5f, 0f, -49.0f),
-                new Vector3(259.0f, 0f, -48.5f)
+                new Vector3(258.5f, 0f, -45.5f), new Vector3(265.0f, 0f, -46.0f), new Vector3(265.5f, 0f, -49.0f), new Vector3(259.0f, 0f, -48.5f)
             });
             AddCivilianWalker(root.transform, "Cinderroad Approach Guard", "Human", "Warrior", 1.40f, 2.0f, terrains, new[]
             {
-                new Vector3(243.5f, 0f, -45.5f),
-                new Vector3(248.0f, 0f, -45.0f),
-                new Vector3(248.0f, 0f, -48.5f),
-                new Vector3(243.5f, 0f, -48.5f)
+                new Vector3(243.5f, 0f, -45.5f), new Vector3(248.0f, 0f, -45.0f), new Vector3(248.0f, 0f, -48.5f), new Vector3(243.5f, 0f, -48.5f)
             });
             AddCivilianWalker(root.transform, "Cinderroad Salvage Buyer", "Human", "Rogue", 1.35f, 2.4f, terrains, new[]
             {
-                new Vector3(269.0f, 0f, -50.5f),
-                new Vector3(274.5f, 0f, -51.5f),
-                new Vector3(274.0f, 0f, -55.5f),
-                new Vector3(268.5f, 0f, -54.5f)
+                new Vector3(269.0f, 0f, -50.5f), new Vector3(274.5f, 0f, -51.5f), new Vector3(274.0f, 0f, -55.5f), new Vector3(268.5f, 0f, -54.5f)
             });
 
-            report.AppendLine("Staged SE Mega-Site: Cinderroad Ironworks Bastion at (262,-55).");
+            report.AppendLine("Staged Cinderroad Ironworks Small Town.");
         }
 
         // =========================================================================
-        // 4. SW CORNER MEGA-SITE — THORNWATCH CITADEL (-275, -110)
+        // 4. SW CORNER SMALL TOWN — THORNWATCH CITADEL (-275, -110)
         // =========================================================================
-        static void StageThornwatchCitadel(Transform parent, Terrain[] terrains, StringBuilder report)
+        static void StageThornwatchTown(Transform parent, Terrain[] terrains, StringBuilder report)
         {
             var root = new GameObject("Thornwatch Citadel");
             root.transform.SetParent(parent, false);
 
-            // 15m Grand Lighthouse Watchtower at (-275, -110)
-            float keepBase = BuildGroundedFoundation(root.transform, "Thornwatch_KeepBase", ThornwatchCenter, 8.6f, 8.6f, 3.2f, "Limestone", terrains);
-            Vector3 tp = new Vector3(ThornwatchCenter.x, keepBase, ThornwatchCenter.z);
-            Part(root.transform, "Thornwatch_KeepShaft", tp + Vector3.up * 4.8f, new Vector3(5.6f, 9.6f, 5.6f), "Pale Stone", collider: true);
-            Part(root.transform, "Thornwatch_Battlement", tp + Vector3.up * 10.0f, new Vector3(6.8f, 1.4f, 6.8f), "Slate", collider: true);
-            Part(root.transform, "Thornwatch_LanternCage", tp + Vector3.up * 12.2f, new Vector3(3.4f, 3.2f, 3.4f), "Black Iron", collider: false);
-            Part(root.transform, "Thornwatch_BeaconFire", tp + Vector3.up * 12.2f, new Vector3(2.0f, 2.0f, 2.0f), "Amber", collider: false);
-            Part(root.transform, "Thornwatch_RoofCap", tp + Vector3.up * 14.3f, new Vector3(4.4f, 1.4f, 4.4f), "Banner Teal", collider: false);
+            // Real Highspire & Emberwatch FBX fortress town!
+            PlaceFbx(root.transform, "HighspireDistrict/Highspire_GuildHall.fbx", "Thornwatch_KeepShaft", -276f, -110f, 90f, terrains, footingSize: 8.5f);
+            PlaceFbx(root.transform, "HighspireDistrict/Highspire_Gatehouse.fbx", "Thornwatch_GateLintel", -262f, -103f, 90f, terrains, footingSize: 6.5f);
+            PlaceFbx(root.transform, "HighspireDistrict/Highspire_MarketLoggia.fbx", "Thornwatch_Market", -286f, -103f, 0f, terrains, footingSize: 7.0f);
+            PlaceFbx(root.transform, "HighspireDistrict/Highspire_Workshop.fbx", "Thornwatch_Smithy", -275f, -123f, 180f, terrains, footingSize: 6.8f);
+            PlaceFbx(root.transform, "EmberwatchCivicSquare/Emberwatch_HearthInn.fbx", "Thornwatch_Inn", -288f, -117f, 60f, terrains, footingSize: 7.5f);
+            PlaceFbx(root.transform, "HighspireDistrict/Highspire_Fountain.fbx", "Thornwatch_Fountain", -272f, -103f, 0f, terrains, footingSize: 3.2f);
+            PlaceFbx(root.transform, "Animals/Horse.fbx", "Thornwatch_HorseA", -267f, -121f, -35f, terrains, footingSize: 0f, addColliders: false);
+            PlaceFbx(root.transform, "Animals/Horse.fbx", "Thornwatch_HorseB", -265f, -120f, -20f, terrains, footingSize: 0f, addColliders: false);
 
-            // Garrison Barracks Hall at (-286, -104)
-            float barrackBase = BuildGroundedFoundation(root.transform, "Thornwatch_BarracksBase", new Vector3(-286f, 0f, -104f), 8.2f, 6.0f, 0.45f, "Limestone", terrains);
-            Vector3 bp = new Vector3(-286f, barrackBase, -104f);
-            Part(root.transform, "Thornwatch_BarracksWalls", bp + Vector3.up * 2.1f, new Vector3(7.6f, 4.2f, 5.4f), "Plaster", collider: true);
-            var bRoofA = Part(root.transform, "Thornwatch_BarracksRoofA", bp + new Vector3(0f, 4.7f, 1.4f), new Vector3(8.4f, 0.28f, 3.8f), "Banner Teal", collider: false);
-            bRoofA.transform.rotation = Quaternion.Euler(22f, 0f, 0f);
-            var bRoofB = Part(root.transform, "Thornwatch_BarracksRoofB", bp + new Vector3(0f, 4.7f, -1.4f), new Vector3(8.4f, 0.28f, 3.8f), "Banner Teal", collider: false);
-            bRoofB.transform.rotation = Quaternion.Euler(-22f, 0f, 0f);
+            PlaceFbx(root.transform, "VillageLandmarks/Greenhollow_TrailLantern.fbx", "TW_Lantern1", -235f, -84f, 0f, terrains, footingSize: 0f, addColliders: false);
+            PlaceFbx(root.transform, "VillageLandmarks/Greenhollow_TrailLantern.fbx", "TW_Lantern2", -250f, -94f, 0f, terrains, footingSize: 0f, addColliders: false);
 
-            // Great Stone Gatehouse facing NE toward Highspire (-264, -102)
-            BuildGroundedFoundation(root.transform, "Thornwatch_GateL", new Vector3(-264f, 0f, -99f), 2.8f, 2.8f, 6.0f, "Pale Stone", terrains);
-            BuildGroundedFoundation(root.transform, "Thornwatch_GateR", new Vector3(-264f, 0f, -107f), 2.8f, 2.8f, 6.0f, "Pale Stone", terrains);
-            float gY = Mathf.Max(PhysicsSurface(new Vector3(-264f, 0f, -99f), terrains).y, PhysicsSurface(new Vector3(-264f, 0f, -107f), terrains).y) + 5.6f;
-            Part(root.transform, "Thornwatch_GateLintel", new Vector3(-264f, gY, -103f), new Vector3(2.4f, 1.3f, 10.6f), "Dark Wood", collider: true);
-            Part(root.transform, "Thornwatch_Banner", new Vector3(-262.7f, gY - 1.3f, -103f), new Vector3(0.14f, 2.6f, 2.0f), "Banner Teal", collider: false);
+            AddTownNpc(root.transform, "Captain Vaelen", "Thornwatch Citadel", "Human", "Warrior", new Vector3(-269.5f, 0f, -103.5f),
+                "Thornwatch Citadel guards the southwest coast—guild hall, market loggia, smithy, and hearth inn all open to travelers.", terrains);
+            AddTownNpc(root.transform, "Quartermaster Sera", "Citadel Market", "Elf", "Rogue", new Vector3(-282.5f, 0f, -103.0f),
+                "Supplies arrive daily from Highspire Keep. Take a seat by the courtyard fountain.", terrains);
 
-            // Forge & Stables Pavilion at (-274, -122)
-            float stabBase = BuildGroundedFoundation(root.transform, "Thornwatch_StablesBase", new Vector3(-274f, 0f, -122f), 8.0f, 5.2f, 0.35f, "Limestone", terrains);
-            Vector3 stp = new Vector3(-274f, stabBase, -122f);
-            Part(root.transform, "Thornwatch_StablesRoof", stp + Vector3.up * 3.5f, new Vector3(8.4f, 0.32f, 5.6f), "Oak", collider: false);
-            Part(root.transform, "Thornwatch_StablesPostA", stp + new Vector3(-3.6f, 1.75f, -2.2f), new Vector3(0.4f, 3.5f, 0.4f), "Dark Wood", collider: true);
-            Part(root.transform, "Thornwatch_StablesPostB", stp + new Vector3(3.6f, 1.75f, -2.2f), new Vector3(0.4f, 3.5f, 0.4f), "Dark Wood", collider: true);
-            Part(root.transform, "Thornwatch_StablesPostC", stp + new Vector3(-3.6f, 1.75f, 2.2f), new Vector3(0.4f, 3.5f, 0.4f), "Dark Wood", collider: true);
-            Part(root.transform, "Thornwatch_StablesPostD", stp + new Vector3(3.6f, 1.75f, 2.2f), new Vector3(0.4f, 3.5f, 0.4f), "Dark Wood", collider: true);
-
-            // Approach lanterns linking Highspire road to Thornwatch Citadel
-            AddTrailLantern(root.transform, "Thornwatch_ApproachLantern1", new Vector3(-235f, 0f, -84f), terrains);
-            AddTrailLantern(root.transform, "Thornwatch_ApproachLantern2", new Vector3(-250f, 0f, -94f), terrains);
-            AddTrailLantern(root.transform, "Thornwatch_ApproachLantern3", new Vector3(-261f, 0f, -103f), terrains);
-
-            AddTownNpc(root.transform, "Captain Vaelen", "Thornwatch Citadel", "Human", "Warrior",
-                new Vector3(-269.5f, 0f, -103.5f),
-                "Thornwatch Citadel holds the southwest coast. Our lighthouse guides ships past the reef and watches every road below Highspire.",
-                terrains);
-
-            var pin = new GameObject("Thornwatch Citadel map pin").AddComponent<SettlementWaystop>();
-            pin.transform.SetParent(root.transform, false);
-            pin.transform.position = PhysicsSurface(new Vector3(-267.5f, 0f, -103.5f), terrains);
-            pin.displayName = "Thornwatch Citadel";
-            pin.notice = "Thornwatch Citadel — Southwest frontier lighthouse fortress, barracks courtyard, and garrison stables.";
+            AddWaystop(root.transform, "Thornwatch Citadel", new Vector3(-267.5f, 0f, -103.5f),
+                "Thornwatch Citadel — Southwest fortified garrison town with guild hall, market loggia, smithy, tavern, and courtyard fountain.", terrains);
 
             AddCivilianWalker(root.transform, "Thornwatch Sentry", "Human", "Warrior", 1.35f, 2.2f, terrains, new[]
             {
-                new Vector3(-271f, 0f, -97.5f),
-                new Vector3(-273.5f, 0f, -97.5f),
-                new Vector3(-276f, 0f, -97.5f),
-                new Vector3(-276f, 0f, -100.5f),
-                new Vector3(-273.5f, 0f, -100.5f),
-                new Vector3(-271f, 0f, -100.5f)
+                new Vector3(-271f, 0f, -97.5f), new Vector3(-273.5f, 0f, -97.5f), new Vector3(-276f, 0f, -97.5f),
+                new Vector3(-276f, 0f, -99.5f), new Vector3(-273.5f, 0f, -99.5f), new Vector3(-271f, 0f, -99.5f)
             });
             AddCivilianWalker(root.transform, "Thornwatch Quartermaster Runner", "Human", "Rogue", 1.45f, 2.0f, terrains, new[]
             {
-                new Vector3(-267.5f, 0f, -111.5f),
-                new Vector3(-267.5f, 0f, -114.5f),
-                new Vector3(-267.5f, 0f, -117.5f),
-                new Vector3(-270.0f, 0f, -117.5f),
-                new Vector3(-270.0f, 0f, -114.5f),
-                new Vector3(-270.0f, 0f, -111.5f)
+                new Vector3(-267.5f, 0f, -111.5f), new Vector3(-267.5f, 0f, -114.5f), new Vector3(-267.5f, 0f, -117.5f),
+                new Vector3(-269.5f, 0f, -117.5f), new Vector3(-269.5f, 0f, -114.5f), new Vector3(-269.5f, 0f, -111.5f)
             });
             AddCivilianWalker(root.transform, "Thornwatch Rampart Guard", "Human", "Warrior", 1.35f, 2.4f, terrains, new[]
             {
-                new Vector3(-260.5f, 0f, -98.5f),
-                new Vector3(-258.5f, 0f, -101.0f),
-                new Vector3(-258.5f, 0f, -104.0f),
-                new Vector3(-258.5f, 0f, -107.0f),
-                new Vector3(-260.5f, 0f, -106.5f),
-                new Vector3(-260.5f, 0f, -102.5f)
+                new Vector3(-254.0f, 0f, -101.0f), new Vector3(-252.5f, 0f, -101.0f), new Vector3(-252.5f, 0f, -103.0f),
+                new Vector3(-252.5f, 0f, -105.0f), new Vector3(-254.0f, 0f, -105.0f), new Vector3(-254.0f, 0f, -103.0f)
             });
 
-            report.AppendLine("Staged SW Mega-Site: Thornwatch Citadel at (-275,-110).");
+            report.AppendLine("Staged Thornwatch Citadel Small Town.");
         }
 
         // =========================================================================
-        // 5. FAR NE MOUNTAIN SANCTUARY — SKYREACH AERIE (355, 420)
+        // 5. FAR NE MOUNTAIN TOWN — SKYREACH AERIE (355, 420)
         // =========================================================================
-        static void StageSkyreachAerie(Transform parent, Terrain[] terrains, StringBuilder report)
+        static void StageSkyreachTown(Transform parent, Terrain[] terrains, StringBuilder report)
         {
             var root = new GameObject("Skyreach Aerie");
             root.transform.SetParent(parent, false);
 
-            // 16m Pale-Stone & Steel Windspire Observatory
-            float obsBase = BuildGroundedFoundation(root.transform, "Skyreach_ObservatoryBase", SkyreachCenter, 9.2f, 9.2f, 2.8f, "Pale Stone", terrains);
-            Vector3 sp = new Vector3(SkyreachCenter.x, obsBase, SkyreachCenter.z);
-            Part(root.transform, "Skyreach_WindspireShaft", sp + Vector3.up * 5.5f, new Vector3(5.2f, 11.0f, 5.2f), "Pale Stone", collider: true);
-            Part(root.transform, "Skyreach_SteelRing", sp + Vector3.up * 11.2f, new Vector3(7.2f, 1.4f, 7.2f), "Steel", collider: true);
-            Part(root.transform, "Skyreach_SkyBeacon", sp + Vector3.up * 13.6f, new Vector3(2.4f, 2.8f, 2.4f), "Amber", collider: false);
-            Part(root.transform, "Skyreach_Crown", sp + Vector3.up * 15.8f, new Vector3(4.2f, 1.4f, 4.2f), "Banner Teal", collider: false);
+            PlaceFbx(root.transform, "BloodrockLookout/Bloodrock_VistaLookout.fbx", "Skyreach_WindspireShaft", 355f, 420f, -140f, terrains, scale: 1.55f, footingSize: 6.0f);
+            PlaceFbx(root.transform, "SilverglenArrivalCourt/Silverglen_ReadingPavilion.fbx", "Skyreach_Pavilion", 365f, 418f, -45f, terrains, footingSize: 6.0f);
+            PlaceFbx(root.transform, "FrostpeakTrailStation/Frostpeak_WindbreakShelter.fbx", "Skyreach_Lodge", 346f, 423f, 60f, terrains, footingSize: 5.5f);
+            PlaceFbx(root.transform, "FrostpeakTrailStation/Frostpeak_PassForge.fbx", "Skyreach_Forge", 356f, 408f, 180f, terrains, footingSize: 4.5f);
+            PlaceFbx(root.transform, "SilverglenArrivalCourt/Silverglen_TrailBeacon.fbx", "Skyreach_Beacon1", 347f, 411f, 0f, terrains, footingSize: 0f, addColliders: false);
+            PlaceFbx(root.transform, "SilverglenArrivalCourt/Silverglen_TrailBeacon.fbx", "Skyreach_Beacon2", 362f, 410f, 0f, terrains, footingSize: 0f, addColliders: false);
 
-            // Grand Stone Sky-Archway framing the southwest cliff approach
-            BuildGroundedFoundation(root.transform, "Skyreach_ArchL", new Vector3(345f, 0f, 412f), 2.6f, 2.6f, 6.2f, "Pale Stone", terrains);
-            BuildGroundedFoundation(root.transform, "Skyreach_ArchR", new Vector3(351f, 0f, 408f), 2.6f, 2.6f, 6.2f, "Pale Stone", terrains);
-            float archY = Mathf.Max(PhysicsSurface(new Vector3(345f, 0f, 412f), terrains).y, PhysicsSurface(new Vector3(351f, 0f, 408f), terrains).y) + 5.8f;
-            var archTop = Part(root.transform, "Skyreach_ArchLintel", new Vector3(348f, archY, 410f), new Vector3(9.4f, 1.2f, 2.2f), "Steel", collider: true);
-            archTop.transform.rotation = Quaternion.Euler(0f, 34f, 0f);
+            AddTownNpc(root.transform, "Storm-Watcher Lyra", "Skyreach Aerie", "Elf", "Mage", new Vector3(352f, 0f, 413f),
+                "Skyreach Aerie shelters travelers climbing the Wyrmcrest ridge. Rest by our pavilion and pass-forge.", terrains);
+            AddTownNpc(root.transform, "Scout Kael", "Ridge Watch", "Human", "Rogue", new Vector3(361f, 0f, 414f),
+                "Clear skies over the Redridge basin today. Watch the drake peaks to the north!", terrains);
 
-            // Sheltered Storm-Watcher Lodge
-            float lodgeTop = BuildGroundedFoundation(root.transform, "Skyreach_LodgeBase", new Vector3(366f, 0f, 416f), 7.6f, 5.8f, 0.45f, "Limestone", terrains);
-            Vector3 lp = new Vector3(366f, lodgeTop, 416f);
-            Part(root.transform, "Skyreach_LodgeWalls", lp + Vector3.up * 2.0f, new Vector3(7.0f, 4.0f, 5.2f), "Plaster", collider: true);
-            var lrA = Part(root.transform, "Skyreach_LodgeRoofA", lp + new Vector3(0f, 4.5f, 1.4f), new Vector3(7.8f, 0.28f, 3.6f), "Slate", collider: false);
-            lrA.transform.rotation = Quaternion.Euler(22f, 0f, 0f);
-            var lrB = Part(root.transform, "Skyreach_LodgeRoofB", lp + new Vector3(0f, 4.5f, -1.4f), new Vector3(7.8f, 0.28f, 3.6f), "Slate", collider: false);
-            lrB.transform.rotation = Quaternion.Euler(-22f, 0f, 0f);
-
-            AddTownNpc(root.transform, "Storm-Watcher Lyra", "Skyreach Aerie", "Elf", "Mage",
-                new Vector3(352f, 0f, 413f),
-                "From Skyreach Aerie you can watch the drakes circle Wyrmcrest Summit and the smoke rise from Breaker Works. Safe footing on the ridge, traveler.",
-                terrains);
-
-            var pin = new GameObject("Skyreach Aerie map pin").AddComponent<SettlementWaystop>();
-            pin.transform.SetParent(root.transform, false);
-            pin.transform.position = PhysicsSurface(new Vector3(350f, 0f, 412f), terrains);
-            pin.displayName = "Skyreach Aerie";
-            pin.notice = "Skyreach Aerie — Northeast mountain observatory overlooking Wyrmcrest Crags and the Redridge basin.";
+            AddWaystop(root.transform, "Skyreach Aerie", new Vector3(350f, 0f, 412f),
+                "Skyreach Aerie — Northeast mountain sanctuary with observatory lookout, reading pavilion, and alpine pass-forge.", terrains);
 
             AddCivilianWalker(root.transform, "Skyreach Wind-Scout", "Elf", "Rogue", 1.40f, 2.2f, terrains, new[]
             {
-                new Vector3(358f, 0f, 411f),
-                new Vector3(360.5f, 0f, 411f),
-                new Vector3(360.5f, 0f, 414f),
-                new Vector3(358f, 0f, 414f)
+                new Vector3(358f, 0f, 411f), new Vector3(360.5f, 0f, 411f), new Vector3(360.5f, 0f, 414f), new Vector3(358f, 0f, 414f)
             });
 
-            report.AppendLine("Staged NE Mountain Sanctuary: Skyreach Aerie at (355,420).");
+            report.AppendLine("Staged Skyreach Aerie Mountain Town.");
         }
 
         // =========================================================================
-        // 6. SOUTH-CENTRAL RUINS — SUNSTONE ABBEY ARCHITECTURE (115, -115)
+        // 6. SOUTH-CENTRAL RUINS — SUNSTONE ABBEY (115, -115)
         // =========================================================================
         static void StageSunstoneAbbeyRuins(Transform parent, Terrain[] terrains, StringBuilder report)
         {
             var root = new GameObject("Sunstone Abbey Ruins");
             root.transform.SetParent(parent, false);
 
-            // Ruined Cathedral Nave Colonnade flanking (115, -110) — leaves wide open combat aisle inside!
-            for (int i = 0; i < 4; i++)
-            {
-                float z = -100f - i * 7.5f;
-                float hL = (i == 1) ? 4.2f : 6.4f;
-                float hR = (i == 2) ? 3.8f : 6.4f;
-                BuildGroundedFoundation(root.transform, $"Abbey_PillarL_{i}", new Vector3(106.5f, 0f, z), 2.0f, 2.0f, hL, "Pale Stone", terrains);
-                BuildGroundedFoundation(root.transform, $"Abbey_PillarR_{i}", new Vector3(123.5f, 0f, z), 2.0f, 2.0f, hR, "Pale Stone", terrains);
-            }
+            PlaceFbx(root.transform, "DeathknellCloister/Deathknell_WatchArch.fbx", "Abbey_EntryArch", 115f, -95f, 0f, terrains, scale: 1.4f, footingSize: 0f);
+            PlaceFbx(root.transform, "DeathknellCloister/Deathknell_BrokenArcade.fbx", "Abbey_ArcadeL1", 104f, -104f, 90f, terrains, scale: 1.25f, footingSize: 0f);
+            PlaceFbx(root.transform, "DeathknellCloister/Deathknell_BrokenArcade.fbx", "Abbey_ArcadeR1", 126f, -104f, -90f, terrains, scale: 1.25f, footingSize: 0f);
+            PlaceFbx(root.transform, "DeathknellCloister/Deathknell_BrokenArcade.fbx", "Abbey_ArcadeL2", 104f, -118f, 90f, terrains, scale: 1.25f, footingSize: 0f);
+            PlaceFbx(root.transform, "DeathknellCloister/Deathknell_BrokenArcade.fbx", "Abbey_ArcadeR2", 126f, -118f, -90f, terrains, scale: 1.25f, footingSize: 0f);
+            PlaceFbx(root.transform, "DeathknellCloister/Deathknell_Cenotaph.fbx", "Abbey_HighAltar", 115f, -134f, 0f, terrains, scale: 1.4f, footingSize: 4.5f);
+            PlaceFbx(root.transform, "DeathknellCloister/Deathknell_CloisterLantern.fbx", "Abbey_Lantern1", 109f, -94f, 0f, terrains, footingSize: 0f, addColliders: false);
+            PlaceFbx(root.transform, "DeathknellCloister/Deathknell_CloisterLantern.fbx", "Abbey_Lantern2", 121f, -94f, 0f, terrains, footingSize: 0f, addColliders: false);
 
-            // Grand Ruined Entry Archway at (115, -96)
-            BuildGroundedFoundation(root.transform, "Abbey_EntryTowerL", new Vector3(109.5f, 0f, -96f), 2.8f, 2.8f, 7.6f, "Limestone", terrains);
-            BuildGroundedFoundation(root.transform, "Abbey_EntryTowerR", new Vector3(120.5f, 0f, -96f), 2.8f, 2.8f, 7.6f, "Limestone", terrains);
-            float eY = Mathf.Max(PhysicsSurface(new Vector3(109.5f, 0f, -96f), terrains).y, PhysicsSurface(new Vector3(120.5f, 0f, -96f), terrains).y) + 7.2f;
-            Part(root.transform, "Abbey_EntryLintel", new Vector3(115f, eY, -96f), new Vector3(13.6f, 1.4f, 2.4f), "Slate", collider: true);
-            Part(root.transform, "Abbey_RoseCrest", new Vector3(115f, eY + 1.4f, -96f), new Vector3(3.2f, 2.2f, 0.8f), "Violet", collider: false);
-
-            // Broken High Altar Apse Wall behind Arch-Inquisitor Malrik (115, -135)
-            BuildGroundedFoundation(root.transform, "Abbey_ApseWall", new Vector3(115f, 0f, -135f), 16.5f, 2.4f, 8.2f, "Pale Stone", terrains);
-            BuildGroundedFoundation(root.transform, "Abbey_BellTowerRuins", new Vector3(104.5f, 0f, -133f), 4.6f, 4.6f, 12.5f, "Limestone", terrains);
-
-            report.AppendLine("Staged South-Central Ruins: Sunstone Abbey at (115,-115).");
+            report.AppendLine("Staged FBX Sunstone Abbey Ruins.");
         }
 
         // =========================================================================
-        // 7. FAR EAST OUTLAW QUARRY ARCHITECTURE — IRONMAW QUARRY (385, 90)
+        // 7. FAR EAST OUTLAW QUARRY — IRONMAW QUARRY (385, 90)
         // =========================================================================
         static void StageIronmawQuarry(Transform parent, Terrain[] terrains, StringBuilder report)
         {
             var root = new GameObject("Ironmaw Quarry Architecture");
             root.transform.SetParent(parent, false);
 
-            // Tall timber & black-iron mine headframe behind Ironjaw Krag's pit
-            float hfBase = BuildGroundedFoundation(root.transform, "Ironmaw_HeadframeBase", new Vector3(398f, 0f, 90f), 7.2f, 7.2f, 1.2f, "Basalt", terrains);
-            Vector3 hp = new Vector3(398f, hfBase, 90f);
-            Part(root.transform, "Ironmaw_MastA", hp + new Vector3(-2.4f, 6.2f, -2.4f), new Vector3(0.65f, 12.4f, 0.65f), "Dark Wood", collider: true);
-            Part(root.transform, "Ironmaw_MastB", hp + new Vector3(-2.4f, 6.2f, 2.4f), new Vector3(0.65f, 12.4f, 0.65f), "Dark Wood", collider: true);
-            Part(root.transform, "Ironmaw_MastC", hp + new Vector3(2.4f, 6.2f, -2.4f), new Vector3(0.65f, 12.4f, 0.65f), "Dark Wood", collider: true);
-            Part(root.transform, "Ironmaw_MastD", hp + new Vector3(2.4f, 6.2f, 2.4f), new Vector3(0.65f, 12.4f, 0.65f), "Dark Wood", collider: true);
-            Part(root.transform, "Ironmaw_HoistCrown", hp + Vector3.up * 12.2f, new Vector3(6.4f, 1.2f, 6.4f), "Black Iron", collider: false);
-            Part(root.transform, "Ironmaw_SmelterGlow", hp + new Vector3(-3.2f, 1.6f, 0f), new Vector3(1.6f, 1.8f, 2.6f), "Amber", collider: false);
+            PlaceFbx(root.transform, "RustwaterSalvageYard/Rustwater_SalvageCrane.fbx", "Ironmaw_Crane", 398f, 90f, -90f, terrains, scale: 1.3f, footingSize: 5.5f);
+            PlaceFbx(root.transform, "RustwaterSalvageYard/Rustwater_SortingDrum.fbx", "Ironmaw_Drum", 394f, 100f, 30f, terrains, footingSize: 4.5f);
+            PlaceFbx(root.transform, "GorKreshForgeCourt/GorKresh_QuartermasterShed.fbx", "Ironmaw_Shed", 395f, 80f, -45f, terrains, footingSize: 5.0f);
+            PlaceFbx(root.transform, "BloodrockLookout/Bloodrock_VistaLookout.fbx", "Ironmaw_WatchN", 371f, 103f, -135f, terrains, footingSize: 4.5f);
+            PlaceFbx(root.transform, "BloodrockLookout/Bloodrock_VistaLookout.fbx", "Ironmaw_WatchS", 371f, 77f, -45f, terrains, footingSize: 4.5f);
 
-            // Palisade watchtowers framing the western pit entrance
-            BuildGroundedFoundation(root.transform, "Ironmaw_WatchtowerN", new Vector3(372f, 0f, 102f), 3.6f, 3.6f, 6.8f, "Dark Wood", terrains);
-            BuildGroundedFoundation(root.transform, "Ironmaw_WatchtowerS", new Vector3(372f, 0f, 78f), 3.6f, 3.6f, 6.8f, "Dark Wood", terrains);
-
-            report.AppendLine("Staged Far-East Ironmaw Quarry headframe & watchtowers at (385,90).");
+            report.AppendLine("Staged FBX Ironmaw Quarry.");
         }
 
         // =========================================================================
-        // 8. FAR NORTHWEST TIMBER MILL — FROSTPINE WATCH (-270, 520)
+        // 8. FAR NW TIMBER TOWN — FROSTPINE WATCH (-270, 520)
         // =========================================================================
-        static void StageFrostpineWatch(Transform parent, Terrain[] terrains, StringBuilder report)
+        static void StageFrostpineTown(Transform parent, Terrain[] terrains, StringBuilder report)
         {
             var root = new GameObject("Frostpine Watch");
             root.transform.SetParent(parent, false);
 
-            float towerTop = BuildGroundedFoundation(root.transform, "Frostpine_TowerBase", new Vector3(-270f, 0f, 520f), 6.2f, 6.2f, 2.4f, "Limestone", terrains);
-            Vector3 tp = new Vector3(-270f, towerTop, 520f);
-            Part(root.transform, "Frostpine_TowerShaft", tp + Vector3.up * 4.5f, new Vector3(4.2f, 9.0f, 4.2f), "Dark Wood", collider: true);
-            Part(root.transform, "Frostpine_Beacon", tp + Vector3.up * 9.8f, new Vector3(1.8f, 1.6f, 1.8f), "Amber", collider: false);
+            PlaceFbx(root.transform, "BloodrockLookout/Bloodrock_VistaLookout.fbx", "Frostpine_Tower", -272f, 522f, 120f, terrains, scale: 1.3f, footingSize: 5.0f);
+            PlaceFbx(root.transform, "EmberwatchCivicSquare/Emberwatch_HearthInn.fbx", "Frostpine_Inn", -256f, 520f, -90f, terrains, footingSize: 7.5f);
+            PlaceFbx(root.transform, "FrostpeakTrailStation/Frostpeak_PassForge.fbx", "Frostpine_Forge", -268f, 509f, 20f, terrains, footingSize: 4.5f);
+            PlaceFbx(root.transform, "VillageLandmarks/Emberwatch_LoadingShed.fbx", "Frostpine_MillShed", -257f, 508f, 160f, terrains, footingSize: 5.2f);
+            PlaceFbx(root.transform, "VillageLandmarks/Emberwatch_SupplyWagon.fbx", "Frostpine_Wagon", -263f, 519f, 45f, terrains, footingSize: 0f);
 
-            float millTop = BuildGroundedFoundation(root.transform, "Frostpine_SawmillBase", new Vector3(-258f, 0f, 516f), 8.2f, 5.6f, 0.45f, "Limestone", terrains);
-            Vector3 mp = new Vector3(-258f, millTop, 516f);
-            Part(root.transform, "Frostpine_SawmillWalls", mp + Vector3.up * 1.9f, new Vector3(7.4f, 3.8f, 5.0f), "Oak", collider: true);
-            Part(root.transform, "Frostpine_SawmillRoof", mp + Vector3.up * 4.1f, new Vector3(8.4f, 0.45f, 6.2f), "Slate", collider: false);
+            AddTownNpc(root.transform, "Forester Orin", "Frostpine Watch", "Human", "Warrior", new Vector3(-264f, 0f, 515f),
+                "Frostpine Watch is the northernmost timber village in Riftbound. Warm up at the hearth inn before heading south to Pinewatch.", terrains);
+            AddTownNpc(root.transform, "Sawyer Hale", "Timber Mill", "Human", "Rogue", new Vector3(-261f, 0f, 511f),
+                "Fresh cedar beams stacked and ready for the wagons!", terrains);
 
-            AddTownNpc(root.transform, "Forester Orin", "Frostpine Watch", "Human", "Warrior",
-                new Vector3(-264f, 0f, 515f),
-                "Frostpine Watch cuts the northern cedar that keeps Pinewatch and Greenhollow supplied. Stay warm near the mill fire.",
-                terrains);
-
-            var pin = new GameObject("Frostpine Watch map pin").AddComponent<SettlementWaystop>();
-            pin.transform.SetParent(root.transform, false);
-            pin.transform.position = PhysicsSurface(new Vector3(-263f, 0f, 517f), terrains);
-            pin.displayName = "Frostpine Watch";
-            pin.notice = "Frostpine Watch — Far-northwest timber mill and northern signal tower.";
+            AddWaystop(root.transform, "Frostpine Watch", new Vector3(-263f, 0f, 517f),
+                "Frostpine Watch — Far-northwest timber village with hearth inn, lookout tower, sawmill, and pass-forge.", terrains);
 
             AddCivilianWalker(root.transform, "Frostpine Sawyer", "Human", "Warrior", 1.35f, 2.2f, terrains, new[]
             {
-                new Vector3(-262f, 0f, 511f),
-                new Vector3(-258f, 0f, 511f),
-                new Vector3(-258f, 0f, 512.5f),
-                new Vector3(-262f, 0f, 512.5f)
+                new Vector3(-264f, 0f, 512.5f), new Vector3(-260f, 0f, 512.5f), new Vector3(-260f, 0f, 514.0f), new Vector3(-264f, 0f, 514.0f)
             });
 
-            report.AppendLine("Staged Far-NW Frostpine Watch at (-270,520).");
+            report.AppendLine("Staged Frostpine Watch Timber Village.");
         }
 
         // =========================================================================
-        // 9. FAR SOUTHEAST COAST — REDTIDE HARBOR & LIGHTHOUSE (365, -110)
+        // 9. FAR SE COASTAL TOWN — REDTIDE HARBOR (365, -110)
         // =========================================================================
-        static void StageRedtideHarbor(Transform parent, Terrain[] terrains, StringBuilder report)
+        static void StageRedtideHarborTown(Transform parent, Terrain[] terrains, StringBuilder report)
         {
             var root = new GameObject("Redtide Harbor");
             root.transform.SetParent(parent, false);
 
-            // 17m Striped Stone & Red-Iron Lighthouse
-            float lhBase = BuildGroundedFoundation(root.transform, "Redtide_LighthouseBase", new Vector3(365f, 0f, -110f), 7.6f, 7.6f, 3.0f, "Pale Stone", terrains);
-            Vector3 lp = new Vector3(365f, lhBase, -110f);
-            Part(root.transform, "Redtide_TowerLow", lp + Vector3.up * 3.0f, new Vector3(4.8f, 6.0f, 4.8f), "Pale Stone", collider: true);
-            Part(root.transform, "Redtide_TowerMid", lp + Vector3.up * 8.0f, new Vector3(4.2f, 4.2f, 4.2f), "Red Iron", collider: true);
-            Part(root.transform, "Redtide_TowerTop", lp + Vector3.up * 11.6f, new Vector3(3.8f, 3.2f, 3.8f), "Pale Stone", collider: true);
-            Part(root.transform, "Redtide_LanternGlow", lp + Vector3.up * 14.4f, new Vector3(2.4f, 2.4f, 2.4f), "Amber", collider: false);
-            Part(root.transform, "Redtide_Cap", lp + Vector3.up * 16.4f, new Vector3(4.0f, 1.4f, 4.0f), "Black Iron", collider: false);
+            PlaceFbx(root.transform, "HighspireDistrict/Highspire_Gatehouse.fbx", "Redtide_HarborGate", 365f, -110f, 0f, terrains, scale: 1.25f, footingSize: 6.5f);
+            PlaceFbx(root.transform, "EmberwatchCivicSquare/Emberwatch_HearthInn.fbx", "Redtide_Tavern", 351f, -104f, 70f, terrains, footingSize: 7.5f);
+            PlaceFbx(root.transform, "EmberwatchCivicSquare/Emberwatch_MarketShelter.fbx", "Redtide_FishMarket", 362f, -97f, 180f, terrains, footingSize: 6.2f);
+            PlaceFbx(root.transform, "WestbankFerryLanding/Westbank_CargoHoist.fbx", "Redtide_Hoist", 372f, -104f, -45f, terrains, footingSize: 4.0f);
+            PlaceFbx(root.transform, "WestbankFerryLanding/Westbank_LandingDock.fbx", "Redtide_Dock", 374f, -114f, -90f, terrains, footingSize: 5.5f);
+            PlaceFbx(root.transform, "WestbankFerryLanding/Westbank_WillowSkiff.fbx", "Redtide_Skiff", 377f, -117f, 20f, terrains, footingSize: 0f, addColliders: false);
 
-            // Timber Dockyard Warehouse
-            float whTop = BuildGroundedFoundation(root.transform, "Redtide_WarehouseBase", new Vector3(352f, 0f, -104f), 9.0f, 6.2f, 0.55f, "Limestone", terrains);
-            Vector3 wp = new Vector3(352f, whTop, -104f);
-            Part(root.transform, "Redtide_WarehouseWalls", wp + Vector3.up * 2.1f, new Vector3(8.2f, 4.2f, 5.4f), "Dark Wood", collider: true);
-            Part(root.transform, "Redtide_WarehouseRoof", wp + Vector3.up * 4.5f, new Vector3(9.2f, 0.45f, 6.4f), "Slate", collider: false);
+            AddTownNpc(root.transform, "Harbormaster Vance", "Redtide Harbor", "Human", "Rogue", new Vector3(358f, 0f, -105f),
+                "Redtide Harbor is the southeast port town! Tavern, fish market, cargo hoist, and coastal piers.", terrains);
+            AddTownNpc(root.transform, "Merchant Cora", "Harbor Market", "Human", "Mage", new Vector3(361f, 0f, -100f),
+                "Spices and iron ingots straight off the coastal skiffs!", terrains);
 
-            AddTownNpc(root.transform, "Harbormaster Vance", "Redtide Harbor", "Human", "Rogue",
-                new Vector3(358f, 0f, -105f),
-                "Redtide Harbor ships Cinderroad iron and timber down the southern coast. Keep an eye on the lighthouse beam at dusk.",
-                terrains);
-
-            var pin = new GameObject("Redtide Harbor map pin").AddComponent<SettlementWaystop>();
-            pin.transform.SetParent(root.transform, false);
-            pin.transform.position = PhysicsSurface(new Vector3(359f, 0f, -107f), terrains);
-            pin.displayName = "Redtide Harbor";
-            pin.notice = "Redtide Harbor — Far-southeast lighthouse port and coastal freight warehouse.";
+            AddWaystop(root.transform, "Redtide Harbor", new Vector3(359f, 0f, -107f),
+                "Redtide Harbor — Far-southeast port town with harbor gatehouse, tavern, market shelter, cargo hoist, and docks.", terrains);
 
             AddCivilianWalker(root.transform, "Redtide Dockhand", "Human", "Warrior", 1.35f, 2.2f, terrains, new[]
             {
-                new Vector3(356f, 0f, -99f),
-                new Vector3(361f, 0f, -99f),
-                new Vector3(361f, 0f, -101.5f),
-                new Vector3(356f, 0f, -101.5f)
+                new Vector3(356f, 0f, -101.5f), new Vector3(360f, 0f, -101.5f), new Vector3(360f, 0f, -103.0f), new Vector3(356f, 0f, -103.0f)
             });
 
-            report.AppendLine("Staged Far-SE Redtide Harbor at (365,-110).");
+            report.AppendLine("Staged Redtide Harbor Port Town.");
         }
 
         // =========================================================================
-        // 10. WESTERN RIVERLANDS — WILLOWMERE MILL & FERRY HAMLET (-270, 125)
+        // 10. WESTERN RIVERLANDS HAMLET — WILLOWMERE MILL (-270, 125)
         // =========================================================================
-        static void StageWillowmereMill(Transform parent, Terrain[] terrains, StringBuilder report)
+        static void StageWillowmereHamlet(Transform parent, Terrain[] terrains, StringBuilder report)
         {
             var root = new GameObject("Willowmere Mill");
             root.transform.SetParent(parent, false);
 
-            float millTop = BuildGroundedFoundation(root.transform, "Willowmere_MillBase", new Vector3(-270f, 0f, 125f), 8.2f, 6.4f, 0.55f, "Limestone", terrains);
-            Vector3 mp = new Vector3(-270f, millTop, 125f);
-            Part(root.transform, "Willowmere_MillHouse", mp + Vector3.up * 2.4f, new Vector3(7.4f, 4.8f, 5.6f), "Plaster", collider: true);
-            Part(root.transform, "Willowmere_MillRoof", mp + Vector3.up * 5.2f, new Vector3(8.4f, 0.50f, 6.6f), "Oak", collider: false);
-            Part(root.transform, "Willowmere_WaterWheel", mp + new Vector3(-4.1f, 1.8f, 0f), new Vector3(0.65f, 4.2f, 4.2f), "Dark Wood", collider: false);
+            PlaceFbx(root.transform, "EmberwatchCivicSquare/Emberwatch_HearthInn.fbx", "Willowmere_MillHouse", -270f, 125f, 90f, terrains, footingSize: 7.5f);
+            PlaceFbx(root.transform, "VillageLandmarks/Emberwatch_LoadingShed.fbx", "Willowmere_Granary", -257f, 129f, -60f, terrains, footingSize: 5.2f);
+            PlaceFbx(root.transform, "EmberwatchCivicSquare/Emberwatch_MarketWell.fbx", "Willowmere_Well", -263f, 125f, 0f, terrains, footingSize: 2.8f);
+            PlaceFbx(root.transform, "VillageLandmarks/Emberwatch_HerbBeds.fbx", "Willowmere_Garden", -265f, 131f, 0f, terrains, footingSize: 0f, addColliders: false);
+            PlaceFbx(root.transform, "WestbankFerryLanding/Westbank_LandingDock.fbx", "Willowmere_Pier", -278f, 120f, 180f, terrains, footingSize: 5.0f);
+            PlaceFbx(root.transform, "Animals/Cow.fbx", "Willowmere_Cow", -256f, 122f, -30f, terrains, footingSize: 0f, addColliders: false);
+            PlaceFbx(root.transform, "Animals/Sheep.fbx", "Willowmere_Sheep", -254f, 124f, 40f, terrains, footingSize: 0f, addColliders: false);
 
-            float barnTop = BuildGroundedFoundation(root.transform, "Willowmere_BarnBase", new Vector3(-258f, 0f, 128f), 6.8f, 5.2f, 0.40f, "Limestone", terrains);
-            Vector3 bp = new Vector3(-258f, barnTop, 128f);
-            Part(root.transform, "Willowmere_BarnWalls", bp + Vector3.up * 1.9f, new Vector3(6.2f, 3.8f, 4.6f), "Oak", collider: true);
-            Part(root.transform, "Willowmere_BarnRoof", bp + Vector3.up * 4.1f, new Vector3(7.0f, 0.42f, 5.4f), "Slate", collider: false);
+            AddTownNpc(root.transform, "Miller Bram", "Willowmere Mill", "Human", "Warrior", new Vector3(-264f, 0f, 123f),
+                "Welcome to Willowmere Hamlet! Fresh grain, garden herbs, and a quiet riverside inn between Silverglen and Deathknell.", terrains);
+            AddTownNpc(root.transform, "Baker Liora", "Willowmere Hearth", "Human", "Mage", new Vector3(-266f, 0f, 127f),
+                "Just pulled warm loaves from the hearth oven, traveler.", terrains);
 
-            AddTownNpc(root.transform, "Miller Bram", "Willowmere Mill", "Human", "Warrior",
-                new Vector3(-264f, 0f, 123f),
-                "We grind grain for Silverglen and the western ferry road. The wheel turns day and night as long as the river stays clear.",
-                terrains);
-
-            var pin = new GameObject("Willowmere Mill map pin").AddComponent<SettlementWaystop>();
-            pin.transform.SetParent(root.transform, false);
-            pin.transform.position = PhysicsSurface(new Vector3(-263f, 0f, 125f), terrains);
-            pin.displayName = "Willowmere Mill";
-            pin.notice = "Willowmere Mill — Riverside grain mill and ferry hamlet between Silverglen and Deathknell.";
+            AddWaystop(root.transform, "Willowmere Mill", new Vector3(-263f, 0f, 125f),
+                "Willowmere Mill — Cozy riverside farming hamlet with hearth inn, granary, herb gardens, livestock, and ferry pier.", terrains);
 
             AddCivilianWalker(root.transform, "Willowmere Ferryhand", "Human", "Rogue", 1.35f, 2.2f, terrains, new[]
             {
-                new Vector3(-264f, 0f, 118.5f),
-                new Vector3(-259f, 0f, 118.5f),
-                new Vector3(-259f, 0f, 121.0f),
-                new Vector3(-264f, 0f, 121.0f)
+                new Vector3(-264f, 0f, 118.5f), new Vector3(-259f, 0f, 118.5f), new Vector3(-259f, 0f, 120.5f), new Vector3(-264f, 0f, 120.5f)
             });
 
-            report.AppendLine("Staged Western Riverlands Willowmere Mill at (-270,125).");
+            report.AppendLine("Staged Willowmere Mill Hamlet.");
         }
 
         // =========================================================================
-        // SHARED ZERO-FLOATING GROUNDING HELPERS
+        // SHARED FBX PLACEMENT & ZERO-FLOATING GROUNDING HELPERS
         // =========================================================================
+        static GameObject PlaceFbx(Transform parent, string relativeFbxPath, string name, float x, float z, float yaw,
+            Terrain[] terrains, float scale = 1f, float footingSize = 4.5f, bool addColliders = true)
+        {
+            var asset = AssetDatabase.LoadAssetAtPath<GameObject>(ArtRoot + relativeFbxPath);
+            if (!asset)
+                throw new InvalidOperationException("Missing FBX asset: " + ArtRoot + relativeFbxPath);
+
+            Vector3 pos = PhysicsSurface(new Vector3(x, 0f, z), terrains);
+            float baseY = pos.y;
+            if (footingSize > 0.5f)
+            {
+                baseY = BuildGroundedFoundation(parent, name + "_Footing", new Vector3(x, 0f, z), footingSize, footingSize, 0.04f, "Limestone", terrains);
+            }
+
+            var wrapper = new GameObject(name);
+            wrapper.transform.SetParent(parent, false);
+            wrapper.transform.SetPositionAndRotation(new Vector3(x, baseY, z), Quaternion.Euler(0f, yaw, 0f));
+            wrapper.transform.localScale = Vector3.one * scale;
+
+            var inst = (GameObject)PrefabUtility.InstantiatePrefab(asset, wrapper.transform);
+            if (inst)
+            {
+                inst.transform.localPosition = Vector3.zero;
+                inst.transform.localRotation = Quaternion.identity;
+                inst.transform.localScale = Vector3.one;
+            }
+
+            foreach (var mf in wrapper.GetComponentsInChildren<MeshFilter>(true))
+            {
+                var r = mf.GetComponent<MeshRenderer>();
+                if (r && r.sharedMaterials != null)
+                {
+                    var mats = r.sharedMaterials;
+                    var mapped = new Material[mats.Length];
+                    for (int i = 0; i < mats.Length; i++)
+                        mapped[i] = ResolveProjectMaterial(mats[i]);
+                    r.sharedMaterials = mapped;
+                }
+                if (addColliders && mf.sharedMesh && !mf.GetComponent<Collider>())
+                {
+                    var mc = mf.gameObject.AddComponent<MeshCollider>();
+                    mc.sharedMesh = mf.sharedMesh;
+                }
+            }
+            return wrapper;
+        }
+
+        static Material ResolveProjectMaterial(Material existing)
+        {
+            if (existing && existing.shader && existing.shader.name != "Hidden/InternalErrorShader")
+            {
+                var named = AssetDatabase.LoadAssetAtPath<Material>(Materials + existing.name.Replace(' ', '_') + ".mat");
+                if (named) return named;
+                return existing;
+            }
+            return LoadMaterial("Limestone");
+        }
+
         static float BuildGroundedFoundation(Transform parent, string name, Vector3 centerXZ, float width, float depth, float heightAboveMaxGround, string materialName, Terrain[] terrains)
         {
             float hw = width * 0.5f;
@@ -700,17 +472,24 @@ namespace Riftbound.Editor
             };
             float minY = samples.Min(s => s.y) - 2.2f;
             float topY = samples.Max(s => s.y) + heightAboveMaxGround;
-            float totalH = Mathf.Max(0.5f, topY - minY);
-            Part(parent, name, new Vector3(centerXZ.x, minY + totalH * 0.5f, centerXZ.z),
-                new Vector3(width, totalH, depth), materialName, collider: true);
+            float totalH = Mathf.Max(0.4f, topY - minY);
+            var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            go.name = name;
+            go.transform.SetParent(parent, false);
+            go.transform.position = new Vector3(centerXZ.x, minY + totalH * 0.5f, centerXZ.z);
+            go.transform.localScale = new Vector3(width, totalH, depth);
+            var mat = LoadMaterial(materialName);
+            if (mat) go.GetComponent<MeshRenderer>().sharedMaterial = mat;
             return topY;
         }
 
-        static void AddTrailLantern(Transform parent, string name, Vector3 xzPos, Terrain[] terrains)
+        static void AddWaystop(Transform parent, string displayName, Vector3 xzPos, string noticeText, Terrain[] terrains)
         {
-            Vector3 g = PhysicsSurface(xzPos, terrains);
-            Part(parent, name + "_Post", g + Vector3.up * 0.85f, new Vector3(0.24f, 3.1f, 0.24f), "Dark Wood", collider: false);
-            Part(parent, name + "_Lamp", g + Vector3.up * 2.55f, new Vector3(0.40f, 0.44f, 0.40f), "Amber", collider: false);
+            var pin = new GameObject(displayName + " map pin").AddComponent<SettlementWaystop>();
+            pin.transform.SetParent(parent, false);
+            pin.transform.position = PhysicsSurface(xzPos, terrains);
+            pin.displayName = displayName;
+            pin.notice = noticeText;
         }
 
         static void AddTownNpc(Transform parent, string npcName, string roleTag, string race, string cls, Vector3 xzPos, string greeting, Terrain[] terrains)
@@ -720,13 +499,9 @@ namespace Riftbound.Editor
             actor.transform.position = PhysicsSurface(xzPos, terrains);
             CharacterVisualFactory.CreateVisualInstance(race, cls, actor.transform);
             var body = actor.AddComponent<CapsuleCollider>();
-            body.height = 1.88f;
-            body.radius = 0.36f;
-            body.center = Vector3.up * 0.94f;
+            body.height = 1.88f; body.radius = 0.36f; body.center = Vector3.up * 0.94f;
             var npc = actor.AddComponent<TownNPC>();
-            npc.npcName = npcName;
-            npc.roleTag = roleTag;
-            npc.greeting = greeting;
+            npc.npcName = npcName; npc.roleTag = roleTag; npc.greeting = greeting;
         }
 
         static void AddCivilianWalker(Transform parent, string name, string race, string cls, float walkSpeed, float stopSeconds, Terrain[] terrains, Vector3[] rawPoints)
@@ -765,23 +540,6 @@ namespace Riftbound.Editor
             walker.RebuildRoute();
         }
 
-        static GameObject Part(Transform parent, string name, Vector3 pos, Vector3 scale, string materialName, bool collider)
-        {
-            var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            go.name = name;
-            go.transform.SetParent(parent, false);
-            go.transform.position = pos;
-            go.transform.localScale = scale;
-            if (!collider)
-            {
-                var c = go.GetComponent<Collider>();
-                if (c) Object.DestroyImmediate(c);
-            }
-            var mat = LoadMaterial(materialName);
-            if (mat) go.GetComponent<MeshRenderer>().sharedMaterial = mat;
-            return go;
-        }
-
         static Material LoadMaterial(string name)
         {
             var mat = AssetDatabase.LoadAssetAtPath<Material>(Materials + name.Replace(' ', '_') + ".mat");
@@ -789,10 +547,6 @@ namespace Riftbound.Editor
             return mat;
         }
 
-        /// <summary>
-        /// Raycasts active TerrainColliders first so overlapping legacy/expanded terrain tiles
-        /// never place buildings or NPCs in the air.
-        /// </summary>
         public static Vector3 PhysicsSurface(Vector3 point, Terrain[] terrains)
         {
             var hits = Physics.RaycastAll(new Vector3(point.x, 260f, point.z), Vector3.down, 420f);
@@ -800,11 +554,7 @@ namespace Riftbound.Editor
             bool found = false;
             foreach (var h in hits)
             {
-                if (h.collider is TerrainCollider && h.point.y > best)
-                {
-                    best = h.point.y;
-                    found = true;
-                }
+                if (h.collider is TerrainCollider && h.point.y > best) { best = h.point.y; found = true; }
             }
             point.y = found ? best : WorldRegions.GroundHeight(point, terrains);
             return point;

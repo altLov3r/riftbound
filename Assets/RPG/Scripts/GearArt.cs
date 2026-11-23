@@ -7,12 +7,22 @@ namespace Riftbound
     {
         static readonly Dictionary<string, Texture2D> Icons = new();
 
+        internal static string ResolveArtId(string id) => id switch
+        {
+            "pinewatch-warden-crest" => "emberwatch-sigil",
+            "ursolak-spirit-pelt" => "ember-drake-scale",
+            "sunstone-reliquary-staff" => "scarlet-blade",
+            "ironmaw-cleaver" => "bloodrock-waraxe",
+            _ => id
+        };
+
         internal static Texture2D Icon(GearItem item)
         {
             if (item == null) return null;
             if (!Icons.TryGetValue(item.id, out var icon))
             {
-                icon = Resources.Load<Texture2D>("Gear/Icons/" + item.id);
+                icon = Resources.Load<Texture2D>("Gear/Icons/" + item.id)
+                    ?? Resources.Load<Texture2D>("Gear/Icons/" + ResolveArtId(item.id));
                 Icons.Add(item.id, icon);
             }
             return icon;
@@ -41,7 +51,8 @@ namespace Riftbound
                 model = null;
                 if (id != null)
                 {
-                    var prefab = Resources.Load<GameObject>("Gear/Weapons/" + id);
+                    var prefab = Resources.Load<GameObject>("Gear/Weapons/" + id)
+                        ?? Resources.Load<GameObject>("Gear/Weapons/" + GearArt.ResolveArtId(id));
                     if (prefab) Prepare(prefab);
                 }
             }
