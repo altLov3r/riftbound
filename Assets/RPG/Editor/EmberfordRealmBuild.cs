@@ -24,6 +24,7 @@ namespace Riftbound.Editor
         {
             if (!buildingRealm || report == null || scene.path != WorldRegions.ScenePath) return;
             VillageRemodelPreviewBuild.StageRemodels(scene);
+            PinewatchPreviewBuild.StagePinewatch(scene);
         }
 
         [MenuItem("Riftbound/Emberford/Ensure Realm Prefabs")]

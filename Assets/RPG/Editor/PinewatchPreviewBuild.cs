@@ -74,6 +74,11 @@ namespace Riftbound.Editor
             Debug.Log("Pinewatch preview staged: " + notes);
         }
 
+        public static GameObject StagePinewatch(Scene scene, StringBuilder report = null)
+        {
+            return Stage(scene, report ?? new StringBuilder(), out _, out _);
+        }
+
         static GameObject Stage(Scene scene, StringBuilder report, out Vector3 deck, out Vector3 rampFoot)
         {
             var terrains = scene.GetRootGameObjects().SelectMany(root => root.GetComponentsInChildren<Terrain>()).ToArray();
@@ -96,6 +101,8 @@ namespace Riftbound.Editor
             notice.displayName = "Pinewatch Relay";
             notice.notice = "Pinewatch Relay. The wind snapped the east signal line. Halen is fitting a replacement at the shelter.";
             AddWatchkeeper(root.transform, terrains);
+            AddEnvironmentalClues(root.transform, terrains, deck);
+            AddCivilianWalkers(root.transform, terrains);
             return root;
         }
 
@@ -202,6 +209,101 @@ namespace Riftbound.Editor
             npc.npcName = "Watchkeeper Halen";
             npc.roleTag = "Pinewatch Relay";
             npc.greeting = "The east line snapped in the night. Greenhollow's waiting for our signal. You can see their ridge from the overlook.";
+        }
+
+        static void AddEnvironmentalClues(Transform parent, Terrain[] terrains, Vector3 deck)
+        {
+            var cluesRoot = new GameObject("Pinewatch Clues");
+            cluesRoot.transform.SetParent(parent);
+
+            AddClueMarker(cluesRoot.transform, "Clue_SnappedHaulLine",
+                Surface(new Vector3(-228.5f, 0, 396.5f), terrains),
+                new Vector3(0.45f, 0.22f, 0.85f), "Dark Wood",
+                "Snapped Haul-Line",
+                "A frayed cedar haul-line and snapped iron pulley clip lie coiled beneath the hoist arm.");
+
+            AddClueMarker(cluesRoot.transform, "Clue_RepairBenchTally",
+                Surface(new Vector3(-219.2f, 0, 401.2f), terrains),
+                new Vector3(0.55f, 0.30f, 0.40f), "Oak",
+                "Courier Tally Slate",
+                "Six cedar bundles logged for Whisperwood Exchange. The morning runner left late before the squall.");
+
+            AddClueMarker(cluesRoot.transform, "Clue_GreenhollowSightline",
+                deck + new Vector3(1.2f, 0.08f, 0.9f),
+                new Vector3(0.38f, 0.34f, 0.38f), "Limestone",
+                "East Ridge Sightline",
+                "Greenhollow's watchfires are visible across the timber valley when the relay lantern is raised.");
+        }
+
+        static void AddClueMarker(Transform parent, string name, Vector3 pos, Vector3 size, string material, string displayName, string noticeText)
+        {
+            var marker = Solid(parent, name, pos + Vector3.up * (size.y * 0.5f), size, material);
+            var col = marker.GetComponent<Collider>();
+            if (col) Object.DestroyImmediate(col);
+            var stop = marker.AddComponent<SettlementWaystop>();
+            stop.displayName = displayName;
+            stop.notice = noticeText;
+        }
+
+        static void AddCivilianWalkers(Transform parent, Terrain[] terrains)
+        {
+            var walkersRoot = new GameObject("Pinewatch Civilians");
+            walkersRoot.transform.SetParent(parent);
+
+            // 1. Relay Messenger (~23m loop along the shelter front, strictly west of the X=-212..-210 mounted bypass)
+            AddCivilianWalker(walkersRoot.transform, "Pinewatch Relay Messenger", "Human", "Rogue", 1.45f, 2.0f, terrains, new[]
+            {
+                new Vector3(-216.2f, 0, 405.5f),
+                new Vector3(-217.5f, 0, 401.2f),
+                new Vector3(-217.6f, 0, 396.0f),
+                new Vector3(-216.2f, 0, 392.4f),
+                new Vector3(-215.6f, 0, 398.8f)
+            });
+
+            // 2. Ridge Woodworker (~19m loop along the north timber yard clearing, clear of shelter, overlook ramp & mounted bypass)
+            AddCivilianWalker(walkersRoot.transform, "Pinewatch Ridge Woodworker", "Human", "Warrior", 1.30f, 2.4f, terrains, new[]
+            {
+                new Vector3(-219.5f, 0, 405.5f),
+                new Vector3(-224.8f, 0, 405.8f),
+                new Vector3(-226.0f, 0, 409.5f),
+                new Vector3(-220.2f, 0, 409.2f)
+            });
+        }
+
+        static void AddCivilianWalker(Transform parent, string name, string race, string className, float walkSpeed, float stopSeconds, Terrain[] terrains, Vector3[] rawPoints)
+        {
+            var routeRoot = new GameObject(name + " Route");
+            routeRoot.transform.SetParent(parent);
+
+            var wps = new Transform[rawPoints.Length];
+            for (int i = 0; i < rawPoints.Length; i++)
+            {
+                var wp = new GameObject($"WP_{i}");
+                wp.transform.SetParent(routeRoot.transform);
+                wp.transform.position = Surface(rawPoints[i], terrains);
+                wps[i] = wp.transform;
+            }
+
+            var actor = new GameObject(name);
+            actor.transform.SetParent(parent);
+            actor.transform.position = wps[0].position;
+            CharacterVisualFactory.CreateVisualInstance(race, className, actor.transform);
+
+            var walker = actor.AddComponent<CivilianRouteWalker>();
+            var so = new SerializedObject(walker);
+            var wpProp = so.FindProperty("waypoints");
+            wpProp.arraySize = wps.Length;
+            for (int i = 0; i < wps.Length; i++)
+                wpProp.GetArrayElementAtIndex(i).objectReferenceValue = wps[i];
+            so.FindProperty("closedLoop").boolValue = true;
+            so.FindProperty("walkSpeed").floatValue = walkSpeed;
+            so.FindProperty("stopSeconds").floatValue = stopSeconds;
+            so.FindProperty("walkState").stringValue = "Walk";
+            so.FindProperty("idleState").stringValue = "Idle";
+            var anim = actor.GetComponentInChildren<Animator>();
+            if (anim) so.FindProperty("animator").objectReferenceValue = anim;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            walker.RebuildRoute();
         }
 
         static GameObject Solid(Transform parent, string name, Vector3 position, Vector3 size, string material)
