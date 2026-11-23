@@ -160,6 +160,8 @@ namespace Riftbound.Network
                 servicesGo.AddComponent<WorldBossEncounter>();
             }
 
+            RealmPersistenceService.Initialize(RealmConfig.ResolveServerDataDirectory());
+
             ExplorationSites.Ensure();
             RiverReaverCamp.Ensure();
             PinewatchWoodsZone.Ensure();
