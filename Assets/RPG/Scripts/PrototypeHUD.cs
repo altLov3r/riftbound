@@ -28,8 +28,10 @@ namespace Riftbound
         void Start()
         {
             // Region discovery has a top-screen ZoneBanner; legacy 3D floating captions duplicate it.
-            foreach (var text in FindObjectsByType<TextMesh>(FindObjectsSortMode.None))
+            foreach (var text in FindObjectsByType<TextMesh>(FindObjectsInactive.Include, FindObjectsSortMode.None))
             {
+                if (WorldSignText.Show(text)) continue;
+                if (!text.gameObject.activeInHierarchy) continue;
                 if (text.GetComponentInParent<TownNPC>() || text.GetComponentInParent<Merchant>() || text.GetComponentInParent<QuestGiver>() || text.GetComponent<FloatingCombatNumber>())
                     continue;
                 var renderer = text.GetComponent<MeshRenderer>(); if (renderer) renderer.enabled = false;
