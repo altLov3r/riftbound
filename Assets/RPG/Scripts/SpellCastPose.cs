@@ -1,4 +1,5 @@
 using UnityEngine;
+using Riftbound.Network;
 
 namespace Riftbound
 {
@@ -43,6 +44,7 @@ namespace Riftbound
 
         PlayerController player;
         CastBarSystem cast;
+        RiftboundCoopPlayer serverCaster;
         Animator boundAnimator;
         Arm left, right;
         bool holy, applied;
@@ -53,11 +55,25 @@ namespace Riftbound
             Restore();
             player = caster;
             cast = bar;
+            serverCaster = null;
             holy = healing;
             releasedAt = float.NegativeInfinity;
         }
 
         internal void Release() => releasedAt = Time.time;
+
+        internal void BeginServer(PlayerController caster, RiftboundCoopPlayer owner, bool healing)
+        {
+            Begin(caster, null, healing);
+            serverCaster = owner;
+        }
+
+        internal void CancelServer()
+        {
+            serverCaster = null;
+            releasedAt = float.NegativeInfinity;
+            Restore();
+        }
 
         void Update() => Restore();
         void OnDisable() => Restore();
@@ -72,7 +88,8 @@ namespace Riftbound
 
         void LateUpdate()
         {
-            bool casting = cast && cast.IsCombatCasting;
+            bool online = serverCaster && serverCaster.IsSpawned && serverCaster.HasActiveClientCast;
+            bool casting = online || (cast && cast.IsOfflineCombatCasting);
             const float blendOut = .22f;
             float elapsedAfterRelease = Time.time - releasedAt;
             if ((!casting && elapsedAfterRelease >= blendOut) || !player || !player.animator || !player.animator.isHuman) return;
@@ -84,7 +101,9 @@ namespace Riftbound
             }
             var chest = boundAnimator.GetBoneTransform(HumanBodyBones.Chest);
             if (!chest) return;
-            float progress = casting ? Mathf.Clamp01((Time.time - cast.CastStartTime) / cast.CastDuration) : 1f;
+            float progress = online
+                ? Mathf.Clamp01(CastBarSystem.ServerCastElapsed(serverCaster) / serverCaster.ActiveClientCastDuration)
+                : casting ? Mathf.Clamp01((Time.time - cast.CastStartTime) / cast.CastDuration) : 1f;
             float weight = casting ? Mathf.SmoothStep(0f, .95f, progress / .22f) :
                 Mathf.SmoothStep(.95f, 0f, elapsedAfterRelease / blendOut);
             float release = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(.65f, 1f, progress));

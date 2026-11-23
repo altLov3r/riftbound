@@ -90,7 +90,8 @@ namespace Riftbound
             string hovered = DrawNavigationPins(center, origin, floor, yaw, pixelsPerMeter);
             Vector2 playerPoint = center + Project(position - origin, yaw) * pixelsPerMeter;
             string tracking = DrawNavigationTarget(center, playerPoint, position, origin, floor, yaw, pixelsPerMeter);
-            DrawNavigationArrow(playerPoint, player.transform.eulerAngles.y - yaw, 20, PlayerColor);
+            Dot(playerPoint, 12, Shadow);
+            Dot(playerPoint, 8, Paper);
             if (showCompass)
             {
                 DrawCardinal(center, NavigationRadius, "N", -yaw);

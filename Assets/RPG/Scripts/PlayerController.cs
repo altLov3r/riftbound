@@ -399,10 +399,12 @@ namespace Riftbound
             bool diagonalBackpedal = isBackpedaling && (strafeLeft || strafeRight);
             float speed = Mounted && SelectedMount ? (running ? SelectedMount.runSpeed : SelectedMount.walkSpeed) : running ? runSpeed : walkSpeed;
             if (CharacterRace == "Human") speed *= 1.10f;
-            if (Time.time < sprintUntil) speed *= 1.65f;
+            var owner = Network.RiftboundCoopPlayer.LocalOwner;
+            bool sprinting = Network.CoopSessionConfig.IsMultiplayer ? owner && owner.IsSprinting.Value : Time.time < sprintUntil;
+            if (sprinting) speed *= 1.65f;
             speed *= WorldShrineSystem.GetSpeedMultiplier();
             if (!Mounted && HasMilestone("fleetfoot")) speed *= 1.08f;
-            UpdateMotionTrail(Time.time < sprintUntil || Time.time < dodgeEnds || Mounted);
+            UpdateMotionTrail(sprinting || Time.time < dodgeEnds || Mounted);
             if (isBackpedaling && !Mounted) speed *= (diagonalBackpedal ? 0.78f : backwardMultiplier);
 
             if (isFlyingMount)
@@ -791,6 +793,12 @@ namespace Riftbound
                 }
                 if (!CanSeeCombatTarget(Target)) { Message = "Something blocks your line of sight."; return; }
                 var victim = Target;
+                if (Network.CoopSessionConfig.IsMultiplayer)
+                {
+                    FaceSpellTarget(victim);
+                    Network.RiftboundCoopPlayer.LocalOwner?.RequestStartCast("fireball", victim);
+                    return;
+                }
                 float castSeconds = ClassSystem.GetAbilityCastSeconds(CharacterClass, 1);
                 if (castSeconds <= 0f) LaunchFireball(victim);
                 else
@@ -844,12 +852,7 @@ namespace Riftbound
             FaceSpellTarget(victim);
             attackReady = Time.time + 1.25f;
             busyUntil = Time.time + 0.6f;
-            if (Network.CoopSessionConfig.IsMultiplayer)
-            {
-                Play("Attack", true);
-                Network.RiftboundCoopPlayer.LocalOwner?.TriggerActionAnim("Cast", 0.60f);
-            }
-            else GetComponent<SpellCastPose>()?.Release();
+            GetComponent<SpellCastPose>()?.Release();
             AudioEffects.PlaySpellCast();
             float damage = (36 + (Level - 1) * 4 + WeaponBonus) * MilestoneDamageMultiplier;
             if (CharacterRace == "Brute") damage *= 1.15f;
@@ -958,12 +961,14 @@ namespace Riftbound
             if (CharacterClass == "Mage")
             {
                 if (ClassResource < 20) { Message = "Not enough Mana!"; return; }
+                var owner = Network.RiftboundCoopPlayer.LocalOwner;
+                bool online = Network.CoopSessionConfig.IsMultiplayer;
+                if (online && !owner) return;
                 ClassResource -= 20;
                 HealReady = Time.time + 10f;
+                if (online) owner.RequestMovementAbility("arcane_ward");
                 motor.Move(transform.forward * 7.5f);
-                Stats.Heal(40);
-                if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner != null)
-                    Network.RiftboundCoopPlayer.LocalOwner.RequestAbilityHeal(40, "arcane_ward");
+                if (!online) Stats.Heal(40);
                 AudioEffects.PlaySpellCast();
                 SpellFX.CreateArcaneBurst(transform.position);
                 Message = "Blink & Arcane Ward: Teleported & shielded 40 HP!";
@@ -971,9 +976,13 @@ namespace Riftbound
             else if (CharacterClass == "Rogue")
             {
                 if (ClassResource < 20) { Message = "Not enough Energy!"; return; }
+                var owner = Network.RiftboundCoopPlayer.LocalOwner;
+                bool online = Network.CoopSessionConfig.IsMultiplayer;
+                if (online && !owner) return;
                 ClassResource -= 20;
                 HealReady = Time.time + 10f;
-                sprintUntil = Time.time + 5f;
+                if (online) owner.RequestSprint();
+                else sprintUntil = Time.time + 5f;
                 attackReady = Time.time;
                 AudioEffects.PlaySpellCast();
                 Message = "Sprint: +65% speed for 5 seconds!";
@@ -982,6 +991,11 @@ namespace Riftbound
             {
                 if (Stats && Stats.Health >= Stats.maxHealth) { Message = "Health is already full."; return; }
                 if (ClassResource < 3) { Message = "Requires 3 Holy Power!"; return; }
+                if (Network.CoopSessionConfig.IsMultiplayer)
+                {
+                    Network.RiftboundCoopPlayer.LocalOwner?.RequestStartCast("holy_light");
+                    return;
+                }
                 float castSeconds = ClassSystem.GetAbilityCastSeconds(CharacterClass, 3);
                 if (castSeconds <= 0f) ReleaseHolyLight();
                 else
@@ -1006,12 +1020,30 @@ namespace Riftbound
             ClassResource -= 3;
             HealReady = Time.time + 12f;
             Stats.Heal(60);
-            if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner != null)
-                Network.RiftboundCoopPlayer.LocalOwner.RequestAbilityHeal(60, "holy_light");
-            else GetComponent<SpellCastPose>()?.Release();
+            GetComponent<SpellCastPose>()?.Release();
             AudioEffects.PlaySpellCast();
             SpellFX.CreateConsecration(transform.position, 2f);
             Message = "Holy Light: restored 60 health.";
+        }
+
+        internal void PresentServerSpellRelease(string abilityId)
+        {
+            if (abilityId == "fireball")
+            {
+                ClassResource = Mathf.Max(0f, ClassResource - 15f);
+                attackReady = Time.time + 1.1f;
+                busyUntil = Time.time + .35f;
+                SpellFX.CreateArcaneBurst(transform.position + transform.forward * .65f);
+                Message = "Fireball launched!";
+            }
+            else if (abilityId == "holy_light")
+            {
+                ClassResource = Mathf.Max(0f, ClassResource - 3f);
+                HealReady = Time.time + 8f;
+                SpellFX.CreateConsecration(transform.position, 2f);
+                Message = "Holy Light released.";
+            }
+            AudioEffects.PlaySpellCast();
         }
 
         IEnumerator Attack(bool cleave, float duration = -1f, float damage = 24f, string message = "")

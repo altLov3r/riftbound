@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using Riftbound.Network;
+using Unity.Netcode;
 
 namespace Riftbound
 {
@@ -39,7 +41,25 @@ namespace Riftbound
         Vector3 startPosition;
         PlayerController player;
         Func<bool> canContinueCombatCast;
-        internal bool IsCombatCasting => IsCasting && canContinueCombatCast != null;
+        internal bool IsOfflineCombatCasting => IsCasting && canContinueCombatCast != null;
+        internal bool IsCombatCasting => IsOfflineCombatCasting || ServerCaster != null;
+
+        static RiftboundCoopPlayer ServerCaster
+        {
+            get
+            {
+                var owner = RiftboundCoopPlayer.LocalOwner;
+                return owner && owner.IsSpawned && owner.HasActiveClientCast ? owner : null;
+            }
+        }
+
+        internal static float ServerCastElapsed(RiftboundCoopPlayer caster)
+        {
+            var network = NetworkManager.Singleton;
+            return network && network.IsListening
+                ? Mathf.Clamp((float)(network.ServerTime.Time - caster.ActiveClientCastServerStartTime), 0f, caster.ActiveClientCastDuration)
+                : Mathf.Clamp(Time.time - caster.ActiveClientCastStartTime, 0f, caster.ActiveClientCastDuration);
+        }
         GUIStyle textStyle, timerStyle, targetCastStyle, interruptedStyle;
         Texture2D bgTex, fillTex, borderTex, interruptFillTex, interruptBorderTex, shieldFillTex, shieldBorderTex;
 
@@ -52,6 +72,38 @@ namespace Riftbound
             }
             Instance = this;
             player = GetComponent<PlayerController>();
+            RiftboundCoopPlayer.OnServerCastEvent += OnServerCastEvent;
+        }
+
+        void OnDestroy()
+        {
+            if (Instance != this) return;
+            RiftboundCoopPlayer.OnServerCastEvent -= OnServerCastEvent;
+            Instance = null;
+        }
+
+        void OnServerCastEvent(ServerCastEvent castEvent)
+        {
+            if (!castEvent.IsLocalOwner || castEvent.Caster != RiftboundCoopPlayer.LocalOwner) return;
+            if (!player) player = GetComponent<PlayerController>() ?? FindFirstObjectByType<PlayerController>();
+            if (!player) return;
+
+            var pose = player.GetComponent<SpellCastPose>();
+            switch (castEvent.Phase)
+            {
+                case ServerCastPhase.Started:
+                    if (!pose) pose = player.gameObject.AddComponent<SpellCastPose>();
+                    pose.BeginServer(player, castEvent.Caster, castEvent.AbilityId == "holy_light");
+                    break;
+                case ServerCastPhase.Canceled:
+                    if (pose) pose.CancelServer();
+                    player.Message = "Cast interrupted.";
+                    break;
+                case ServerCastPhase.Released:
+                    if (pose) pose.Release();
+                    player.PresentServerSpellRelease(castEvent.AbilityId);
+                    break;
+            }
         }
 
         public static void StartCast(string spellName, float duration, Action onComplete, bool interruptOnMove = true, bool interruptOnDamage = true)
@@ -257,16 +309,21 @@ namespace Riftbound
             if (!player) player = GetComponent<PlayerController>() ?? FindFirstObjectByType<PlayerController>();
 
             // --- 1. Player Cast Bar (Centered above Action Bar) ---
-            if (IsCasting)
+            var serverCaster = ServerCaster;
+            if (serverCaster || IsCasting)
             {
                 float barW = 260f;
                 float barH = 22f;
                 float cx = screenW / 2f - barW / 2f;
                 float cy = screenH - 145f;
 
-                float elapsed = Time.time - CastStartTime;
-                float progress = Mathf.Clamp01(elapsed / CastDuration);
-                float remaining = Mathf.Max(0f, CastDuration - elapsed);
+                float duration = serverCaster ? serverCaster.ActiveClientCastDuration : CastDuration;
+                float elapsed = serverCaster ? ServerCastElapsed(serverCaster) : Time.time - CastStartTime;
+                float progress = Mathf.Clamp01(elapsed / Mathf.Max(.01f, duration));
+                float remaining = Mathf.Max(0f, duration - elapsed);
+                string spell = serverCaster
+                    ? (serverCaster.ActiveClientCastAbilityId == "holy_light" ? "Holy Light" : "Fireball")
+                    : SpellName;
 
                 // Dark border & backing
                 GUI.DrawTexture(new Rect(cx - 2f, cy - 2f, barW + 4f, barH + 4f), borderTex);
@@ -285,7 +342,7 @@ namespace Riftbound
                 }
 
                 // Spell Name Label on the left
-                GUI.Label(new Rect(cx + 8f, cy - 1f, barW - 60f, barH), SpellName, textStyle);
+                GUI.Label(new Rect(cx + 8f, cy - 1f, barW - 60f, barH), spell, textStyle);
 
                 // Remaining seconds on the right
                 GUI.Label(new Rect(cx + barW - 55f, cy - 1f, 50f, barH), $"{remaining:F1}s", timerStyle);
