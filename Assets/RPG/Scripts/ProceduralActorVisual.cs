@@ -14,6 +14,12 @@ namespace Riftbound
         [SerializeField] Transform stagedDisplay;
 
         Transform display, pelvis;
+        Transform rightHandBone, leftHandBone;
+        Transform rightWeaponSocket, leftWeaponSocket;
+        GameObject rightWeaponInstance, leftWeaponInstance;
+        string equippedWeaponId = "";
+        string equippedOffhandId = "";
+        bool weaponVisible = true;
         Animator displayAnimator;
         Joint[] joints;
         Wrist[] wrists;
@@ -75,6 +81,10 @@ namespace Riftbound
 
         public Animator Driver => source;
         public Transform StagedDisplay => stagedDisplay;
+        public string EquippedWeaponId => equippedWeaponId;
+        public Transform RightWeaponSocket => rightWeaponSocket;
+        public GameObject RightWeaponInstance => rightWeaponInstance;
+        public bool UsingUnarmedVariant { get; private set; }
 
 #if UNITY_EDITOR
         public void StageDisplay(Transform preview)
@@ -102,10 +112,44 @@ namespace Riftbound
             var parent = source ? source.transform : transform;
             originals = FindOriginalMeshes(parent);
             var oldBones = source ? source.GetComponentsInChildren<Transform>(true) : Array.Empty<Transform>();
-            var instance = stagedDisplay ? stagedDisplay.gameObject : Instantiate(model, parent, false);
-            instance.name = "Emberford Body";
-            display = instance.transform;
-            if (!stagedDisplay) SetDisplayTransform(display, parent);
+
+            string baseModelName = CleanModelName(model.name);
+            var unarmedPrefab = Resources.Load<GameObject>("Actors/Unarmed/" + baseModelName + "_Unarmed");
+
+            GameObject instance;
+            if (unarmedPrefab != null)
+            {
+                UsingUnarmedVariant = true;
+                instance = Instantiate(unarmedPrefab, parent, false);
+                instance.name = "Emberford Body";
+                display = instance.transform;
+                if (stagedDisplay)
+                {
+                    display.localPosition = stagedDisplay.localPosition;
+                    display.localRotation = stagedDisplay.localRotation;
+                    display.localScale = stagedDisplay.localScale;
+                    foreach (var child in display.GetComponentsInChildren<Transform>(true))
+                        child.gameObject.layer = stagedDisplay.gameObject.layer;
+                    var oldStaged = stagedDisplay.gameObject;
+                    stagedDisplay = display;
+                    oldStaged.SetActive(false);
+                    if (Application.isPlaying) Destroy(oldStaged);
+                    else DestroyImmediate(oldStaged);
+                }
+                else
+                {
+                    SetDisplayTransform(display, parent);
+                }
+            }
+            else
+            {
+                UsingUnarmedVariant = false;
+                instance = stagedDisplay ? stagedDisplay.gameObject : Instantiate(model, parent, false);
+                instance.name = "Emberford Body";
+                display = instance.transform;
+                if (!stagedDisplay) SetDisplayTransform(display, parent);
+            }
+
             foreach (var npc in instance.GetComponentsInChildren<TownNPC>(true))
             {
                 npc.enabled = false;
@@ -119,6 +163,9 @@ namespace Riftbound
                 else DestroyImmediate(instance);
                 return;
             }
+
+            rightHandBone = Array.Find(skin.bones, b => b && b.name == "hand.R");
+            leftHandBone = Array.Find(skin.bones, b => b && b.name == "hand.L");
 
             displayAnimator = instance.GetComponentInChildren<Animator>();
             var bindings = Body.Select(pair =>
@@ -159,9 +206,194 @@ namespace Riftbound
             }
             movingParameter = displayAnimator && displayAnimator.parameters.Any(
                 p => p.type == AnimatorControllerParameterType.Bool && p.name == "Moving");
-            foreach (var renderer in originals) renderer.forceRenderingOff = true;
+            foreach (var renderer in originals)
+            {
+                if (renderer && (!display || !renderer.transform.IsChildOf(display)))
+                    renderer.forceRenderingOff = true;
+            }
             previousPosition = transform.position;
             CopyPose();
+
+            if (UsingUnarmedVariant)
+            {
+                var (mainWeapon, offWeapon, rarity) = ResolveDefaultWeapons(gameObject, baseModelName);
+                if (!string.IsNullOrEmpty(mainWeapon))
+                    EquipWeaponVisual(mainWeapon, offWeapon, rarity);
+            }
+        }
+
+        static string CleanModelName(string raw)
+        {
+            if (string.IsNullOrEmpty(raw)) return "";
+            string s = raw.Replace("(Clone)", "").Trim();
+            if (s.EndsWith("_Unarmed", StringComparison.Ordinal))
+                s = s.Substring(0, s.Length - "_Unarmed".Length);
+            return s;
+        }
+
+        public void EquipWeaponVisual(string weaponId, string offhandWeaponId = null, string rarity = null)
+        {
+            if (!display) CreateDisplay();
+            if (!rightHandBone) return;
+
+            string normMain = weaponId ?? "";
+            string normOff = offhandWeaponId ?? "";
+            if (equippedWeaponId == normMain && equippedOffhandId == normOff && rightWeaponInstance != null)
+            {
+                ApplyWeaponRaritySheen(rightWeaponInstance, rarity);
+                SetWeaponVisualVisible(weaponVisible);
+                return;
+            }
+
+            equippedWeaponId = normMain;
+            equippedOffhandId = normOff;
+
+            ClearSocketWeapon(ref rightWeaponInstance);
+            ClearSocketWeapon(ref leftWeaponInstance);
+
+            if (!string.IsNullOrEmpty(normMain))
+            {
+                rightWeaponSocket = EnsureSocket(rightHandBone, "WeaponSocket_R");
+                rightWeaponInstance = SpawnWeaponInSocket(rightWeaponSocket, normMain, isLeftHand: false, rarity: rarity);
+            }
+
+            if (!string.IsNullOrEmpty(normOff) && leftHandBone)
+            {
+                leftWeaponSocket = EnsureSocket(leftHandBone, "WeaponSocket_L");
+                leftWeaponInstance = SpawnWeaponInSocket(leftWeaponSocket, normOff, isLeftHand: true, rarity: rarity);
+            }
+
+            SetWeaponVisualVisible(weaponVisible);
+        }
+
+        public void SetWeaponVisualVisible(bool visible)
+        {
+            weaponVisible = visible;
+            if (rightWeaponInstance) rightWeaponInstance.SetActive(visible);
+            if (leftWeaponInstance) leftWeaponInstance.SetActive(visible);
+        }
+
+        Transform EnsureSocket(Transform handBone, string socketName)
+        {
+            var existing = handBone.Find(socketName);
+            if (existing) return existing;
+            var go = new GameObject(socketName);
+            go.layer = handBone.gameObject.layer;
+            go.transform.SetParent(handBone, false);
+            return go.transform;
+        }
+
+        GameObject SpawnWeaponInSocket(Transform socket, string weaponId, bool isLeftHand, string rarity)
+        {
+            var prefab = GearArt.LoadWeaponPrefab(weaponId);
+            if (!prefab) return null;
+
+            bool isStaff = weaponId.IndexOf("staff", StringComparison.OrdinalIgnoreCase) >= 0;
+            bool isDagger = weaponId.IndexOf("dagger", StringComparison.OrdinalIgnoreCase) >= 0;
+
+            // Calibrated palm grip along hand bone (+Y points wrist -> fingertips in Blender FBX rig)
+            socket.localPosition = new Vector3(0f, 0.058f, 0f);
+            if (isStaff)
+            {
+                socket.localRotation = Quaternion.Euler(14f, 0f, isLeftHand ? 8f : -8f);
+                socket.localScale = Vector3.one * 0.92f;
+            }
+            else if (isDagger)
+            {
+                socket.localRotation = Quaternion.Euler(74f, 0f, isLeftHand ? 14f : -14f);
+                socket.localScale = Vector3.one * 0.95f;
+            }
+            else
+            {
+                socket.localRotation = Quaternion.Euler(78f, 0f, isLeftHand ? 12f : -12f);
+                socket.localScale = Vector3.one * 0.92f;
+            }
+
+            var inst = Instantiate(prefab, socket, false);
+            inst.name = "HeldWeapon_" + weaponId;
+            inst.transform.localPosition = Vector3.zero;
+            inst.transform.localRotation = Quaternion.identity;
+            inst.transform.localScale = Vector3.one;
+
+            int layer = socket.gameObject.layer;
+            foreach (var t in inst.GetComponentsInChildren<Transform>(true)) t.gameObject.layer = layer;
+            foreach (var c in inst.GetComponentsInChildren<Collider>(true)) c.enabled = false;
+
+            ApplyWeaponRaritySheen(inst, rarity);
+            return inst;
+        }
+
+        static void ApplyWeaponRaritySheen(GameObject weaponGo, string rarity)
+        {
+            if (!weaponGo) return;
+            bool glow = rarity == "Epic" || rarity == "Legendary";
+            Color emit = rarity == "Legendary" ? new Color(0.65f, 0.36f, 0.08f) :
+                         rarity == "Epic" ? new Color(0.36f, 0.14f, 0.55f) : Color.black;
+            var block = new MaterialPropertyBlock();
+            foreach (var r in weaponGo.GetComponentsInChildren<Renderer>(true))
+            {
+                for (int i = 0; i < r.sharedMaterials.Length; i++)
+                {
+                    r.GetPropertyBlock(block, i);
+                    block.SetColor("_EmissionColor", glow ? emit : Color.black);
+                    r.SetPropertyBlock(block, i);
+                }
+            }
+        }
+
+        static void ClearSocketWeapon(ref GameObject inst)
+        {
+            if (!inst) return;
+            if (Application.isPlaying) Destroy(inst);
+            else DestroyImmediate(inst);
+            inst = null;
+        }
+
+        public static (string main, string offhand, string rarity) ResolveDefaultWeapons(GameObject owner, string modelName)
+        {
+            if (!owner) return (null, null, null);
+
+            var player = owner.GetComponentInParent<PlayerController>();
+            if (player)
+            {
+                string id = !string.IsNullOrEmpty(player.EquippedWeaponId) ? player.EquippedWeaponId : "starter-axe";
+                var item = ItemCatalog.Get(id);
+                string off = player.CharacterClass == "Rogue" && id.IndexOf("dagger", StringComparison.OrdinalIgnoreCase) >= 0
+                    ? "copper-dagger" : null;
+                return (id, off, item?.rarity);
+            }
+
+            var enemy = owner.GetComponentInParent<EnemyController>();
+            if (enemy)
+            {
+                string eid = (enemy.enemyId ?? "").ToLowerInvariant();
+                if (eid.Contains("malrik") || eid.Contains("sunstone")) return ("sunstone-reliquary-staff", null, "Epic");
+                if (eid.Contains("krag") || eid.Contains("ironmaw-boss")) return ("ironmaw-cleaver", null, "Epic");
+                if (eid.Contains("grimgnaw")) return ("bloodrock-waraxe", null, "Rare");
+                if (eid.Contains("captain") || eid.Contains("selvek")) return ("captain-axe", null, "Rare");
+                if (eid.Contains("warden")) return ("warden-axe", null, "Rare");
+                if (eid.Contains("malakar") || eid.Contains("abbot")) return ("scarlet-blade", null, "Epic");
+                if (eid.Contains("raider") || eid.Contains("tribe")) return ("raider-cleaver", null, "Uncommon");
+            }
+
+            if (modelName.Contains("Mage") || modelName.Contains("Wraith"))
+                return ("mage-arcane-staff", null, "Rare");
+            if (modelName.Contains("Rogue"))
+                return ("duskwood-shadow-dagger", "copper-dagger", "Uncommon");
+            if (modelName.Contains("Goblin"))
+                return ("copper-dagger", null, "Common");
+            if (modelName.Contains("Paladin"))
+                return ("truesilver-blade", null, "Rare");
+            if (modelName.Contains("Sentinel"))
+                return ("worldbreaker-maul", null, "Epic");
+            if (modelName.Contains("Brute"))
+                return ("bloodrock-waraxe", null, "Uncommon");
+            if (modelName.Contains("Briar_Knight"))
+                return ("raider-cleaver", null, "Uncommon");
+            if (modelName.Contains("Emberwatch_Knight"))
+                return ("bronze-broadsword", null, "Uncommon");
+
+            return (null, null, null);
         }
 
         Renderer[] FindOriginalMeshes(Transform parent) =>

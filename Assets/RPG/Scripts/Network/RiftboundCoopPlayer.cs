@@ -98,6 +98,7 @@ namespace Riftbound.Network
         public NetworkVariable<bool> IsMounted = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
         public NetworkVariable<bool> IsSprinting = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
         public NetworkVariable<FixedString32Bytes> MountId = new NetworkVariable<FixedString32Bytes>(new FixedString32Bytes("horse"), NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+        public NetworkVariable<FixedString64Bytes> EquippedWeaponId = new NetworkVariable<FixedString64Bytes>(new FixedString64Bytes("starter-axe"), NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
         public NetworkVariable<float> MoveSpeed = new NetworkVariable<float>(0f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
         public NetworkVariable<byte> LocomotionFlags = new NetworkVariable<byte>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server); // bit0=airborne, bit1=walking, bit2=blocking
         public NetworkVariable<byte> ResourcePct = new NetworkVariable<byte>(100, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
@@ -260,6 +261,7 @@ namespace Riftbound.Network
                 ClassName.OnValueChanged += OnIdentityChanged;
                 IsMounted.OnValueChanged += OnMountChanged;
                 MountId.OnValueChanged += OnMountIdChanged;
+                EquippedWeaponId.OnValueChanged += OnEquippedWeaponChanged;
                 Health.OnValueChanged += OnRemoteHealthChanged;
                 RebuildRemoteVisual();
             }
@@ -287,6 +289,7 @@ namespace Riftbound.Network
             ClassName.OnValueChanged -= OnIdentityChanged;
             IsMounted.OnValueChanged -= OnMountChanged;
             MountId.OnValueChanged -= OnMountIdChanged;
+            EquippedWeaponId.OnValueChanged -= OnEquippedWeaponChanged;
             Health.OnValueChanged -= OnRemoteHealthChanged;
             ClearRemoteMountVisual();
             ReleaseRemoteGroundingObserver();
@@ -317,6 +320,26 @@ namespace Riftbound.Network
         void OnMountIdChanged(FixedString32Bytes prev, FixedString32Bytes next)
         {
             if (!IsOwner) UpdateRemoteMountVisual();
+        }
+
+        void OnEquippedWeaponChanged(FixedString64Bytes prev, FixedString64Bytes next)
+        {
+            if (!IsOwner) ApplyRemoteWeaponVisual();
+        }
+
+        void ApplyRemoteWeaponVisual()
+        {
+            if (!remoteVisualRoot) return;
+            string wid = EquippedWeaponId.Value.ToString();
+            if (string.IsNullOrWhiteSpace(wid)) wid = "starter-axe";
+            var item = ItemCatalog.Get(wid);
+            string off = builtClass == "Rogue" && wid.IndexOf("dagger", System.StringComparison.OrdinalIgnoreCase) >= 0
+                ? "copper-dagger" : null;
+            foreach (var pav in remoteVisualRoot.GetComponentsInChildren<ProceduralActorVisual>(true))
+            {
+                pav.EquipWeaponVisual(wid, off, item?.rarity);
+                pav.SetWeaponVisualVisible(!IsMounted.Value);
+            }
         }
 
         void OnRemoteHealthChanged(int prev, int next)
@@ -480,6 +503,7 @@ namespace Riftbound.Network
                 remoteAnimator = remoteVisualRoot.GetComponentInChildren<Animator>(true);
                 currentRemoteAnim = "";
                 BindRemoteGroundingObserver();
+                ApplyRemoteWeaponVisual();
             }
             UpdateRemoteMountVisual();
         }
@@ -516,6 +540,9 @@ namespace Riftbound.Network
                 remoteWeaponRenderer.enabled = remoteWeaponWasEnabled;
                 remoteWeaponRenderer = null;
             }
+            if (remoteVisualRoot)
+                foreach (var pav in remoteVisualRoot.GetComponentsInChildren<ProceduralActorVisual>(true))
+                    pav.SetWeaponVisualVisible(true);
             remoteRiderHips = null;
             if (remoteVisualRoot)
             {
@@ -560,6 +587,9 @@ namespace Riftbound.Network
                 if (remoteAnimator)
                 {
                     remoteRiderHips = FindRiderHips(remoteAnimator);
+                    if (remoteVisualRoot)
+                        foreach (var pav in remoteVisualRoot.GetComponentsInChildren<ProceduralActorVisual>(true))
+                            pav.SetWeaponVisualVisible(false);
                     foreach (var r in remoteAnimator.GetComponentsInChildren<Renderer>(true))
                     {
                         if (r.name.ToLowerInvariant().Contains("axe"))
@@ -885,6 +915,24 @@ namespace Riftbound.Network
         {
             if (!CoopSessionConfig.IsMultiplayer || !IsSpawned) return;
             RequestSetMountServerRpc(mounted, string.IsNullOrEmpty(mountId) ? "horse" : mountId);
+        }
+
+        public void RequestSetEquippedWeapon(string weaponId)
+        {
+            if (!CoopSessionConfig.IsMultiplayer || !IsSpawned || !IsOwner) return;
+            string clean = string.IsNullOrWhiteSpace(weaponId) ? "starter-axe" : weaponId.Trim();
+            if (EquippedWeaponId.Value.ToString() == clean) return;
+            SubmitEquippedWeaponServerRpc(new FixedString64Bytes(clean));
+        }
+
+        [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Owner)]
+        void SubmitEquippedWeaponServerRpc(FixedString64Bytes weaponId)
+        {
+            string wid = weaponId.ToString().Trim();
+            if (string.IsNullOrEmpty(wid) || wid.Length > 48) return;
+            var item = ItemCatalog.Get(wid);
+            if (item != null && item.slot == GearSlot.Weapon)
+                EquippedWeaponId.Value = new FixedString64Bytes(item.id);
         }
 
         int ServerGreenhollowCount() =>

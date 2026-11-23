@@ -100,6 +100,7 @@ namespace Riftbound
             if (!riderHips) { Message = "Riding pose is unavailable."; return; }
             mountInstance = Instantiate(SelectedMount.prefab, transform); mountInstance.transform.SetLocalPositionAndRotation(Vector3.zero, Quaternion.identity);
             motor.height = 3.6f; motor.center = Vector3.up * 1.8f; motor.radius = .62f;
+            foreach (var pav in GetComponentsInChildren<ProceduralActorVisual>(true)) pav.SetWeaponVisualVisible(false);
             foreach (var renderer in animator.GetComponentsInChildren<Renderer>()) if (renderer.name.ToLowerInvariant().Contains("axe")) { weaponRenderer = renderer; weaponWasEnabled = renderer.enabled; renderer.enabled = false; break; }
             animator.speed = 1; Play("Ride", true); moveVelocity = Vector3.zero;
             SpellFX.CreateArcaneBurst(transform.position);
@@ -124,6 +125,7 @@ namespace Riftbound
                 motor.radius = normalRadius; motor.height = normalHeight; motor.center = normalCenter;
             }
             if (animator) animator.transform.localPosition = riderPosition;
+            foreach (var pav in GetComponentsInChildren<ProceduralActorVisual>(true)) pav.SetWeaponVisualVisible(true);
             if (weaponRenderer) weaponRenderer.enabled = weaponWasEnabled;
             weaponRenderer = null; riderHips = null; moveVelocity = Vector3.zero; if (animator) { animator.speed = 1; Play("Idle", true); }
             if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner != null)
@@ -155,6 +157,7 @@ namespace Riftbound
             }
             mountInstance = Instantiate(taxiDef.prefab, transform);
             mountInstance.transform.SetLocalPositionAndRotation(Vector3.zero, Quaternion.identity);
+            foreach (var pav in GetComponentsInChildren<ProceduralActorVisual>(true)) pav.SetWeaponVisualVisible(false);
             foreach (var renderer in animator.GetComponentsInChildren<Renderer>())
                 if (renderer.name.ToLowerInvariant().Contains("axe")) { weaponRenderer = renderer; weaponWasEnabled = renderer.enabled; renderer.enabled = false; break; }
             animator.speed = 1f;

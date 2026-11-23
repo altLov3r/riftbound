@@ -67,6 +67,7 @@ namespace Riftbound
             var (specHealth, specArmor) = TalentSystem.GetSpecializationVitals(this);
             Stats.ConfigureVitals(150 + levelHealth + health + raceHpBonus + gemHp + MilestoneHealth + specHealth,
                 ArmorRating + raceArmorBonus + gemArmor + MilestoneArmor + specArmor);
+            RefreshHeldWeaponVisual();
             if (!animator || Weapon == null) return;
             var block = new MaterialPropertyBlock();
             Color tint = Weapon.rarity == "Legendary" ? new Color(1.0f, 0.65f, 0.2f) :
@@ -118,6 +119,23 @@ namespace Riftbound
                     }
                 }
             }
+        }
+
+        public void RefreshHeldWeaponVisual()
+        {
+            string weaponId = !string.IsNullOrEmpty(EquippedWeaponId) ? EquippedWeaponId : "starter-axe";
+            var item = ItemCatalog.Get(weaponId);
+            string offhand = CharacterClass == "Rogue" && weaponId.IndexOf("dagger", System.StringComparison.OrdinalIgnoreCase) >= 0
+                ? "copper-dagger"
+                : null;
+            foreach (var pav in GetComponentsInChildren<ProceduralActorVisual>(true))
+            {
+                if (!pav) continue;
+                pav.EquipWeaponVisual(weaponId, offhand, item?.rarity);
+                pav.SetWeaponVisualVisible(!Mounted);
+            }
+            if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner != null)
+                Network.RiftboundCoopPlayer.LocalOwner.RequestSetEquippedWeapon(weaponId);
         }
         string EnemyItem(EnemyController enemy)
         {

@@ -275,6 +275,17 @@ namespace Riftbound
                 anim.Update(0f);
             }
 
+            string previewWeapon = characterClass switch
+            {
+                "Mage" => "mage-arcane-staff",
+                "Rogue" => "duskwood-shadow-dagger",
+                "Paladin" => "truesilver-blade",
+                _ => "emberwatch-axe"
+            };
+            string previewOffhand = characterClass == "Rogue" ? "copper-dagger" : null;
+            var pav = visual.GetComponent<ProceduralActorVisual>();
+            if (pav) pav.EquipWeaponVisual(previewWeapon, previewOffhand, ItemCatalog.Get(previewWeapon)?.rarity);
+
             return visual;
         }
 
@@ -365,6 +376,7 @@ namespace Riftbound
             player.backRunStrideSpeed = runStride * 0.85f;
 
             player.OnVisualApplied(anim);
+            player.RefreshHeldWeaponVisual();
             player.Play("Idle", true);
             Debug.Log($"<color=#70df80>[CharacterVisualFactory]</color> Applied {race} {characterClass} to player avatar successfully.");
         }

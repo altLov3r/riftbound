@@ -54,6 +54,7 @@ namespace Riftbound.Editor
             StageFrostpineTown(root.transform, terrains, report);
             StageRedtideHarborTown(root.transform, terrains, report);
             StageWillowmereHamlet(root.transform, terrains, report);
+            StageFrontierFlightPosts(root.transform, terrains, report);
 
             return root;
         }
@@ -111,7 +112,7 @@ namespace Riftbound.Editor
             PlaceFbx(root.transform, "EmberwatchCivicSquare/Emberwatch_MarketWell.fbx", "WW_Well", 35f, 238f, 0f, terrains, footingSize: 2.8f);
             PlaceFbx(root.transform, "VillageLandmarks/Emberwatch_SupplyWagon.fbx", "WW_Wagon", 24.5f, 248.5f, 20f, terrains, footingSize: 0f);
             PlaceFbx(root.transform, "VillageLandmarks/Emberwatch_RoofedNoticeBoard.fbx", "WW_NoticeBoard", 30.5f, 249.5f, 90f, terrains, footingSize: 0f);
-            PlaceFbx(root.transform, "Animals/Horse.fbx", "WW_Horse", 21.5f, 245.5f, 40f, terrains, footingSize: 0f, addColliders: false);
+            PlaceTownHorse(root.transform, "WW_Horse", 21.5f, 245.5f, 40f, terrains);
 
             PlaceKitPrefab(root.transform, "Street_Lantern", 4f, 247f, 0f, terrains, 0f, 0f, addColliders: false);
             PlaceKitPrefab(root.transform, "Street_Lantern", 19f, 248f, 0f, terrains, 0f, 0f, addColliders: false);
@@ -123,6 +124,8 @@ namespace Riftbound.Editor
                 "Rooms and warm stew at the Wayfarer Inn, traveler.", terrains);
             AddTownNpc(root.transform, "Smith Garrett", "Exchange Smithy", "Human", "Warrior", new Vector3(28.0f, 0f, 238.0f),
                 "Horseshoes and axle pins forged fresh for the north convoys.", terrains);
+            AddFlightMaster(root.transform, "Whisperwood Flight Master", "Whisperwood Exchange", "Neutral", "Human", "Rogue",
+                new Vector3(43.5f, 0f, 246.0f), -130f, terrains);
 
             AddWaystop(root.transform, "Whisperwood Exchange", new Vector3(30.5f, 0f, 249.5f),
                 "Whisperwood Exchange — Bustling crossroads market town with Wayfarer Inn, cottages, smithy, and plaza well.", terrains);
@@ -171,6 +174,8 @@ namespace Riftbound.Editor
                 "Welcome to Cinderroad Ironworks! Our grand smithy, inn, freight crane, and smelter keep the southeastern frontier supplied.", terrains);
             AddTownNpc(root.transform, "Blacksmith Torin", "Ironworks Smithy", "Dwarf", "Warrior", new Vector3(249.5f, 0f, -58.5f),
                 "Fresh iron ingots straight out of the kiln!", terrains);
+            AddFlightMaster(root.transform, "Cinderroad Windrider", "Cinderroad Ironworks", "Neutral", "Dwarf", "Rogue",
+                new Vector3(258.5f, 0f, -41.5f), 160f, terrains);
 
             AddWaystop(root.transform, "Cinderroad Ironworks", new Vector3(258f, 0f, -48f),
                 "Cinderroad Ironworks — Southeast foundry town with Emberford Smithy, Wayfarer Inn, freight crane, and smelter yard.", terrains);
@@ -207,7 +212,7 @@ namespace Riftbound.Editor
             PlaceKitPrefab(root.transform, "Emberford_Smithy", -274f, -126f, 0f, terrains, 8.2f, 6.8f);
             PlaceKitPrefab(root.transform, "Timber_Cottage", -261f, -120f, -65f, terrains, 7.6f, 7.0f);
             PlaceFbx(root.transform, "HighspireDistrict/Highspire_Fountain.fbx", "Thornwatch_Fountain", -271f, -103f, 0f, terrains, footingSize: 3.2f);
-            PlaceFbx(root.transform, "Animals/Horse.fbx", "TW_HorseA", -267f, -124f, -30f, terrains, footingSize: 0f, addColliders: false);
+            PlaceTownHorse(root.transform, "TW_HorseA", -267f, -124f, -30f, terrains);
             PlaceKitPrefab(root.transform, "Street_Lantern", -235f, -84f, 0f, terrains, 0f, 0f, addColliders: false);
             PlaceKitPrefab(root.transform, "Street_Lantern", -250f, -94f, 0f, terrains, 0f, 0f, addColliders: false);
 
@@ -215,6 +220,8 @@ namespace Riftbound.Editor
                 "Thornwatch Citadel stands watch over the southwest coast—Citadel Hall, coastal lighthouse, inn, smithy, and fountain square.", terrains);
             AddTownNpc(root.transform, "Quartermaster Sera", "Citadel Market", "Elf", "Rogue", new Vector3(-278.5f, 0f, -97.5f),
                 "All sea lanes past the cape are marked by our lighthouse.", terrains);
+            AddFlightMaster(root.transform, "Thornwatch Gryphon Master", "Thornwatch Citadel", "Alliance", "Elf", "Rogue",
+                new Vector3(-261.0f, 0f, -94.0f), 125f, terrains);
 
             AddWaystop(root.transform, "Thornwatch Citadel", new Vector3(-266.0f, 0f, -103.5f),
                 "Thornwatch Citadel — Southwest garrison fortress town with Citadel Hall, coastal lighthouse, inn, smithy, and plaza fountain.", terrains);
@@ -533,6 +540,55 @@ namespace Riftbound.Editor
             pin.transform.position = PhysicsSurface(xzPos, terrains);
             pin.displayName = displayName;
             pin.notice = noticeText;
+        }
+
+        static void StageFrontierFlightPosts(Transform parent, Terrain[] terrains, StringBuilder report)
+        {
+            var root = new GameObject("Frontier Flight Masters");
+            root.transform.SetParent(parent, false);
+            AddFlightMaster(root.transform, "Greenhollow Skywarden", "Greenhollow Post", "Neutral", "Elf", "Rogue",
+                new Vector3(-35.0f, 0f, 392.0f), 180f, terrains);
+            AddFlightMaster(root.transform, "Pinewatch Gryphon Keeper", "Pinewatch Relay", "Neutral", "Human", "Rogue",
+                new Vector3(-214.0f, 0f, 392.0f), -60f, terrains);
+            report.AppendLine("Staged Greenhollow Post and Pinewatch Relay Flight Masters.");
+        }
+
+        static GameObject PlaceTownHorse(Transform parent, string name, float x, float z, float yaw, Terrain[] terrains)
+        {
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/RPG/Prefabs/Mount Horse.prefab");
+            if (!prefab)
+                return PlaceFbx(parent, "Animals/Horse.fbx", name, x, z, yaw, terrains, scale: 0.303f, footingSize: 0f, addColliders: false);
+
+            Vector3 pos = PhysicsSurface(new Vector3(x, 0f, z), terrains);
+            var inst = (GameObject)PrefabUtility.InstantiatePrefab(prefab, parent);
+            inst.name = name;
+            inst.transform.SetPositionAndRotation(pos, Quaternion.Euler(0f, yaw, 0f));
+
+            var mv = inst.GetComponent<MountVisual>();
+            if (mv) Object.DestroyImmediate(mv);
+            foreach (var col in inst.GetComponentsInChildren<Collider>(true)) col.enabled = false;
+            var anim = inst.GetComponentInChildren<Animator>(true);
+            if (anim)
+            {
+                anim.applyRootMotion = false;
+                anim.cullingMode = AnimatorCullingMode.CullUpdateTransforms;
+            }
+            return inst;
+        }
+
+        static void AddFlightMaster(Transform parent, string npcName, string nodeName, string faction, string race, string cls,
+            Vector3 xzPos, float yaw, Terrain[] terrains)
+        {
+            var actor = new GameObject(npcName);
+            actor.transform.SetParent(parent, false);
+            actor.transform.SetPositionAndRotation(PhysicsSurface(xzPos, terrains), Quaternion.Euler(0f, yaw, 0f));
+            CharacterVisualFactory.CreateVisualInstance(race, cls, actor.transform);
+            var body = actor.AddComponent<CapsuleCollider>();
+            body.height = 1.9f; body.radius = 0.38f; body.center = Vector3.up * 0.95f;
+            var fm = actor.AddComponent<FlightMaster>();
+            fm.nodeName = nodeName;
+            fm.faction = faction;
+            fm.flightStationPos = actor.transform.position;
         }
 
         static void AddTownNpc(Transform parent, string npcName, string roleTag, string race, string cls, Vector3 xzPos, string greeting, Terrain[] terrains)

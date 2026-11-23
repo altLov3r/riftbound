@@ -59,6 +59,70 @@ namespace Riftbound
             return presentation;
         }
 
+        internal static GameObject SpawnPerchedGryphon(Transform parent, Vector3 worldPos, Quaternion worldRot, float scale = 1.05f)
+        {
+            Shader shader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+            if (!shader) return null;
+            if (!bodyMesh || materials == null || !materials[0]) BuildMeshes(shader);
+
+            var roost = new GameObject("Perched Gryphon");
+            roost.transform.SetParent(parent, true);
+            roost.transform.SetPositionAndRotation(worldPos, worldRot);
+            roost.transform.localScale = Vector3.one * scale;
+            foreach (var t in roost.GetComponentsInChildren<Transform>(true)) t.gameObject.layer = 2;
+
+            // Stone roost pad + timber hitching post beside the perched gryphon
+            var pad = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            pad.name = "GryphonRoostPad";
+            pad.transform.SetParent(roost.transform, false);
+            pad.transform.localPosition = new Vector3(0f, 0.06f, 0f);
+            pad.transform.localScale = new Vector3(2.2f, 0.08f, 2.2f);
+            var padCol = pad.GetComponent<Collider>();
+            if (padCol) { if (Application.isPlaying) Object.Destroy(padCol); else Object.DestroyImmediate(padCol); }
+            pad.GetComponent<MeshRenderer>().sharedMaterial = materials[Dark];
+
+            var post = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            post.name = "GryphonHitchPost";
+            post.transform.SetParent(roost.transform, false);
+            post.transform.localPosition = new Vector3(-0.95f, 0.65f, 0.45f);
+            post.transform.localScale = new Vector3(0.14f, 0.68f, 0.14f);
+            var postCol = post.GetComponent<Collider>();
+            if (postCol) { if (Application.isPlaying) Object.Destroy(postCol); else Object.DestroyImmediate(postCol); }
+            post.GetComponent<MeshRenderer>().sharedMaterial = materials[Umber];
+
+            var cap = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            cap.name = "GryphonPostCap";
+            cap.transform.SetParent(roost.transform, false);
+            cap.transform.localPosition = new Vector3(-0.95f, 1.36f, 0.45f);
+            cap.transform.localScale = Vector3.one * 0.22f;
+            var capCol = cap.GetComponent<Collider>();
+            if (capCol) { if (Application.isPlaying) Object.Destroy(capCol); else Object.DestroyImmediate(capCol); }
+            cap.GetComponent<MeshRenderer>().sharedMaterial = materials[Gold];
+
+            var visualRoot = new GameObject("Perched Gryphon Visual").transform;
+            visualRoot.gameObject.layer = 2;
+            visualRoot.SetParent(roost.transform, false);
+            visualRoot.localPosition = new Vector3(0f, 0.12f, 0f);
+
+            var presentation = new GryphonPresentation(visualRoot);
+            var anim = roost.AddComponent<PerchedGryphonAnimator>();
+            anim.Bind(presentation, visualRoot);
+            return roost;
+        }
+
+        internal void AnimatePerched(float time)
+        {
+            // Subtle breathing + periodic wing rustle every ~6 seconds
+            float cycle = Mathf.Repeat(time, 6.2f);
+            float rustle = cycle < 0.9f ? Mathf.Sin(cycle / 0.9f * Mathf.PI) * Mathf.Sin(cycle * 14f) : 0f;
+            float wingYaw = 76f - Mathf.Abs(rustle) * 16f;
+            float wingRoll = 22f + rustle * 14f;
+            leftWing.localRotation = Quaternion.Euler(0f, -wingYaw, -wingRoll);
+            rightWing.localRotation = Quaternion.Euler(0f, wingYaw, wingRoll);
+            for (int i = 0; i < legs.Length; i++)
+                legs[i].localRotation = Quaternion.identity;
+        }
+
         internal void Animate(float speed, bool airborne, float delta)
         {
             flightBlend = Mathf.MoveTowards(flightBlend, airborne ? 1f : 0f, delta * 3.5f);
@@ -249,6 +313,31 @@ namespace Riftbound
                 mesh.RecalculateBounds();
                 return mesh;
             }
+        }
+    }
+
+    public sealed class PerchedGryphonAnimator : MonoBehaviour
+    {
+        GryphonPresentation presentation;
+        Transform visual;
+        Vector3 basePos;
+        float offset;
+
+        internal void Bind(GryphonPresentation pres, Transform vis)
+        {
+            presentation = pres;
+            visual = vis;
+            basePos = vis ? vis.localPosition : Vector3.zero;
+            offset = Mathf.Abs(transform.position.x * 0.17f + transform.position.z * 0.23f);
+        }
+
+        void Update()
+        {
+            if (presentation == null || !visual) return;
+            float t = Time.time + offset;
+            presentation.AnimatePerched(t);
+            visual.localPosition = basePos + new Vector3(0f, Mathf.Sin(t * 2.1f) * 0.025f, 0f);
+            visual.localRotation = Quaternion.Euler(0f, Mathf.Sin(t * 0.55f) * 5.5f, 0f);
         }
     }
 }

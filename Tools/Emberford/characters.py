@@ -28,7 +28,7 @@ def joints(kind):
     return out
 
 
-def character(b,kind,hostile=False):
+def character(b,kind,hostile=False,include_weapons=True):
     h,w=dimensions(kind)
     armor=kind in ("knight","paladin","sentinel")
     caster=kind in ("mage","wraith")
@@ -155,7 +155,12 @@ def character(b,kind,hostile=False):
           "brute":("club",1.21,.22,.184),"goblin":("dagger",1.11,.22,.105),
           "wraith":("staff",.19,.28,.78),"sentinel":("maul",1.28,.23,.19)}.get(kind)
     if item:
-        grip(item[0], -1, *item[1:])
+        if include_weapons:
+            grip(item[0], -1, *item[1:])
+        else:
+            knuckles = "Leather" if kind in ("knight", "paladin", "rogue") else skin
+            for finger in (-1, 0, 1):
+                box(-.659 + finger*.030, -.113, .944, .038, .049, .082, knuckles, "hand.R", .012)
     if kind in ("knight","paladin"):
         x=.66
         beam((x-.072,-.085,.949),(x+.072,-.085,.949),.028,"Dark Wood","hand.L",sides=6)
@@ -166,7 +171,11 @@ def character(b,kind,hostile=False):
         plate([(x,1.225),(x-.081,1.08),(x,.920),(x+.081,1.08)],-.20,.030,
               "Bone" if hostile else "Gold","hand.L")
     if kind=="rogue":
-        grip("dagger", 1, .94, .24, .105)
+        if include_weapons:
+            grip("dagger", 1, .94, .24, .105)
+        else:
+            for finger in (-1, 0, 1):
+                box(.659 + finger*.030, -.113, .944, .038, .049, .082, "Leather", "hand.L", .012)
     if kind in ("brute", "goblin"):
         for side in (-1, 1):
             beam((side*.066,-.119,1.691),(side*.089,-.154,1.761),

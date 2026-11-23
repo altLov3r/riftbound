@@ -11,10 +11,15 @@ namespace Riftbound
         {
             "pinewatch-warden-crest" => "emberwatch-sigil",
             "ursolak-spirit-pelt" => "ember-drake-scale",
-            "sunstone-reliquary-staff" => "scarlet-blade",
-            "ironmaw-cleaver" => "bloodrock-waraxe",
             _ => id
         };
+
+        public static GameObject LoadWeaponPrefab(string id)
+        {
+            if (string.IsNullOrEmpty(id)) return null;
+            return Resources.Load<GameObject>("Gear/Weapons/" + id)
+                ?? Resources.Load<GameObject>("Gear/Weapons/" + ResolveArtId(id));
+        }
 
         public static Texture2D Icon(GearItem item)
         {
