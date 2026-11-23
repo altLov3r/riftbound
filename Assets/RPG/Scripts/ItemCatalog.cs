@@ -81,7 +81,10 @@ namespace Riftbound
             // World Boss Gorgonax Epic Drops
             new GearItem("worldbreaker-maul", "Worldbreaker's War-Maul", GearSlot.Weapon, "Epic", 26, 0, 50, 48, "Two-Hand Mace", "Smashes the ground with the seismic force of a mountain."),
             new GearItem("crown-of-molten-ruin", "Crown of Molten Ruin", GearSlot.Armor, "Epic", 0, 12, 70, 46, "Plate Helm", "Encrusted with glowing magma embers from the sulfur rift."),
-            new GearItem("cinderfury-signet", "Cinderfury Signet", GearSlot.Trinket, "Epic", 6, 4, 65, 45, "Finger Ring", "Radiates intense heat, empowering all melee and spell attacks.")
+            new GearItem("cinderfury-signet", "Cinderfury Signet", GearSlot.Trinket, "Epic", 6, 4, 65, 45, "Finger Ring", "Radiates intense heat, empowering all melee and spell attacks."),
+            // Frontier Questline Boss Rewards
+            new GearItem("pinewatch-warden-crest", "Pinewatch Warden's Crest", GearSlot.Trinket, "Rare", 4, 2, 45, 28, "Insignia", "Carved cedar-and-iron crest awarded by Watchkeeper Halen for breaking Warchief Grimgnaw's Timberfang raids."),
+            new GearItem("ursolak-spirit-pelt", "Mantle of Ursolak", GearSlot.Armor, "Epic", 5, 10, 65, 42, "Spirit Leather", "Woven with glowing jade spirit-runes from the Ancient Bear Guardian of Ashenmaw Cavern.")
         };
 
         public static GearItem Get(string id)

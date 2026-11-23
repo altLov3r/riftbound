@@ -217,7 +217,8 @@ namespace Riftbound
             root.transform.rotation = Quaternion.Euler(0f, 180f, 0f);
 
             // Sculpted Ancient Bear Guardian visual (unmistakable massive bear silhouette with glowing jade spirit-runes)
-            BuildBearGuardianVisual(root.transform);
+            var vis = BuildBearGuardianVisual(root.transform);
+            vis.gameObject.AddComponent<BearGuardianAnimator>();
 
             var enemy = root.AddComponent<EnemyController>();
             enemy.enemyId = BossId;
@@ -245,7 +246,7 @@ namespace Riftbound
             root.SetActive(!player || !Application.isPlaying || !player.HasDefeated(BossId));
         }
 
-        static void BuildBearGuardianVisual(Transform parent)
+        static Transform BuildBearGuardianVisual(Transform parent)
         {
             var vis = new GameObject("BearGuardianVisual").transform;
             vis.SetParent(parent, false);
@@ -285,12 +286,21 @@ namespace Riftbound
                 Block(vis, $"Bear_Leg_{i}", legOffsets[i], new Vector3(0.48f, 1.15f, 0.52f), furDark, false);
                 Block(vis, $"Bear_Paw_{i}", new Vector3(legOffsets[i].x, 0.12f, legOffsets[i].z + 0.18f), new Vector3(0.50f, 0.22f, 0.45f), clawCol, false);
             }
+            return vis;
         }
 
         static void AddBrazier(Transform parent, Vector3 pos, Color flameColor)
         {
             Block(parent, "Brazier_Stand", pos + Vector3.up * 0.65f, new Vector3(0.75f, 1.3f, 0.75f), new Color(0.22f, 0.23f, 0.25f), true);
-            Block(parent, "Brazier_Fire", pos + Vector3.up * 1.48f, new Vector3(0.55f, 0.50f, 0.55f), flameColor, false, emissive: true);
+            var flame = Block(parent, "Brazier_Fire", pos + Vector3.up * 1.48f, new Vector3(0.55f, 0.50f, 0.55f), flameColor, false, emissive: true);
+            if (!Application.isBatchMode)
+            {
+                var light = flame.AddComponent<Light>();
+                light.type = LightType.Point;
+                light.color = flameColor;
+                light.range = 16f;
+                light.intensity = 2.6f;
+            }
         }
 
         static void AddCrystalCluster(Transform parent, Vector3 pos, Color crystalColor)
@@ -349,6 +359,33 @@ namespace Riftbound
                 }
             }
             return found ? best : WorldRegions.GroundHeight(xz);
+        }
+    }
+
+    /// <summary>
+    /// Procedural breathing, stride sway, and combat rearing motion for Ursolak, Ancient Bear Guardian.
+    /// </summary>
+    public sealed class BearGuardianAnimator : MonoBehaviour
+    {
+        EnemyController enemy;
+        Vector3 baseLocalPos;
+
+        void Awake()
+        {
+            enemy = GetComponentInParent<EnemyController>();
+            baseLocalPos = transform.localPosition;
+        }
+
+        void Update()
+        {
+            float t = Time.time;
+            bool chasing = enemy != null && enemy.IsChasing;
+            float speed = chasing ? 6.5f : 2.1f;
+            float bob = Mathf.Sin(t * speed) * (chasing ? 0.12f : 0.045f);
+            float pitch = chasing ? Mathf.Sin(t * speed * 0.5f) * 7.5f : Mathf.Sin(t * 1.6f) * 2.0f;
+            float roll = chasing ? Mathf.Cos(t * speed) * 4.5f : 0f;
+            transform.localPosition = baseLocalPos + new Vector3(0f, Mathf.Abs(bob), 0f);
+            transform.localRotation = Quaternion.Euler(pitch, 0f, roll);
         }
     }
 }

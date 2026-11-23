@@ -58,9 +58,11 @@ namespace Riftbound.Editor
                                 am1 != null && am2 != null &&
                                 am1.giverNpc == AshenmawCavernZone.QuestGiverName &&
                                 am2.prerequisiteQuestId == "ashenmaw_tribe_cull" &&
-                                am2.targetId == AshenmawCavernZone.BossId;
+                                am2.targetId == AshenmawCavernZone.BossId &&
+                                ItemCatalog.Get("pinewatch-warden-crest") != null &&
+                                ItemCatalog.Get("ursolak-spirit-pelt") != null;
                 Check("pinewatch_and_ashenmaw_questlines_registered", questsOk,
-                    $"pw=({pw1 != null},{pw2 != null},{pw3 != null}), ashenmaw=({am1 != null},{am2 != null})");
+                    $"pw=({pw1 != null},{pw2 != null},{pw3 != null}), ashenmaw=({am1 != null},{am2 != null}), items=({ItemCatalog.Get("pinewatch-warden-crest") != null},{ItemCatalog.Get("ursolak-spirit-pelt") != null})");
 
                 // 2. Pinewatch Timberfang Woods camps + Warchief Grimgnaw boss
                 PinewatchWoodsZone.Ensure();

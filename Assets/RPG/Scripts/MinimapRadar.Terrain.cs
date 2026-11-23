@@ -113,6 +113,11 @@ namespace Riftbound
             "Rustwater Scrapworks" => new(.49f, .39f, .30f),
             "Camp Bloodrock" => new(.56f, .34f, .25f),
             "The Brass Hollows" => new(.49f, .40f, .29f),
+            "Ashenmaw Cavern" => new(.18f, .46f, .38f),
+            "Pinewatch Relay" => new(.26f, .46f, .30f),
+            "Whisperwood Exchange" => new(.30f, .49f, .34f),
+            "Cinderroad Ironworks" => new(.56f, .34f, .24f),
+            "Thornwatch Citadel" => new(.34f, .46f, .54f),
             "The Scarlet Crypts" => new(.47f, .39f, .55f),
             _ => new(.34f, .49f, .32f)
         };
