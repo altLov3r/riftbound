@@ -98,6 +98,25 @@ namespace Riftbound
             }
 
             string hovered = DrawQuestPins(center, radius, range, position, floor, yaw);
+            if (floor == 0 && RiftIncursionSystem.Instance && RiftIncursionSystem.Instance.IsActive)
+            {
+                Vector3 riftDelta = RiftIncursionSystem.Instance.ActiveRiftPosition - position;
+                Vector2 riftOffset = Project(riftDelta, yaw) * (radius / range);
+                float pulse = 1f + Mathf.Sin(Time.time * 5.2f) * 0.25f;
+                Color riftInk = new Color(0.86f, 0.30f, 1.0f, 0.96f);
+                if (riftOffset.magnitude > radius - 13f)
+                {
+                    DrawNeedle(center + riftOffset.normalized * (radius - 15f), Vector2.SignedAngle(Vector2.up, -riftOffset), 14f, riftInk);
+                }
+                else
+                {
+                    Vector2 pt = center + riftOffset;
+                    Outline(Centered(pt, 16f * pulse), riftInk);
+                    Dot(pt, 7f, riftInk);
+                    if (Centered(pt, 18f).Contains(Event.current.mousePosition))
+                        hovered = $"Rift: {RiftIncursionSystem.Instance.ActiveSiteName}";
+                }
+            }
             string routeCaption = null;
             if ((trackQuests || customWaypoint.HasValue) && TryGetNavigationTarget(out var destination, out var title))
             {

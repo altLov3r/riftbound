@@ -77,6 +77,7 @@ namespace Riftbound
             if (!GetComponent<WorldShrineSystem>()) gameObject.AddComponent<WorldShrineSystem>();
             if (!GetComponent<TargetFrameHUD>()) gameObject.AddComponent<TargetFrameHUD>();
             if (!GetComponent<LivingWorldEvents>()) gameObject.AddComponent<LivingWorldEvents>();
+            if (!RiftIncursionSystem.Instance && !GetComponent<RiftIncursionSystem>()) gameObject.AddComponent<RiftIncursionSystem>();
         }
         void OnGUI()
         {
@@ -389,6 +390,10 @@ namespace Riftbound
             if (WorldBossEncounter.Instance)
             {
                 WorldBossEncounter.Instance.DrawBossHealthBar(width, height);
+            }
+            if (RiftIncursionSystem.Instance)
+            {
+                RiftIncursionSystem.Instance.DrawIncursionHUD(width, height);
             }
             if (AuctionHouseSystem.Instance && AuctionHouseSystem.Instance.HasUnreadMail())
             {
