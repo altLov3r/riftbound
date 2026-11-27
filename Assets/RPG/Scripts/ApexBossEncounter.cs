@@ -35,6 +35,50 @@ namespace Riftbound
             Instance = this;
             player = GetComponent<PlayerController>();
             if (WorldRegions.Expanded) summitCenter = WorldRegions.Summit;
+            FindBossReferences();
+        }
+
+        void OnDestroy()
+        {
+            if (Instance == this) Instance = null;
+        }
+
+        static bool IsAuthoritativeRuntime =>
+            !Network.CoopSessionConfig.IsMultiplayer ||
+            (Unity.Netcode.NetworkManager.Singleton != null && Unity.Netcode.NetworkManager.Singleton.IsServer);
+
+        bool TryGetNearestRoostTarget(out Vector3 targetPos, out float bestDist, out bool inRoost)
+        {
+            targetPos = Vector3.zero;
+            bestDist = float.MaxValue;
+            inRoost = false;
+            if (!bossCombatant) return false;
+
+            if (Network.CoopSessionConfig.IsMultiplayer)
+            {
+                bool found = false;
+                foreach (var cp in Network.RiftboundCoopPlayer.AllPlayers)
+                {
+                    if (!cp || !cp.IsSpawned || cp.Health.Value <= 0) continue;
+                    float d = Vector3.Distance(cp.transform.position, bossCombatant.transform.position);
+                    bool cpInRoost = d < 42f && cp.transform.position.y > (summitCenter.y - 10f);
+                    if (!found || (cpInRoost && !inRoost) || (cpInRoost == inRoost && d < bestDist))
+                    {
+                        bestDist = d;
+                        targetPos = cp.transform.position;
+                        inRoost = cpInRoost;
+                        found = true;
+                    }
+                }
+                return found;
+            }
+
+            if (!player) player = FindFirstObjectByType<PlayerController>();
+            if (!player || !player.Stats || !player.Stats.Alive) return false;
+            bestDist = Vector3.Distance(player.transform.position, bossCombatant.transform.position);
+            targetPos = player.transform.position;
+            inRoost = bestDist < 42f && player.transform.position.y > (summitCenter.y - 10f);
+            return true;
         }
 
         void Start()
@@ -57,6 +101,11 @@ namespace Riftbound
                 }
             }
 
+            if (!bossController && bossCombatant)
+                bossController = bossCombatant.GetComponent<EnemyController>();
+            if (bossController)
+                bossController.skipDefaultLootDrop = true;
+
             if (!hoardChest)
             {
                 foreach (var chest in FindObjectsByType<LootChest>(FindObjectsSortMode.None))
@@ -72,9 +121,8 @@ namespace Riftbound
 
         void Update()
         {
-            if (FrontendMenu.IsOpen || EncounterCompleted) return;
-            if (!player) player = FindFirstObjectByType<PlayerController>();
-            if (!player) return;
+            if (EncounterCompleted || (!Network.CoopSessionConfig.IsDedicatedServer && FrontendMenu.IsOpen)) return;
+            if (!IsAuthoritativeRuntime) return;
 
             if (bossCombatant == null)
             {
@@ -92,11 +140,8 @@ namespace Riftbound
                 return;
             }
 
-            if (!player) player = FindFirstObjectByType<PlayerController>();
-            if (!player) return;
-
-            float dist = Vector3.Distance(player.transform.position, bossCombatant.transform.position);
-            bool inRoost = dist < 42f && player.transform.position.y > (summitCenter.y - 10f);
+            if (!TryGetNearestRoostTarget(out Vector3 nearestTargetPos, out float dist, out bool inRoost))
+                return;
 
             if (!EncounterStarted)
             {
@@ -127,7 +172,7 @@ namespace Riftbound
             if (Enraged && Time.time >= nextMeteorTime)
             {
                 nextMeteorTime = Time.time + 9f;
-                CastMoltenMeteors();
+                CastMoltenMeteors(nearestTargetPos);
             }
         }
 
@@ -137,33 +182,63 @@ namespace Riftbound
             nextBreathTime = Time.time + 5f;
             nextMeteorTime = Time.time + 10f;
 
-            ChatSystem.LogSystem("<color=#ff4500><b>[APEX ROOST]</b></color> Vermithrax the Ember Sovereign lets out an earth-shattering roar!");
-            ZoneBanner.Show("Wyrmcrest Summit", "Apex Boss: Vermithrax the Ember Sovereign");
-            AudioEffects.PlaySpellCast();
+            if (!Network.CoopSessionConfig.IsDedicatedServer)
+            {
+                ChatSystem.LogSystem("<color=#ff4500><b>[APEX ROOST]</b></color> Vermithrax the Ember Sovereign lets out an earth-shattering roar!");
+                ZoneBanner.Show("Wyrmcrest Summit", "Apex Boss: Vermithrax the Ember Sovereign");
+                AudioEffects.PlaySpellCast();
+            }
         }
 
         void TriggerEnrage()
         {
             Enraged = true;
-            ChatSystem.LogSystem("<color=#ff2000><b>[BOSS ENRAGE]</b></color> Vermithrax unleashes the Primordial Flame! Molten fury consumes the summit!");
-            CombatTextManager.Spawn(bossCombatant.transform.position + Vector3.up * 5.5f, "🔥 PRIMORDIAL FLAME ENRAGE! 🔥", new Color(1f, 0.25f, 0.05f), true);
-
             if (bossController)
             {
                 bossController.attackInterval = 1.15f;
                 bossController.attackDamage = 35f;
             }
-            SpellFX.CreateConsecration(bossCombatant.transform.position, 4.0f);
+            if (!Network.CoopSessionConfig.IsDedicatedServer)
+            {
+                ChatSystem.LogSystem("<color=#ff2000><b>[BOSS ENRAGE]</b></color> Vermithrax unleashes the Primordial Flame! Molten fury consumes the summit!");
+                CombatTextManager.Spawn(bossCombatant.transform.position + Vector3.up * 5.5f, "🔥 PRIMORDIAL FLAME ENRAGE! 🔥", new Color(1f, 0.25f, 0.05f), true);
+                SpellFX.CreateConsecration(bossCombatant.transform.position, 4.0f);
+            }
         }
 
         void CastFlameBreath()
         {
-            if (!bossCombatant || !bossCombatant.Alive || !player || !player.Stats.Alive) return;
+            if (!bossCombatant || !bossCombatant.Alive) return;
+            if (!TryGetNearestRoostTarget(out _, out _, out _)) return;
             ChatSystem.LogCombat("Vermithrax begins channeling [Ember Breath]...");
 
             CastBarSystem.StartTargetCast(bossCombatant, "Pyroclastic Surge", "🔥", 2.6f, () =>
             {
-                if (bossCombatant && bossCombatant.Alive && player && player.Stats.Alive)
+                if (!bossCombatant || !bossCombatant.Alive) return;
+                float dmg = Enraged ? 36f : 26f;
+                if (Network.CoopSessionConfig.IsMultiplayer)
+                {
+                    foreach (var cp in Network.RiftboundCoopPlayer.AllPlayers)
+                    {
+                        if (!cp || !cp.IsSpawned || cp.Health.Value <= 0) continue;
+                        Vector3 toCp = (cp.transform.position - bossCombatant.transform.position).normalized;
+                        float angle = Vector3.Angle(bossCombatant.transform.forward, toCp);
+                        float dist = Vector3.Distance(bossCombatant.transform.position, cp.transform.position);
+                        if (angle < 65f && dist < 18f)
+                        {
+                            Network.RiftboundCoopPlayer.DispatchEnemyHitToPlayer(cp.OwnerClientId, dmg, "vermithrax-boss");
+                            if (!Network.CoopSessionConfig.IsDedicatedServer)
+                            {
+                                CombatTextManager.Spawn(cp.transform.position, $"-{dmg:0} FIRE BREATH", new Color(1f, 0.4f, 0.1f), true);
+                                SpellFX.CreateConsecration(cp.transform.position, 2.0f);
+                            }
+                        }
+                    }
+                    if (!Network.CoopSessionConfig.IsDedicatedServer)
+                        AudioEffects.PlayBladeHit();
+                    return;
+                }
+                if (player && player.Stats.Alive)
                 {
                     Vector3 toPlayer = (player.transform.position - bossCombatant.transform.position).normalized;
                     float angle = Vector3.Angle(bossCombatant.transform.forward, toPlayer);
@@ -171,7 +246,6 @@ namespace Riftbound
 
                     if (angle < 65f && dist < 18f)
                     {
-                        float dmg = Enraged ? 36f : 26f;
                         player.Stats.Damage(dmg);
                         CombatTextManager.Spawn(player.transform.position, $"-{dmg:0} FIRE BREATH", new Color(1f, 0.4f, 0.1f), true);
                         SpellFX.CreateConsecration(player.transform.position, 2.0f);
@@ -181,16 +255,16 @@ namespace Riftbound
             }, interruptible: !Enraged);
         }
 
-        void CastMoltenMeteors()
+        void CastMoltenMeteors(Vector3 focusPos)
         {
-            if (!bossCombatant || !bossCombatant.Alive || !player || !player.Stats.Alive) return;
+            if (!bossCombatant || !bossCombatant.Alive) return;
             ChatSystem.LogCombat("Volcanic fire rains down from the Wyrmcrest heavens!");
 
             for (int i = 0; i < 3; i++)
             {
                 Vector3 offset = UnityEngine.Random.insideUnitSphere * 12f;
                 offset.y = 0f;
-                Vector3 impactPos = player.transform.position + offset;
+                Vector3 impactPos = focusPos + offset;
                 StartCoroutine(DropMeteor(impactPos, 1.2f + i * 0.5f));
             }
         }
@@ -199,8 +273,26 @@ namespace Riftbound
         {
             yield return new WaitForSeconds(delay);
             if (!bossCombatant || !bossCombatant.Alive) yield break;
-            SpellFX.CreateConsecration(targetPos, 2.5f);
-            AudioEffects.PlayBladeHit();
+            if (!Network.CoopSessionConfig.IsDedicatedServer)
+            {
+                SpellFX.CreateConsecration(targetPos, 2.5f);
+                AudioEffects.PlayBladeHit();
+            }
+
+            if (Network.CoopSessionConfig.IsMultiplayer)
+            {
+                foreach (var cp in Network.RiftboundCoopPlayer.AllPlayers)
+                {
+                    if (!cp || !cp.IsSpawned || cp.Health.Value <= 0) continue;
+                    if (Vector3.Distance(cp.transform.position, targetPos) < 4.5f)
+                    {
+                        Network.RiftboundCoopPlayer.DispatchEnemyHitToPlayer(cp.OwnerClientId, 28f, "vermithrax-boss");
+                        if (!Network.CoopSessionConfig.IsDedicatedServer)
+                            CombatTextManager.Spawn(cp.transform.position, "-28 METEOR STRIKE", new Color(1f, 0.2f, 0.1f), true);
+                    }
+                }
+                yield break;
+            }
 
             if (player && player.Stats.Alive && Vector3.Distance(player.transform.position, targetPos) < 4.5f)
             {
@@ -212,9 +304,19 @@ namespace Riftbound
         void OnBossDefeated()
         {
             EncounterCompleted = true;
-            ChatSystem.LogSystem("<color=#ffd700><b>*** APEX APOTHEOSIS ***</b></color> Vermithrax the Ember Sovereign has been slain!");
-            ZoneBanner.Show("Wyrmcrest Conquered!", "Apex Sovereign Purged. The Skies of Aethelgard are Free.");
-            AudioEffects.PlayBossVictory();
+            if (!Network.CoopSessionConfig.IsDedicatedServer)
+            {
+                ChatSystem.LogSystem("<color=#ffd700><b>*** APEX APOTHEOSIS ***</b></color> Vermithrax the Ember Sovereign has been slain!");
+                ZoneBanner.Show("Wyrmcrest Conquered!", "Apex Sovereign Purged. The Skies of Aethelgard are Free.");
+                AudioEffects.PlayBossVictory();
+            }
+
+            // Spawn sparkler corpse loot (single corpse for both solo and co-op clients)
+            if (!Network.CoopSessionConfig.IsDedicatedServer)
+            {
+                Vector3 corpsePos = bossCombatant ? bossCombatant.transform.position : summitCenter;
+                LootDropSystem.SpawnLoot(corpsePos, "Vermithrax the Ember Sovereign", 85, 25, SharedRewardCatalog.GetEnemyDropItemId("vermithrax-boss"), "vermithrax-boss");
+            }
 
             if (player && !Network.CoopSessionConfig.IsMultiplayer)
             {
@@ -222,19 +324,6 @@ namespace Riftbound
                 player.AddGoldDirect(120);
                 CombatTextManager.Spawn(player.transform.position + Vector3.up * 2.5f, "+400 XP (APEX SOVEREIGN)", new Color(0.4f, 1f, 0.5f), true);
                 CombatTextManager.Spawn(player.transform.position + Vector3.up * 1.8f, "+120 Gold", new Color(1f, 0.85f, 0.2f), false);
-
-                // Spawn sparkler corpse loot
-                Vector3 corpsePos = bossCombatant ? bossCombatant.transform.position : summitCenter;
-                LootDropSystem.SpawnLoot(corpsePos, "Vermithrax the Ember Sovereign", 85, 25, "wyrmtooth-edge");
-
-                // Guaranteed legendary heart
-                player.GrantItem("ember-drake-scale");
-                var drakeScale = ItemCatalog.Get("ember-drake-scale");
-                if (drakeScale != null)
-                {
-                    ChatSystem.LogLoot($"Apex Trophy: Received [{drakeScale.name}] (Legendary Trinket)!");
-                    CombatTextManager.Spawn(player.transform.position + Vector3.up * 3.2f, $"Looted: {drakeScale.name}!", drakeScale.color, true);
-                }
 
                 // Award Dragonslayer title
                 PlayerTitleSystem.SetActiveTitle("Dragonslayer");

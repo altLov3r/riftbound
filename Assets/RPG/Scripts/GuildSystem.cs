@@ -140,12 +140,12 @@ namespace Riftbound
             // Seeding Bank Tab 2: Armory & Reagents
             bankTab2.Add(new GuildBankItem { id = "truesilver-ingot", name = "Truesilver Ingot", rarity = "Rare", count = 16, icon = "⛏", description = "Refined rare ore used in masterwork armorsmithing." });
             bankTab2.Add(new GuildBankItem { id = "crimson-ruby", name = "Crimson Ruby", rarity = "Rare", count = 6, icon = "💎", description = "Glinting gem infused with primordial fire essence." });
-            bankTab2.Add(new GuildBankItem { id = "sunforged-breastplate", name = "Sunforged Breastplate", rarity = "Epic", count = 1, icon = "🛡", description = "Heavy epic plate forged with radiant solar wards. (+12 Armor, +65 HP)" });
-            bankTab2.Add(new GuildBankItem { id = "crypt-signet", name = "Ring of the Scarlet Crypt", rarity = "Epic", count = 1, icon = "💍", description = "Ancient crest recovered from Dread Abbot Vael. (+8 Dmg, +5 Crit)" });
+            bankTab2.Add(new GuildBankItem { id = "tin-ore", name = "Tin Ore", rarity = "Uncommon", count = 12, icon = "🪨", description = "Smelted bronze-grade ore used in intermediate armorsmithing." });
+            bankTab2.Add(new GuildBankItem { id = "copper-ore", name = "Copper Ore", rarity = "Common", count = 20, icon = "🧱", description = "Raw frontier copper ore for apprentice smithing." });
 
             // Seeding Bank Activity Logs
             bankLogs.Add(new GuildLogEntry { timestamp = "Today 14:20", text = "[Archmage Karen] deposited 50 Gold into the treasury." });
-            bankLogs.Add(new GuildLogEntry { timestamp = "Today 12:45", text = "[High Commander Abe] deposited [Sunforged Breastplate] into Tab 2." });
+            bankLogs.Add(new GuildLogEntry { timestamp = "Today 12:45", text = "[High Commander Abe] deposited 16x [Truesilver Ingot] into Tab 2." });
             bankLogs.Add(new GuildLogEntry { timestamp = "Yesterday 21:10", text = "[Valeria] deposited 10x [Ember Healing Potion] into Tab 1." });
             bankLogs.Add(new GuildLogEntry { timestamp = "Yesterday 19:30", text = "[Darien] withdrew 2x [Ember Healing Potion] from Tab 1." });
 
@@ -308,7 +308,74 @@ namespace Riftbound
 
             if (player)
             {
-                player.GrantItem(item.id);
+                switch (item.id)
+                {
+                    case "ember-potion":
+                        if (player.Potions < 10) player.AddPotionsDirect(1);
+                        else if (player.Stats && player.Stats.Alive) player.Stats.Heal(120f);
+                        break;
+                    case "mana-biscuit":
+                        BuffSystem.ApplyBuff(new BuffSystem.AuraBuff
+                        {
+                            id = "mana-biscuit",
+                            name = "Conjured Mana Biscuit",
+                            description = "Restores Health and Mana over 15 seconds.",
+                            tag = "MB",
+                            iconColor = new Color(0.45f, 0.78f, 1.0f),
+                            duration = 15f,
+                            bonusHpRegen = 5.33f
+                        });
+                        if (player.CharacterClass == "Mage") player.RestoreClassResourceDirect(80f);
+                        break;
+                    case "elixir-mongoose":
+                        BuffSystem.ApplyBuff(new BuffSystem.AuraBuff
+                        {
+                            id = "elixir-mongoose",
+                            name = "Elixir of the Mongoose",
+                            description = "Increases Attack Damage by +4 and Speed by +10%.",
+                            tag = "EM",
+                            iconColor = new Color(0.25f, 0.85f, 0.45f),
+                            duration = 3600f,
+                            bonusDamage = 4f,
+                            bonusSpeedMultiplier = 0.10f
+                        });
+                        break;
+                    case "flask-titans":
+                        bool hadFlask = BuffSystem.HasBuff("flask-titans");
+                        BuffSystem.ApplyBuff(new BuffSystem.AuraBuff
+                        {
+                            id = "flask-titans",
+                            name = "Flask of the Titans",
+                            description = "Increases Maximum Health by 400 for 1 hour.",
+                            tag = "FT",
+                            iconColor = new Color(0.65f, 0.25f, 0.95f),
+                            duration = 3600f
+                        });
+                        if (!hadFlask && player.Stats)
+                        {
+                            player.Stats.maxHealth += 400f;
+                            player.Stats.Heal(400f);
+                        }
+                        break;
+                    case "truesilver-ingot":
+                    case "tin-ore":
+                    case "copper-ore":
+                        var prof = ProfessionSystem.Instance ?? player.GetComponent<ProfessionSystem>() ?? player.gameObject.AddComponent<ProfessionSystem>();
+                        string reagentName = item.id == "truesilver-ingot" ? "Silver Ore" : item.id == "tin-ore" ? "Tin Ore" : "Copper Ore";
+                        prof.AddReagent(reagentName, 1);
+                        break;
+                    case "crimson-ruby":
+                        var gems = GemSocketSystem.Instance ?? player.GetComponent<GemSocketSystem>() ?? player.gameObject.AddComponent<GemSocketSystem>();
+                        gems.AddGemsToInventory("gem_bold_ruby", 1);
+                        break;
+                    default:
+                        if (!player.GrantItem(item.id) && ItemCatalog.Get(item.id) == null)
+                        {
+                            ChatSystem.LogSystem($"Cannot withdraw unknown item '{item.id}'.");
+                            return false;
+                        }
+                        break;
+                }
             }
 
             item.count--;

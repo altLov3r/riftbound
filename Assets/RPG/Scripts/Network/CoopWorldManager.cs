@@ -157,6 +157,9 @@ namespace Riftbound.Network
         readonly Dictionary<ulong, HashSet<int>> claimedQuestsByClient = new Dictionary<ulong, HashSet<int>>();
         readonly Dictionary<ulong, HashSet<string>> creditedKillsByClient = new Dictionary<ulong, HashSet<string>>();
 
+        public bool HasClaimedChestForClient(ulong clientId, string chestId) =>
+            !string.IsNullOrEmpty(chestId) && claimedChestsByClient.TryGetValue(clientId, out var set) && set.Contains(chestId);
+
         public bool TryClaimChestForClient(ulong clientId, string chestId)
         {
             if (string.IsNullOrEmpty(chestId)) return false;
@@ -164,6 +167,9 @@ namespace Riftbound.Network
                 claimedChestsByClient[clientId] = set = new HashSet<string>();
             return set.Add(chestId);
         }
+
+        public bool HasClaimedQuestForClient(ulong clientId, int questIndex) =>
+            claimedQuestsByClient.TryGetValue(clientId, out var set) && set.Contains(questIndex);
 
         public bool TryClaimQuestForClient(ulong clientId, int questIndex)
         {
@@ -487,16 +493,93 @@ namespace Riftbound.Network
             if (netObj) netObj.Spawn(false);
         }
 
+        public readonly struct PendingRealmIdentity
+        {
+            public readonly string AccountId;
+            public readonly string CharacterName;
+            public readonly string Race;
+            public readonly string ClassName;
+            public readonly string Faction;
+
+            public PendingRealmIdentity(string accountId, string characterName, string race, string className, string faction)
+            {
+                AccountId = accountId ?? "";
+                CharacterName = characterName ?? "";
+                Race = string.IsNullOrWhiteSpace(race) ? "Human" : race;
+                ClassName = string.IsNullOrWhiteSpace(className) ? "Warrior" : className;
+                Faction = string.IsNullOrWhiteSpace(faction) ? "Alliance" : faction;
+            }
+        }
+
+        static readonly Dictionary<ulong, PendingRealmIdentity> pendingRealmIdentityByClientId = new Dictionary<ulong, PendingRealmIdentity>();
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        static void ResetPendingRealmIdentities()
+        {
+            pendingRealmIdentityByClientId.Clear();
+        }
+
+        public static bool TryConsumePendingRealmIdentity(ulong clientId, out PendingRealmIdentity identity)
+        {
+            if (pendingRealmIdentityByClientId.TryGetValue(clientId, out identity))
+            {
+                pendingRealmIdentityByClientId.Remove(clientId);
+                return true;
+            }
+            return false;
+        }
+
+        static string CleanPayloadPart(string raw, string fallback = "")
+        {
+            string val = string.IsNullOrWhiteSpace(raw) ? fallback : raw.Trim();
+            return val.Replace("|", "");
+        }
+
+        static string SanitizePayloadKey(string raw)
+        {
+            if (string.IsNullOrWhiteSpace(raw)) return "adventurer";
+            var sb = new System.Text.StringBuilder(raw.Length);
+            foreach (char c in raw.Trim())
+            {
+                if (char.IsLetterOrDigit(c) || c == '-' || c == '_') sb.Append(char.ToLowerInvariant(c));
+            }
+            return sb.Length > 0 ? sb.ToString() : "adventurer";
+        }
+
+        static string ResolveFactionForRace(string race) =>
+            race == "Orc" || race == "Brute" || race == "Undead" || race == "Goblin" ? "Horde" : "Alliance";
+
         static byte[] BuildRealmConnectionPayload()
         {
-            string race = string.IsNullOrWhiteSpace(RealmConfig.Runtime.clientRace) ? "Human" : RealmConfig.Runtime.clientRace;
-            string payload = $"{CoopSessionConfig.ProtocolVersion}|{RealmConfig.Current.realmId}|{race}";
+            string race = CleanPayloadPart(RealmConfig.Runtime.clientRace, "Human");
+            string cls = CleanPayloadPart(RealmConfig.Runtime.clientClass, "Warrior");
+            string charFallback = FindFirstObjectByType<PlayerController>()?.CharacterName;
+            string charName = CleanPayloadPart(RealmConfig.Runtime.clientCharName, string.IsNullOrWhiteSpace(charFallback) ? "Adventurer" : charFallback);
+            string acctFallback = $"acct_{SanitizePayloadKey(charName)}";
+            string accountId = CleanPayloadPart(RealmConfig.Runtime.clientAccountId, acctFallback);
+            string authToken = CleanPayloadPart(RealmConfig.Runtime.clientAuthToken, "");
+            string payload = $"{CoopSessionConfig.ProtocolVersion}|{RealmConfig.Current.realmId}|{race}|{accountId}|{charName}|{cls}|{authToken}";
             return System.Text.Encoding.UTF8.GetBytes(payload);
         }
 
         public static bool ValidateRealmApprovalPayload(byte[] payload, string expectedRealmId, out string race, out string rejectReason)
+            => ValidateRealmApprovalPayload(payload, expectedRealmId, out race, out _, out _, out _, out _, out rejectReason);
+
+        public static bool ValidateRealmApprovalPayload(
+            byte[] payload,
+            string expectedRealmId,
+            out string race,
+            out string accountId,
+            out string charName,
+            out string className,
+            out string authToken,
+            out string rejectReason)
         {
             race = "Human";
+            accountId = "";
+            charName = "";
+            className = "Warrior";
+            authToken = "";
             rejectReason = string.Empty;
             if (payload == null || payload.Length == 0)
             {
@@ -517,6 +600,14 @@ namespace Riftbound.Network
             }
             if (parts.Length >= 3 && !string.IsNullOrWhiteSpace(parts[2]))
                 race = parts[2].Trim();
+            if (parts.Length >= 4 && !string.IsNullOrWhiteSpace(parts[3]))
+                accountId = parts[3].Trim();
+            if (parts.Length >= 5 && !string.IsNullOrWhiteSpace(parts[4]))
+                charName = parts[4].Trim();
+            if (parts.Length >= 6 && !string.IsNullOrWhiteSpace(parts[5]))
+                className = parts[5].Trim();
+            if (parts.Length >= 7 && !string.IsNullOrEmpty(parts[6]))
+                authToken = parts[6].Trim();
             return true;
         }
 
@@ -533,20 +624,81 @@ namespace Riftbound.Network
             }
 
             string spawnRace = "Human";
-            if (CoopSessionConfig.IsRealmSession && !ValidateRealmApprovalPayload(request.Payload, RealmConfig.Current.realmId, out spawnRace, out string rejectReason))
+            string accountId = "";
+            string charName = "";
+            string className = "Warrior";
+            string authToken = "";
+            if (CoopSessionConfig.IsRealmSession)
             {
-                response.Approved = false;
-                response.Reason = rejectReason;
-                if (CoopSessionConfig.IsDedicatedServer)
-                    RealmServerBootstrap.LogServer($"Rejected clientId={request.ClientNetworkId}: {rejectReason}");
-                return;
+                if (!ValidateRealmApprovalPayload(request.Payload, RealmConfig.Current.realmId, out spawnRace, out accountId, out charName, out className, out authToken, out string rejectReason))
+                {
+                    response.Approved = false;
+                    response.Reason = rejectReason;
+                    if (CoopSessionConfig.IsDedicatedServer)
+                        RealmServerBootstrap.LogServer($"Rejected clientId={request.ClientNetworkId}: {rejectReason}");
+                    return;
+                }
+
+                if (RealmPersistenceService.IsInitialized && !string.IsNullOrEmpty(accountId))
+                {
+                    if (!string.IsNullOrEmpty(authToken))
+                    {
+                        if (!RealmPersistenceService.Authenticate(accountId, authToken, requireExistingAccount: false, out _, out string authError))
+                        {
+                            response.Approved = false;
+                            response.Reason = authError;
+                            if (CoopSessionConfig.IsDedicatedServer)
+                                RealmServerBootstrap.LogServer($"Rejected clientId={request.ClientNetworkId} account={accountId}: {authError}");
+                            return;
+                        }
+                    }
+                    else if (RealmPersistenceService.TryGetAccount(accountId, out var existingAcc))
+                    {
+                        if (existingAcc.isBanned)
+                        {
+                            response.Approved = false;
+                            response.Reason = "Account is banned from this realm.";
+                            if (CoopSessionConfig.IsDedicatedServer)
+                                RealmServerBootstrap.LogServer($"Rejected banned clientId={request.ClientNetworkId} account={accountId}");
+                            return;
+                        }
+                        if (!string.IsNullOrEmpty(existingAcc.tokenHash))
+                        {
+                            response.Approved = false;
+                            response.Reason = "Authentication token required for this account.";
+                            if (CoopSessionConfig.IsDedicatedServer)
+                                RealmServerBootstrap.LogServer($"Rejected missing-token clientId={request.ClientNetworkId} account={accountId}");
+                            return;
+                        }
+                    }
+                }
+
+                pendingRealmIdentityByClientId[request.ClientNetworkId] = new PendingRealmIdentity(
+                    accountId, charName, spawnRace, className, ResolveFactionForRace(spawnRace));
             }
 
             response.Approved = true;
             response.CreatePlayerObject = true;
             int slot = AllocateSpawnSlot(null);
             Vector3 basePos = GetRealmSpawnAnchor(spawnRace);
-            response.Position = RiftboundCoopPlayer.ComputeSpawnPosition(basePos, slot);
+            Vector3 spawnPos = RiftboundCoopPlayer.ComputeSpawnPosition(basePos, slot);
+            if (CoopSessionConfig.IsRealmSession && RealmPersistenceService.IsInitialized &&
+                !string.IsNullOrWhiteSpace(accountId) && !string.IsNullOrWhiteSpace(charName) &&
+                RealmPersistenceService.TryLoadExistingCharacter(accountId, charName, out var existingSave))
+            {
+                Vector3 savedPos = new Vector3(existingSave.posX, existingSave.posY, existingSave.posZ);
+                if (!float.IsNaN(savedPos.x) && !float.IsNaN(savedPos.y) && !float.IsNaN(savedPos.z) && savedPos.sqrMagnitude > 0.01f)
+                {
+                    if (!WorldRegions.Underground(savedPos))
+                    {
+                        float ground = WorldRegions.GroundHeight(savedPos);
+                        if (!float.IsNaN(ground) && !float.IsInfinity(ground))
+                            savedPos.y = Mathf.Max(savedPos.y, ground + 0.30f);
+                    }
+                    spawnPos = savedPos;
+                }
+            }
+            response.Position = spawnPos;
             response.Rotation = Quaternion.identity;
             response.Pending = false;
         }
@@ -575,6 +727,10 @@ namespace Riftbound.Network
 
         void OnClientDisconnected(ulong clientId)
         {
+            pendingRealmIdentityByClientId.Remove(clientId);
+            claimedChestsByClient.Remove(clientId);
+            claimedQuestsByClient.Remove(clientId);
+            creditedKillsByClient.Remove(clientId);
             if (shuttingDown || nm == null) return;
 
             if (nm.IsServer && CoopSessionConfig.IsDedicatedServer)
@@ -615,6 +771,7 @@ namespace Riftbound.Network
         {
             if (shuttingDown) return;
             shuttingDown = true;
+            pendingRealmIdentityByClientId.Clear();
 
             OnlineSessionService.CancelPendingAttempt();
             if (OnlineSessionService.HasActiveSession)
@@ -650,7 +807,11 @@ namespace Riftbound.Network
 
         void OnDestroy()
         {
-            if (Instance == this) Instance = null;
+            if (Instance == this)
+            {
+                Instance = null;
+                pendingRealmIdentityByClientId.Clear();
+            }
             if (nm != null)
             {
                 nm.OnClientConnectedCallback -= OnClientConnected;

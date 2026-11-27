@@ -110,6 +110,58 @@ namespace Riftbound.Editor
                 Check("r2_append_only_audit_log_recorded",
                     auditLines.Length >= 10 && hasAllowed && hasDenied && hasRoleAudit,
                     $"lines={auditLines.Length}, allowed={hasAllowed}, denied={hasDenied}, setRole={hasRoleAudit}");
+
+                // 8. Legacy v1 profession migration (omits professionInitialized/skills/reagents/ownedItems) + v2 empty-reagent persistence
+                string v1Path = Path.Combine(RealmPersistenceService.CharactersDirectory, "alice__legacyv1.json");
+                Directory.CreateDirectory(RealmPersistenceService.CharactersDirectory);
+                File.WriteAllText(v1Path,
+                    "{\"accountId\":\"alice\",\"characterName\":\"LegacyV1\",\"race\":\"Human\",\"className\":\"Warrior\",\"faction\":\"Alliance\",\"level\":3,\"experience\":120,\"gold\":50,\"claimedChests\":[\"village-cache\"]}");
+
+                var v1Loaded = RealmPersistenceService.LoadOrCreateCharacter("alice", "LegacyV1");
+                bool v1Migrated = v1Loaded != null &&
+                                  v1Loaded.professionInitialized &&
+                                  v1Loaded.alchemySkill == Riftbound.ProfessionSystem.DefaultAlchemySkill &&
+                                  v1Loaded.blacksmithingSkill == Riftbound.ProfessionSystem.DefaultBlacksmithingSkill &&
+                                  v1Loaded.engineeringSkill == Riftbound.ProfessionSystem.DefaultEngineeringSkill &&
+                                  v1Loaded.reagents != null &&
+                                  v1Loaded.reagents.Count == Riftbound.ProfessionSystem.StarterReagents.Length &&
+                                  v1Loaded.reagents.Contains("Peacebloom=6") &&
+                                  v1Loaded.reagents.Contains("Silver Ore=2") &&
+                                  v1Loaded.ownedItems != null &&
+                                  v1Loaded.ownedItems.Contains("starter-axe") &&
+                                  v1Loaded.ownedItems.Contains("leather-vest");
+
+                // Reload after restart -> idempotent, no further migration
+                RealmPersistenceService.ShutdownForTest();
+                RealmPersistenceService.Initialize(tempDir);
+                var v1Reloaded = RealmPersistenceService.LoadOrCreateCharacter("alice", "LegacyV1");
+                bool v1Idempotent = v1Reloaded != null &&
+                                    v1Reloaded.professionInitialized &&
+                                    v1Reloaded.reagents != null &&
+                                    v1Reloaded.reagents.Count == Riftbound.ProfessionSystem.StarterReagents.Length &&
+                                    !RealmPersistenceService.NormalizeCharacterSave(v1Reloaded);
+
+                // Case B: new v2 character defaults
+                bool v2DefaultsOk = ch.professionInitialized &&
+                                    ch.reagents != null &&
+                                    ch.reagents.Count == Riftbound.ProfessionSystem.StarterReagents.Length;
+
+                // Case C: v2 character with professionInitialized=true and all reagents spent (reagents=[]) must NOT re-seed on reload
+                var spent = RealmPersistenceService.LoadOrCreateCharacter("alice", "SpentV2", "Human", "Warrior", "Alliance");
+                spent.reagents.Clear();
+                spent.professionInitialized = true;
+                RealmPersistenceService.SaveCharacter(spent);
+                RealmPersistenceService.ShutdownForTest();
+                RealmPersistenceService.Initialize(tempDir);
+                var spentReloaded = RealmPersistenceService.LoadOrCreateCharacter("alice", "SpentV2");
+                bool v2EmptyNotReseeded = spentReloaded != null &&
+                                          spentReloaded.professionInitialized &&
+                                          spentReloaded.reagents != null &&
+                                          spentReloaded.reagents.Count == 0;
+
+                Check("r2_legacy_v1_profession_migration_and_v2_empty_reagents",
+                    v1Migrated && v1Idempotent && v2DefaultsOk && v2EmptyNotReseeded,
+                    $"v1Migrated={v1Migrated}, v1Idempotent={v1Idempotent}, v2Defaults={v2DefaultsOk}, v2EmptyNotReseeded={v2EmptyNotReseeded}");
             }
             catch (Exception ex)
             {

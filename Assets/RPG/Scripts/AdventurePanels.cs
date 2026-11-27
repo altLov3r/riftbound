@@ -83,7 +83,7 @@ namespace Riftbound
             {
                 bool westernQuest = player.CanUseWesternRoadQuest && player.ActiveMerchant.npcName == WesternRoadCamps.Rowan &&
                     player.QuestIndex >= 2;
-                float shopHeight = merchantTopic != null ? 330f : westernQuest ? 570f : 500f;
+                float shopHeight = merchantTopic != null ? 330f : westernQuest ? 512f : 442f;
                 float x = width / 2 - 330, y = height / 2 - shopHeight / 2;
                 Panel(new Rect(x, y, 660, shopHeight));
                 bool hasTopics = merchantTopics != null && merchantTopics.Count > 0;
@@ -118,30 +118,26 @@ namespace Riftbound
                 GUI.enabled = player.Gold >= 45 && !player.TemperedWeapon && !player.InCombat();
                 if (GUI.Button(new Rect(x + 455, y + 195, 180, 36), "UPGRADE / 45 GOLD", questButton)) player.TemperWeapon();
                 GUI.enabled = true;
-                GUI.Label(new Rect(x + 24, y + 259, 400, 30), "Leather vest / 2 armor, +10 max HP", label);
-                GUI.enabled = player.Gold >= 25 && !player.OwnsItem("leather-vest") && !player.InCombat();
-                if (GUI.Button(new Rect(x + 455, y + 253, 180, 36), player.OwnsItem("leather-vest") ? "OWNED" : "BUY VEST / 25 GOLD", questButton)) player.BuyVest();
-                GUI.enabled = true;
-                GUI.Label(new Rect(x + 24, y + 317, 400, 30), "Rest / restore all health", label);
+                GUI.Label(new Rect(x + 24, y + 259, 400, 30), "Rest / restore all health", label);
                 GUI.enabled = player.Gold >= 5 && player.Stats.Health < player.Stats.maxHealth && !player.InCombat();
-                if (GUI.Button(new Rect(x + 455, y + 311, 180, 36), "REST / 5 GOLD", questButton)) player.RestAtMerchant();
+                if (GUI.Button(new Rect(x + 455, y + 253, 180, 36), "REST / 5 GOLD", questButton)) player.RestAtMerchant();
                 GUI.enabled = true;
-                GUI.Label(new Rect(x + 24, y + 375, 400, 30), $"Bone shards: {player.BoneShards} / 2 gold each", label);
+                GUI.Label(new Rect(x + 24, y + 317, 400, 30), $"Bone shards: {player.BoneShards} / 2 gold each", label);
                 GUI.enabled = player.BoneShards > 0 && !player.InCombat();
-                if (GUI.Button(new Rect(x + 455, y + 369, 180, 36), "SELL ALL SHARDS", questButton)) player.SellShards();
+                if (GUI.Button(new Rect(x + 455, y + 311, 180, 36), "SELL ALL SHARDS", questButton)) player.SellShards();
                 GUI.enabled = true;
                 if (westernQuest)
                 {
-                    GUI.Label(new Rect(x + 24, y + 420, 610, 26), WesternRoadCamps.QuestTitle, title);
+                    GUI.Label(new Rect(x + 24, y + 362, 610, 26), WesternRoadCamps.QuestTitle, title);
                     string roadText = player.WesternRoadStage switch
                     {
                         0 => "The grain wagon never arrived. Find its waybill at the layby on the Highspire road.",
                         3 => "One wagon and two seals. Let’s pay the ferry crew for the load they actually carried.",
                         _ => player.WesternRoadObjective
                     };
-                    GUI.Label(new Rect(x + 24, y + 450, 420, 53), roadText, small);
+                    GUI.Label(new Rect(x + 24, y + 392, 420, 53), roadText, small);
                     if ((player.WesternRoadStage == 0 || player.WesternRoadStage == 3) &&
-                        GUI.Button(new Rect(x + 452, y + 453, 183, 38), player.WesternRoadStage == 0 ? "Accept quest" : "Turn in quest", questButton))
+                        GUI.Button(new Rect(x + 452, y + 395, 183, 38), player.WesternRoadStage == 0 ? "Accept quest" : "Turn in quest", questButton))
                         player.HandleWesternRoadAtRowan();
                 }
             }

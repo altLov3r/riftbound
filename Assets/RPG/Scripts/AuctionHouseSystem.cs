@@ -71,24 +71,24 @@ namespace Riftbound
             listings.Add(new AuctionListing
             {
                 id = "auc-1",
-                itemName = "Shadowfang Stiletto",
-                sellerName = "Rogue_Vax",
-                buyoutPrice = 45,
-                category = "Weapon",
-                rarity = "Epic",
-                itemId = "duskwood-shadow-dagger",
-                rarityColor = new Color(0.64f, 0.21f, 0.93f)
+                itemName = "Kingsblood (Stack of 5)",
+                sellerName = "Herbalist_Willow",
+                buyoutPrice = 12,
+                category = "Trade Goods",
+                rarity = "Uncommon",
+                itemId = "Kingsblood",
+                rarityColor = new Color(0.12f, 1.0f, 0.0f)
             });
             listings.Add(new AuctionListing
             {
                 id = "auc-2",
-                itemName = "Aegis of the Scarlet Dawn",
-                sellerName = "Paladin_Brian",
-                buyoutPrice = 60,
-                category = "Armor",
-                rarity = "Epic",
-                itemId = "scarlet-aegis",
-                rarityColor = new Color(0.64f, 0.21f, 0.93f)
+                itemName = "Silver Ore (Stack of 5)",
+                sellerName = "Miner_Garrick",
+                buyoutPrice = 18,
+                category = "Trade Goods",
+                rarity = "Rare",
+                itemId = "Silver Ore",
+                rarityColor = new Color(0.0f, 0.44f, 0.87f)
             });
             listings.Add(new AuctionListing
             {
@@ -126,13 +126,13 @@ namespace Riftbound
             listings.Add(new AuctionListing
             {
                 id = "auc-6",
-                itemName = "Inquisitor's Sunblade",
-                sellerName = "Templar_Alden",
-                buyoutPrice = 55,
-                category = "Weapon",
-                rarity = "Epic",
-                itemId = "scarlet-blade",
-                rarityColor = new Color(0.64f, 0.21f, 0.93f)
+                itemName = "Ember Healing Potion (x2)",
+                sellerName = "Alchemist_Mireya",
+                buyoutPrice = 15,
+                category = "Consumable",
+                rarity = "Common",
+                itemId = "potion",
+                rarityColor = Color.white
             });
         }
 
@@ -185,11 +185,25 @@ namespace Riftbound
             // Grant purchased item
             if (listing.category == "Trade Goods")
             {
-                if (ProfessionSystem.Instance) ProfessionSystem.Instance.AddReagent(listing.itemId, 5);
+                var prof = ProfessionSystem.Instance ?? player.GetComponent<ProfessionSystem>() ?? player.gameObject.AddComponent<ProfessionSystem>();
+                if (prof) prof.AddReagent(listing.itemId, 5);
             }
             else if (listing.itemId == "potion")
             {
                 player.AddPotionsDirect(2);
+            }
+            else if (listing.itemId == "buff-strength")
+            {
+                BuffSystem.ApplyBuff(new BuffSystem.AuraBuff
+                {
+                    id = "elixir-strength",
+                    name = "Lion's Strength",
+                    description = "Increases Attack Damage by +8.",
+                    tag = "LS",
+                    iconColor = new Color(1f, 0.45f, 0.15f),
+                    duration = 60f,
+                    bonusDamage = 8f
+                });
             }
             else
             {

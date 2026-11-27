@@ -204,6 +204,17 @@ namespace Riftbound
 
         static bool ValidId(string id) => id == "" || (id != null && Guid.TryParseExact(id, "N", out _));
 
+        static string SanitizeAccountComponent(string raw)
+        {
+            if (string.IsNullOrWhiteSpace(raw)) return "garrick";
+            var sb = new System.Text.StringBuilder(raw.Length);
+            foreach (char c in raw.Trim())
+            {
+                if (char.IsLetterOrDigit(c) || c == '-' || c == '_') sb.Append(char.ToLowerInvariant(c));
+            }
+            return sb.Length > 0 ? sb.ToString() : "garrick";
+        }
+
         void ApplySettings()
         {
             AudioListener.volume = volume;
@@ -262,6 +273,13 @@ namespace Riftbound
                     realm.clientRace = Selected.race;
                     realm.clientClass = Selected.characterClass;
                     realm.clientFaction = Selected.faction;
+                }
+                if (!realm.hasExplicitAccountId)
+                {
+                    string charFallback = !string.IsNullOrWhiteSpace(realm.clientCharName) ? realm.clientCharName : Selected.name;
+                    realm.clientAccountId = !string.IsNullOrWhiteSpace(Selected.id)
+                        ? $"acct_{Selected.id}"
+                        : $"acct_{SanitizeAccountComponent(charFallback)}";
                 }
                 Network.RealmServerBootstrap.IsolateOfflineSaves();
             }

@@ -51,9 +51,9 @@ namespace Riftbound
         {
             if (savedSets.Count > 0) return;
 
-            savedSets.Add(new EquipmentSet("Vanguard Tank", "🛡", "bloodrock-waraxe", "iron-plate-mail", "vitality-talisman"));
-            savedSets.Add(new EquipmentSet("Sovereign Striker", "⚔", "wyrmtooth-edge", "runed-scout-vest", "dragonslayer-medal"));
-            savedSets.Add(new EquipmentSet("Wanderer Explorer", "🏹", "ashwood-greatsword", "scout-leather-tunic", "lucky-adventurer-stone"));
+            savedSets.Add(new EquipmentSet("Vanguard Tank", "🛡", "bloodrock-waraxe", "iron-buckler", "emberwatch-sigil"));
+            savedSets.Add(new EquipmentSet("Sovereign Striker", "⚔", "wyrmtooth-edge", "ursolak-spirit-pelt", "ember-drake-scale"));
+            savedSets.Add(new EquipmentSet("Wanderer Explorer", "🏹", "emberwatch-axe", "leather-vest", "travel-charm"));
         }
 
         public bool SaveCurrentEquipment(string setName, string icon = "⚔")
@@ -100,9 +100,18 @@ namespace Riftbound
             // In Classic WoW: Weapons can be swapped in combat, but Armor and Trinkets CANNOT!
             if (inCombat)
             {
-                if (!string.IsNullOrEmpty(set.weaponId))
+                if (string.IsNullOrEmpty(set.weaponId))
                 {
-                    player.EquipDirect(set.weaponId);
+                    feedback = $"Set '{set.name}' has no weapon; Armor and Trinkets cannot be changed during combat!";
+                    ChatSystem.LogSystem($"<color=#ffaa00>⚔ <b>[Equipment Manager]</b> {feedback}</color>");
+                    return false;
+                }
+                if (!player.EquipIfOwned(set.weaponId))
+                {
+                    var wItem = ItemCatalog.Get(set.weaponId);
+                    feedback = $"Cannot swap weapon: you do not own [{wItem?.name ?? set.weaponId}].";
+                    ChatSystem.LogSystem($"<color=#ffaa00>⚔ <b>[Equipment Manager]</b> {feedback}</color>");
+                    return false;
                 }
                 feedback = $"Swapped weapon to '{set.name}', but Armor and Trinkets cannot be changed during combat!";
                 ChatSystem.LogSystem($"<color=#ffaa00>⚔ <b>[Equipment Manager]</b> {feedback}</color>");
@@ -110,12 +119,22 @@ namespace Riftbound
                 return true;
             }
 
-            // Out of combat: Full set swap
-            if (!string.IsNullOrEmpty(set.weaponId)) player.EquipDirect(set.weaponId);
-            if (!string.IsNullOrEmpty(set.armorId)) player.EquipDirect(set.armorId);
-            if (!string.IsNullOrEmpty(set.trinketId)) player.EquipDirect(set.trinketId);
+            // Out of combat: Full set swap (owned items only)
+            int attempted = 0, equipped = 0;
+            if (!string.IsNullOrEmpty(set.weaponId)) { attempted++; if (player.EquipIfOwned(set.weaponId)) equipped++; }
+            if (!string.IsNullOrEmpty(set.armorId)) { attempted++; if (player.EquipIfOwned(set.armorId)) equipped++; }
+            if (!string.IsNullOrEmpty(set.trinketId)) { attempted++; if (player.EquipIfOwned(set.trinketId)) equipped++; }
 
-            feedback = $"Equipped set '{set.name}' ({set.icon})!";
+            if (attempted > 0 && equipped == 0)
+            {
+                feedback = $"You do not own any gear in equipment set '{set.name}'.";
+                ChatSystem.LogSystem($"<color=#ffaa00>🛡 <b>[Equipment Manager]</b> {feedback}</color>");
+                return false;
+            }
+
+            feedback = equipped < attempted
+                ? $"Partially equipped set '{set.name}' ({equipped}/{attempted} owned items)."
+                : $"Equipped set '{set.name}' ({set.icon})!";
             ChatSystem.LogSystem($"<color=#00ff88>🛡 <b>[Equipment Manager]</b> {feedback}</color>");
             ZoneBanner.Show("EQUIPMENT SET APPLIED", $"{set.icon} {set.name}");
             AudioEffects.PlayQuestComplete();

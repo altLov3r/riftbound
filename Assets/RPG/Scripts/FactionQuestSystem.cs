@@ -89,7 +89,7 @@ namespace Riftbound
                 title = "Charting the Frontier", faction = "Any", zone = "Greenhollow Post",
                 description = "Survey Westbank Overlook by the western river, Bloodrock Vista in the eastern frontier, and Wyrmcrest Lookout on the summit road. Return to Cartographer Elara at Greenhollow Post. Earlier discoveries count.",
                 targetType = "discover_landmark", targetId = "frontier-vistas", targetName = "Frontier survey sites",
-                requiredCount = 3, rewardGold = 75, rewardXP = 150, rewardItem = "travel-charm",
+                requiredCount = 3, rewardGold = 75, rewardXP = 150,
                 targetLocation = new Vector3(-241, 6, 44), nextQuestId = "river_reaver_bounty"
             });
             Add(new QuestDef
@@ -98,7 +98,7 @@ namespace Riftbound
                 title = "Silence the River Reavers", faction = "Any", zone = "Willowmere Wilds",
                 description = "Your survey exposed a River Reaver camp on the western bank, north of Willow Crossing. Captain Selvek and two guards threaten the road. Defeat the captain, then return to Elara at Greenhollow Post. His lockbox can be opened after his defeat.",
                 targetType = "defeat_enemy", targetId = RiverReaverCamp.CaptainId, targetName = "Captain Selvek",
-                requiredCount = 1, rewardGold = 60, rewardXP = 140, rewardItem = "riverwarden-signet",
+                requiredCount = 1, rewardGold = 60, rewardXP = 140,
                 prerequisiteQuestId = "frontier_cartography", targetLocation = RiverReaverCamp.Position
             });
 
@@ -129,7 +129,7 @@ namespace Riftbound
                 title = "Crown of Briarhollow", faction = "Any", zone = "Pinewatch Relay",
                 description = "Warchief Grimgnaw is directing the Timberfang raids from Briarhollow Den at the far edge of the woods. Slay Warchief Grimgnaw, claim his spoils chest, and return to Watchkeeper Halen to secure Pinewatch Relay.",
                 targetType = "defeat_enemy", targetId = PinewatchWoodsZone.BossId, targetName = PinewatchWoodsZone.BossName,
-                requiredCount = 1, rewardGold = 115, rewardXP = 220, rewardItem = "pinewatch-warden-crest",
+                requiredCount = 1, rewardGold = 115, rewardXP = 220,
                 prerequisiteQuestId = "pinewatch_recover_line", targetLocation = PinewatchWoodsZone.BossPosition
             });
 
@@ -151,7 +151,7 @@ namespace Riftbound
                 title = "Trial of the Bear Guardian", faction = "Any", zone = "Ashenmaw Cavern",
                 description = "Deep inside the cavern's vaulted sanctum, Ursolak—the Ancient Bear Guardian—still rages before the spirit altar. Defeat Ursolak, claim his spirit reliquary, and return to Warden Kaelen.",
                 targetType = "defeat_enemy", targetId = AshenmawCavernZone.BossId, targetName = AshenmawCavernZone.BossName,
-                requiredCount = 1, rewardGold = 160, rewardXP = 300, rewardItem = "ursolak-spirit-pelt",
+                requiredCount = 1, rewardGold = 160, rewardXP = 300,
                 prerequisiteQuestId = "ashenmaw_tribe_cull", targetLocation = AshenmawCavernZone.SanctumPos
             });
 
@@ -240,7 +240,7 @@ namespace Riftbound
                 title = "Expedition: Thornwatch Citadel", faction = "Any", zone = "Ironmaw Quarry",
                 description = "Cross the southern valley all the way to Thornwatch Citadel in the southwest corner and present the completed Frontier Expedition ledger to Captain Vaelen.",
                 targetType = "talk_npc", targetId = "Captain Vaelen", targetName = "Report to Captain Vaelen",
-                requiredCount = 1, rewardGold = 200, rewardXP = 350, rewardItem = "worldbreaker-maul",
+                requiredCount = 1, rewardGold = 200, rewardXP = 350,
                 prerequisiteQuestId = "ironmaw_outlaw_boss", targetLocation = new Vector3(-275f, 14f, -110f)
             });
 
@@ -253,7 +253,7 @@ namespace Riftbound
                 title = "Reclaim Ironmaw Quarry", faction = "Any", zone = "Ironmaw Quarry",
                 description = "Ironjaw Krag and his outlaw gang seized the eastern iron pit and locked the ore vault. Fight into Ironmaw Quarry, defeat Ironjaw Krag, loot the vault, and report back to Overseer Rusk.",
                 targetType = "defeat_enemy", targetId = IronmawQuarryZone.BossId, targetName = IronmawQuarryZone.BossName,
-                requiredCount = 1, rewardGold = 150, rewardXP = 280, rewardItem = "ironmaw-cleaver",
+                requiredCount = 1, rewardGold = 150, rewardXP = 280,
                 targetLocation = IronmawQuarryZone.QuarryPos
             });
 
@@ -293,7 +293,6 @@ namespace Riftbound
                 requiredCount = 1,
                 rewardGold = 25,
                 rewardXP = 70,
-                rewardItem = "iron-buckler",
                 prerequisiteQuestId = "emberwatch_raider_cull",
                 nextQuestId = "emberwatch_to_highspire",
                 targetLocation = new Vector3(9f, 0f, 8f)
@@ -313,7 +312,6 @@ namespace Riftbound
                 requiredCount = 1,
                 rewardGold = 50,
                 rewardXP = 120,
-                rewardItem = "alliance-war-banner",
                 prerequisiteQuestId = "emberwatch_armory_check",
                 nextQuestId = "highspire_royal_council",
                 targetLocation = new Vector3(-200f, 12f, -60f)
@@ -374,7 +372,6 @@ namespace Riftbound
                 requiredCount = 1,
                 rewardGold = 80,
                 rewardXP = 200,
-                rewardItem = "bloodrock-waraxe",
                 prerequisiteQuestId = "bloodrock_munitions",
                 nextQuestId = "bloodrock_stronghold",
                 targetLocation = new Vector3(306f, 18f, 226f)
@@ -394,7 +391,6 @@ namespace Riftbound
                 requiredCount = 1,
                 rewardGold = 55,
                 rewardXP = 130,
-                rewardItem = "horde-war-banner",
                 prerequisiteQuestId = "bloodrock_warlord",
                 nextQuestId = "gorkresh_war_forge",
                 targetLocation = new Vector3(340f, 25f, 290f)
@@ -436,7 +432,6 @@ namespace Riftbound
                 requiredCount = 3,
                 rewardGold = 45,
                 rewardXP = 110,
-                rewardItem = "travel-charm",
                 prerequisiteQuestId = "deathknell_ghouls",
                 nextQuestId = "deathknell_shadow_rite",
                 targetLocation = new Vector3(-220f, 12f, 198f)
@@ -475,7 +470,6 @@ namespace Riftbound
                 requiredCount = 1,
                 rewardGold = 60,
                 rewardXP = 140,
-                rewardItem = "horde-war-banner",
                 prerequisiteQuestId = "deathknell_shadow_rite",
                 nextQuestId = "gorkresh_war_forge",
                 targetLocation = new Vector3(340f, 25f, 290f)
@@ -517,7 +511,6 @@ namespace Riftbound
                 requiredCount = 3,
                 rewardGold = 50,
                 rewardXP = 115,
-                rewardItem = "copper-dagger",
                 prerequisiteQuestId = "rustwater_scavengers",
                 nextQuestId = "rustwater_blast_check",
                 targetLocation = new Vector3(260f, 14f, 166f)
@@ -556,7 +549,6 @@ namespace Riftbound
                 requiredCount = 1,
                 rewardGold = 60,
                 rewardXP = 135,
-                rewardItem = "horde-war-banner",
                 prerequisiteQuestId = "rustwater_blast_check",
                 nextQuestId = "gorkresh_war_forge",
                 targetLocation = new Vector3(340f, 25f, 290f)
@@ -598,7 +590,6 @@ namespace Riftbound
                 requiredCount = 3,
                 rewardGold = 45,
                 rewardXP = 110,
-                rewardItem = "iron-buckler",
                 prerequisiteQuestId = "frostpeak_troggs",
                 nextQuestId = "frostpeak_armory_check",
                 targetLocation = new Vector3(-76f, 16f, -106f)
@@ -637,7 +628,6 @@ namespace Riftbound
                 requiredCount = 1,
                 rewardGold = 55,
                 rewardXP = 130,
-                rewardItem = "alliance-war-banner",
                 prerequisiteQuestId = "frostpeak_armory_check",
                 nextQuestId = "highspire_royal_council",
                 targetLocation = new Vector3(-200f, 12f, -60f)
@@ -679,7 +669,6 @@ namespace Riftbound
                 requiredCount = 3,
                 rewardGold = 45,
                 rewardXP = 110,
-                rewardItem = "travel-charm",
                 prerequisiteQuestId = "silverglen_sprites",
                 nextQuestId = "silverglen_ley_counsel",
                 targetLocation = new Vector3(-170f, 15f, 92f)
@@ -718,7 +707,6 @@ namespace Riftbound
                 requiredCount = 1,
                 rewardGold = 55,
                 rewardXP = 130,
-                rewardItem = "alliance-war-banner",
                 prerequisiteQuestId = "silverglen_ley_counsel",
                 nextQuestId = "highspire_royal_council",
                 targetLocation = new Vector3(-200f, 12f, -60f)
@@ -741,6 +729,7 @@ namespace Riftbound
                 requiredCount = 1,
                 rewardGold = 40,
                 rewardXP = 100,
+                rewardItem = "horde-war-banner",
                 prerequisiteQuestId = "",
                 nextQuestId = "gorkresh_caldera_threat",
                 targetLocation = new Vector3(356f, 25f, 296f)
@@ -798,7 +787,6 @@ namespace Riftbound
                 requiredCount = 1,
                 rewardGold = 150,
                 rewardXP = 450,
-                rewardItem = "ember-drake-scale",
                 prerequisiteQuestId = "gorkresh_wyrmcrest_scout",
                 nextQuestId = "",
                 targetLocation = new Vector3(250f, 75f, 510f)
@@ -821,7 +809,6 @@ namespace Riftbound
                 requiredCount = 1,
                 rewardGold = 45,
                 rewardXP = 110,
-                rewardItem = "alliance-war-banner",
                 prerequisiteQuestId = "",
                 nextQuestId = "highspire_royal_council",
                 targetLocation = new Vector3(-200f, 12f, -60f)
@@ -841,6 +828,7 @@ namespace Riftbound
                 requiredCount = 1,
                 rewardGold = 40,
                 rewardXP = 100,
+                rewardItem = "alliance-war-banner",
                 prerequisiteQuestId = "",
                 nextQuestId = "highspire_foothills_convoy",
                 targetLocation = new Vector3(-184f, 12f, -66f)
@@ -898,7 +886,6 @@ namespace Riftbound
                 requiredCount = 3,
                 rewardGold = 85,
                 rewardXP = 210,
-                rewardItem = "scarlet-blade",
                 prerequisiteQuestId = "highspire_duskwood_recon",
                 nextQuestId = "alliance_wyrmcrest_summit",
                 targetLocation = new Vector3(-400f, -40f, 200f)
@@ -918,7 +905,6 @@ namespace Riftbound
                 requiredCount = 1,
                 rewardGold = 150,
                 rewardXP = 450,
-                rewardItem = "ember-drake-scale",
                 prerequisiteQuestId = "duskwood_crypt_purge",
                 nextQuestId = "",
                 targetLocation = new Vector3(250f, 75f, 510f)
@@ -1113,6 +1099,26 @@ namespace Riftbound
             FinalizeQuestCompletion(player, q, goldGain, xpGain, authoritativeGoldAlreadySet: true);
         }
 
+        public void ApplyServerRealmHydration(IEnumerable<string> claimedQuests)
+        {
+            ActiveQuestId = "";
+            CurrentProgress = 0;
+            completedQuests.Clear();
+            if (claimedQuests != null)
+            {
+                foreach (string rawId in claimedQuests)
+                {
+                    if (string.IsNullOrWhiteSpace(rawId)) continue;
+                    string clean = rawId.Trim();
+                    if (clean.StartsWith("faction_quest_", StringComparison.Ordinal))
+                        clean = clean.Substring("faction_quest_".Length);
+                    if (!string.IsNullOrEmpty(clean) && !completedQuests.Contains(clean))
+                        completedQuests.Add(clean);
+                }
+            }
+            MinimapRadar.Instance?.RefreshQuestNavigation();
+        }
+
         void FinalizeQuestCompletion(PlayerController player, QuestDef q, int goldGain, int xpGain, bool authoritativeGoldAlreadySet)
         {
             completedQuests.Add(q.id);
@@ -1125,14 +1131,27 @@ namespace Riftbound
             if (player)
             {
                 if (!authoritativeGoldAlreadySet) player.AddGoldDirect(goldGain);
-                player.AddExperience(xpGain);
+                if (!authoritativeGoldAlreadySet || !Network.CoopSessionConfig.IsRealmClient)
+                    player.AddExperience(xpGain);
                 if (!string.IsNullOrEmpty(rewardItem))
                 {
-                    player.GrantItem(rewardItem, true);
+                    player.GrantItem(rewardItem, !authoritativeGoldAlreadySet);
                     ChatSystem.LogQuest($"<color=#70df80>Received Equipment Reward: [{ItemCatalog.Get(rewardItem)?.name ?? rewardItem}]!</color>");
                 }
                 if (authoritativeGoldAlreadySet && player.Stats)
-                    player.Stats.SetReplicatedHealth(player.Stats.maxHealth, player.Stats.maxHealth);
+                {
+                    if (Network.CoopSessionConfig.IsMultiplayer &&
+                        Network.RiftboundCoopPlayer.LocalOwner != null &&
+                        Network.RiftboundCoopPlayer.LocalOwner.MaxHealth.Value > 0)
+                    {
+                        int authMax = Network.RiftboundCoopPlayer.LocalOwner.MaxHealth.Value;
+                        player.Stats.SetReplicatedHealth(authMax, authMax);
+                    }
+                    else
+                    {
+                        player.Stats.SetReplicatedHealth(player.Stats.maxHealth, player.Stats.maxHealth);
+                    }
+                }
                 else if (player.Stats)
                     player.Stats.Heal(player.Stats.maxHealth);
                 player.Message = $"Quest Complete: {completedTitle}! (+{goldGain} Gold, +{xpGain} XP)";
@@ -1235,10 +1254,10 @@ namespace Riftbound
 
         public void LoadData()
         {
+            if (Network.CoopSessionConfig.IsMultiplayer) return;
             ActiveQuestId = "";
             CurrentProgress = 0;
             completedQuests.Clear();
-            if (Network.CoopSessionConfig.IsMultiplayer) return;
             try
             {
                 string path = SaveFilePath;

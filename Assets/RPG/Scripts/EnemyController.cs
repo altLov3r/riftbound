@@ -23,6 +23,7 @@ namespace Riftbound
         public string enemyId;
         public bool campGuard, isBoss;
         public bool trainingDummy;
+        public bool skipDefaultLootDrop;
         public bool IsMainQuestCaptain => enemyId == "ashwood-captain";
         public bool IsRoadRaider => !trainingDummy && enemyId != null && enemyId.StartsWith("road-raider-", System.StringComparison.Ordinal);
         public bool heavyAttacker, requiresRunes;
@@ -157,7 +158,7 @@ namespace Riftbound
                     CombatStreakSystem.RegisterKill(transform.position);
                     if (Affix == EnemyAffix.Molten)
                         SpellFX.CreateHeavySlam(transform.position, 3.2f);
-                    else if (Affix == EnemyAffix.Arcane)
+                    else if (Affix == EnemyAffix.Arcane && !Network.CoopSessionConfig.IsRealmClient)
                     {
                         player.AddExperience(40);
                         CombatTextManager.Spawn(transform.position + Vector3.up * 2.1f, "+40 ARCANE XP", new Color(0.85f, 0.65f, 1f), true);

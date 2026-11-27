@@ -11,10 +11,12 @@ namespace Riftbound
         public string EquippedArmorId { get; private set; } = "";
         public string EquippedTrinketId { get; private set; } = "";
         public int BoneShards { get; private set; }
+        public void SetAuthoritativeBoneShards(int amount) => BoneShards = Mathf.Max(0, amount);
         public void AddGoldDirect(int amount) { Gold += Mathf.Max(0, amount); SaveAdventure(false); }
         public void AddPotionsDirect(int count) { Potions = Mathf.Clamp(Potions + count, 0, 10); SaveAdventure(false); }
         public bool SpendGoldDirect(int amount) { if (Gold < amount) return false; Gold -= amount; SaveAdventure(false); return true; }
         public void AddBoneShardsDirect(int amount) { BoneShards += Mathf.Max(0, amount); SaveAdventure(false); }
+        public void RestoreClassResourceDirect(float amount) { ClassResource = Mathf.Min(MaxClassResource, ClassResource + Mathf.Max(0f, amount)); }
         public GearItem Weapon => ItemCatalog.Get(EquippedWeaponId);
         public GearItem Armor => ItemCatalog.Get(EquippedArmorId);
         public GearItem Trinket => ItemCatalog.Get(EquippedTrinketId);
@@ -25,8 +27,11 @@ namespace Riftbound
         {
             var item = ItemCatalog.Get(id); if (item == null) return false;
             bool added = !ownedItems.Contains(id); if (added) ownedItems.Add(id);
-            var previous = item.slot == GearSlot.Weapon ? Weapon : item.slot == GearSlot.Armor ? Armor : Trinket;
-            if (equipIfBetter && (previous == null || GearValue(item) > GearValue(previous))) EquipInternal(item);
+            if (!Network.CoopSessionConfig.IsMultiplayer)
+            {
+                var previous = item.slot == GearSlot.Weapon ? Weapon : item.slot == GearSlot.Armor ? Armor : Trinket;
+                if (equipIfBetter && (previous == null || GearValue(item) > GearValue(previous))) EquipInternal(item);
+            }
             return added;
         }
         static int GearValue(GearItem item) => item.damage * 10 + item.armor * 10 + item.health;
@@ -35,15 +40,71 @@ namespace Riftbound
             var item = ItemCatalog.Get(id);
             if (item == null || !ownedItems.Contains(id) || (Stats && !Stats.Alive) || FrontendMenu.IsOpen || !InventoryOpen || ShopOpen || MapOpen || DialogueOpen || (orbit && orbit.Paused)) return;
             if (InCombat()) { Message = "Leave combat before changing equipment."; return; }
+            if (Network.CoopSessionConfig.IsMultiplayer)
+            {
+                if (Network.RiftboundCoopPlayer.LocalOwner == null) return;
+                if (Network.CoopSessionConfig.IsRealmClient && !IsRealmHydrated) return;
+                Network.RiftboundCoopPlayer.LocalOwner.RequestEquipItem(id);
+                return;
+            }
             EquipInternal(item); Message = "Equipped: " + item.name + "."; SaveAdventure(false);
         }
         public void EquipDirect(string id)
         {
             var item = ItemCatalog.Get(id);
             if (item == null) return;
+            if (Network.CoopSessionConfig.IsMultiplayer)
+            {
+                EquipIfOwned(id);
+                return;
+            }
             if (!ownedItems.Contains(id)) ownedItems.Add(id);
             EquipInternal(item);
             SaveAdventure(false);
+        }
+        public bool EquipIfOwned(string id)
+        {
+            var item = ItemCatalog.Get(id);
+            if (item == null || !ownedItems.Contains(id) || (Stats && !Stats.Alive)) return false;
+            if (Network.CoopSessionConfig.IsMultiplayer)
+            {
+                if (Network.RiftboundCoopPlayer.LocalOwner == null) return false;
+                if (Network.CoopSessionConfig.IsRealmClient && !IsRealmHydrated) return false;
+                Network.RiftboundCoopPlayer.LocalOwner.RequestEquipItem(id);
+                return true;
+            }
+            EquipInternal(item);
+            SaveAdventure(false);
+            return true;
+        }
+        public void ApplyAuthoritativeEquipmentSlots(string weaponId, string armorId, string trinketId, int serverHp = -1, int serverMaxHp = -1)
+        {
+            EquippedWeaponId = ValidEquipment(weaponId, GearSlot.Weapon) ? weaponId : "starter-axe";
+            EquippedArmorId = ValidEquipment(armorId, GearSlot.Armor) ? armorId : "";
+            EquippedTrinketId = ValidEquipment(trinketId, GearSlot.Trinket) ? trinketId : "";
+            RefreshEquipmentStats();
+            if (Stats && serverMaxHp > 0 && serverHp >= 0)
+                Stats.SetReplicatedHealth(serverHp, serverMaxHp);
+        }
+        public void ApplyAuthorizedEquippedSlot(GearSlot slot, string itemId, int serverHp = -1, int serverMaxHp = -1)
+        {
+            string clean = string.IsNullOrWhiteSpace(itemId) ? "" : itemId.Trim();
+            if (!string.IsNullOrEmpty(clean) && ItemCatalog.Get(clean) != null && !ownedItems.Contains(clean))
+                ownedItems.Add(clean);
+
+            if (slot == GearSlot.Weapon)
+                EquippedWeaponId = ValidEquipment(clean, GearSlot.Weapon) ? clean : "starter-axe";
+            else if (slot == GearSlot.Armor)
+                EquippedArmorId = ValidEquipment(clean, GearSlot.Armor) ? clean : "";
+            else
+                EquippedTrinketId = ValidEquipment(clean, GearSlot.Trinket) ? clean : "";
+
+            RefreshEquipmentStats();
+            if (Stats && serverMaxHp > 0 && serverHp >= 0)
+                Stats.SetReplicatedHealth(serverHp, serverMaxHp);
+            var item = ItemCatalog.Get(clean);
+            if (item != null && !FrontendMenu.IsOpen)
+                Message = "Equipped: " + item.name + ".";
         }
         void EquipInternal(GearItem item)
         {
@@ -67,6 +128,14 @@ namespace Riftbound
             var (specHealth, specArmor) = TalentSystem.GetSpecializationVitals(this);
             Stats.ConfigureVitals(150 + levelHealth + health + raceHpBonus + gemHp + MilestoneHealth + specHealth,
                 ArmorRating + raceArmorBonus + gemArmor + MilestoneArmor + specArmor);
+            if (Network.CoopSessionConfig.IsMultiplayer &&
+                Network.RiftboundCoopPlayer.LocalOwner != null &&
+                Network.RiftboundCoopPlayer.LocalOwner.MaxHealth.Value > 0)
+            {
+                Stats.SetReplicatedHealth(
+                    Network.RiftboundCoopPlayer.LocalOwner.Health.Value,
+                    Network.RiftboundCoopPlayer.LocalOwner.MaxHealth.Value);
+            }
             RefreshHeldWeaponVisual();
             if (!animator || Weapon == null) return;
             var block = new MaterialPropertyBlock();
@@ -134,31 +203,27 @@ namespace Riftbound
                 pav.EquipWeaponVisual(weaponId, offhand, item?.rarity);
                 pav.SetWeaponVisualVisible(!Mounted);
             }
-            if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner != null)
-                Network.RiftboundCoopPlayer.LocalOwner.RequestSetEquippedWeapon(weaponId);
         }
-        string EnemyItem(EnemyController enemy)
-        {
-            string id = enemy.enemyId == "boss-vermithrax" ? "wyrmtooth-edge" :
-                        enemy.enemyId == "boss-abbot-vael" ? "scarlet-aegis" :
-                        enemy.enemyId == "boss-malakar" ? "scarlet-blade" :
-                        enemy.enemyId == "crypt-warden" ? "warden-axe" :
-                        enemy.IsMainQuestCaptain ? "captain-axe" :
-                        enemy.enemyId == "road-raider-2" ? "raider-cleaver" :
-                        enemy.enemyId == "camp-guard-1" ? "boneplate" : "";
+        string EnemyItem(EnemyController enemy) =>
+            enemy == null ? "" : SharedRewardCatalog.GetEnemyDropItemId(enemy.enemyId);
 
-            return id;
-        }
         string ChestItem(string chestId)
         {
-            string id = chestId == "crypt-reliquary" ? "crypt-signet" :
-                        chestId == "village-cache" ? "leather-vest" :
-                        chestId == "camp-cache" ? "travel-charm" :
-                        chestId == "tower-cache" ? "watchtower-cuirass" :
-                        chestId == "cathedral-altar-chest" ? "scarlet-blade" :
-                        chestId == "bloodrock-chest" ? "bloodrock-waraxe" :
-                        chestId == "wyrmcrest-hoard-chest" ? "ember-drake-scale" : "";
-            return GrantItem(id) ? ItemCatalog.Get(id).name : "";
+            IReadOnlyList<string> itemIds = chestId == WorldBossEncounter.HoardChestId
+                ? SharedRewardCatalog.ResolveGorgonaxChestItems(OwnsItem)
+                : SharedRewardCatalog.GetChestItemIds(chestId);
+            if (itemIds == null || itemIds.Count == 0) return "";
+            var grantedNames = new List<string>();
+            for (int i = 0; i < itemIds.Count; i++)
+            {
+                string id = itemIds[i];
+                if (GrantItem(id))
+                {
+                    var item = ItemCatalog.Get(id);
+                    if (item != null) grantedNames.Add(item.name);
+                }
+            }
+            return grantedNames.Count > 0 ? string.Join(", ", grantedNames) : "";
         }
         void RestoreEquipment(AdventureSave data)
         {
@@ -183,12 +248,12 @@ namespace Riftbound
         public void SellShards()
         {
             if (!CanTrade() || InCombat() || BoneShards <= 0) return;
+            if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner != null)
+            {
+                Network.RiftboundCoopPlayer.LocalOwner.RequestTransaction("sell_shards");
+                return;
+            }
             int gold = BoneShards * 2; BoneShards = 0; Gold += gold; Message = $"Sold bone shards for {gold} gold."; SaveAdventure(false);
-        }
-        public void BuyVest()
-        {
-            if (!CanTrade() || InCombat() || Gold < 25 || OwnsItem("leather-vest")) return;
-            Gold -= 25; GrantItem("leather-vest"); Message = "Purchased Scout's Leather Vest. Open inventory [I] to equip it."; SaveAdventure(false);
         }
     }
 }

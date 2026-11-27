@@ -1,10 +1,71 @@
+using System;
 using System.Collections.Generic;
+using System.Text;
 using Unity.Collections;
 using Unity.Netcode;
 using UnityEngine;
 
 namespace Riftbound.Network
 {
+    public struct RealmHydrationHeader : INetworkSerializable
+    {
+        public uint snapshotSeq;
+        public FixedString64Bytes accountId;
+        public FixedString64Bytes charName;
+        public FixedString64Bytes activeTitle;
+        public FixedString32Bytes race;
+        public FixedString32Bytes className;
+        public FixedString32Bytes faction;
+        public FixedString64Bytes equippedWeaponId;
+        public FixedString64Bytes equippedArmorId;
+        public FixedString64Bytes equippedTrinketId;
+        public FixedString64Bytes mountId;
+        public int level;
+        public int remainderXp;
+        public int gold;
+        public int health;
+        public int maxHealth;
+        public int potions;
+        public int boneShards;
+        public int questIndex;
+        public int questKills;
+        public int alchemySkill;
+        public int blacksmithingSkill;
+        public int engineeringSkill;
+        public bool temperedWeapon;
+        public bool questAccepted;
+        public bool expectChunks;
+
+        public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
+        {
+            serializer.SerializeValue(ref snapshotSeq);
+            serializer.SerializeValue(ref accountId);
+            serializer.SerializeValue(ref charName);
+            serializer.SerializeValue(ref activeTitle);
+            serializer.SerializeValue(ref race);
+            serializer.SerializeValue(ref className);
+            serializer.SerializeValue(ref faction);
+            serializer.SerializeValue(ref equippedWeaponId);
+            serializer.SerializeValue(ref equippedArmorId);
+            serializer.SerializeValue(ref equippedTrinketId);
+            serializer.SerializeValue(ref mountId);
+            serializer.SerializeValue(ref level);
+            serializer.SerializeValue(ref remainderXp);
+            serializer.SerializeValue(ref gold);
+            serializer.SerializeValue(ref health);
+            serializer.SerializeValue(ref maxHealth);
+            serializer.SerializeValue(ref potions);
+            serializer.SerializeValue(ref boneShards);
+            serializer.SerializeValue(ref questIndex);
+            serializer.SerializeValue(ref questKills);
+            serializer.SerializeValue(ref alchemySkill);
+            serializer.SerializeValue(ref blacksmithingSkill);
+            serializer.SerializeValue(ref engineeringSkill);
+            serializer.SerializeValue(ref temperedWeapon);
+            serializer.SerializeValue(ref questAccepted);
+            serializer.SerializeValue(ref expectChunks);
+        }
+    }
     public enum ServerCastPhase : byte
     {
         None = 0,
@@ -99,6 +160,8 @@ namespace Riftbound.Network
         public NetworkVariable<bool> IsSprinting = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
         public NetworkVariable<FixedString32Bytes> MountId = new NetworkVariable<FixedString32Bytes>(new FixedString32Bytes("horse"), NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
         public NetworkVariable<FixedString64Bytes> EquippedWeaponId = new NetworkVariable<FixedString64Bytes>(new FixedString64Bytes("starter-axe"), NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+        public NetworkVariable<FixedString64Bytes> EquippedArmorId = new NetworkVariable<FixedString64Bytes>(new FixedString64Bytes(""), NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+        public NetworkVariable<FixedString64Bytes> EquippedTrinketId = new NetworkVariable<FixedString64Bytes>(new FixedString64Bytes(""), NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
         public NetworkVariable<float> MoveSpeed = new NetworkVariable<float>(0f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
         public NetworkVariable<byte> LocomotionFlags = new NetworkVariable<byte>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server); // bit0=airborne, bit1=walking, bit2=blocking
         public NetworkVariable<byte> ResourcePct = new NetworkVariable<byte>(100, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
@@ -169,13 +232,46 @@ namespace Riftbound.Network
         Quaternion remoteBaseVisualRot = Quaternion.identity;
         float remoteVisualYawOffset;
         bool spawnPositioned;
+        sealed class ServerPendingCorpse
+        {
+            public string enemyKey;
+            public Vector3 position;
+            public int gold;
+            public int boneShards;
+            public List<string> items = new List<string>();
+        }
+
         readonly Dictionary<string, float> serverAbilityCooldowns = new Dictionary<string, float>();
         readonly HashSet<string> serverDefeatedEnemyKeys = new HashSet<string>();
         readonly HashSet<string> serverCompletedEvents = new HashSet<string>();
         readonly HashSet<string> serverDiscoveredLandmarks = new HashSet<string>();
         readonly HashSet<string> serverCompletedFactionQuests = new HashSet<string>();
+        readonly List<string> serverOwnedItems = new List<string> { "starter-axe" };
+        readonly HashSet<string> serverClaimedChests = new HashSet<string>(StringComparer.Ordinal);
+        readonly Dictionary<string, ServerPendingCorpse> serverPendingCorpseLoot = new Dictionary<string, ServerPendingCorpse>(StringComparer.Ordinal);
         int serverPotions = 3;
         bool serverTemperedWeapon;
+        int serverBoneShards;
+        int serverAlchemySkill = ProfessionSystem.DefaultAlchemySkill;
+        int serverBlacksmithingSkill = ProfessionSystem.DefaultBlacksmithingSkill;
+        int serverEngineeringSkill = ProfessionSystem.DefaultEngineeringSkill;
+        readonly Dictionary<string, int> serverReagents = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        string serverFaction = "Alliance";
+        string serverActiveTitle = "";
+        bool serverIdentityResolved;
+        bool serverHydrated;
+        uint serverHydrationSeq;
+
+        bool hasPendingHydrationHeader;
+        RealmHydrationHeader pendingHydrationHeader;
+        readonly List<string> pendingHydrationOwnedItems = new List<string>();
+        readonly List<string> pendingHydrationClaimedChests = new List<string>();
+        readonly List<string> pendingHydrationClaimedQuests = new List<string>();
+        readonly List<string> pendingHydrationDefeatedEnemies = new List<string>();
+        readonly List<string> pendingHydrationLandmarks = new List<string>();
+        readonly List<string> pendingHydrationBossKills = new List<string>();
+        readonly List<string> pendingHydrationReagents = new List<string>();
+        bool hasReadyClientHydrationSnapshot;
         float lastServerPotionTime = -10f;
         float lastServerRespawnTime = -10f;
         bool serverBlocking;
@@ -234,25 +330,80 @@ namespace Riftbound.Network
 
             if (IsServer)
             {
+                serverIdentityResolved = false;
+                serverHydrated = false;
+                serverAssignedAccountId = "";
+                serverOwnedItems.Clear();
+                serverOwnedItems.Add("starter-axe");
+                serverClaimedChests.Clear();
+                serverDefeatedEnemyKeys.Clear();
+                serverDiscoveredLandmarks.Clear();
+                serverCompletedFactionQuests.Clear();
+                serverPendingCorpseLoot.Clear();
+                serverPotions = 3;
+                serverTemperedWeapon = false;
+                serverBoneShards = 0;
+                serverAlchemySkill = ProfessionSystem.DefaultAlchemySkill;
+                serverBlacksmithingSkill = ProfessionSystem.DefaultBlacksmithingSkill;
+                serverEngineeringSkill = ProfessionSystem.DefaultEngineeringSkill;
+                ProfessionSystem.PopulateDefaultReagents(serverReagents);
+                serverFaction = "Alliance";
+                serverActiveTitle = "";
+
                 IsSprinting.Value = false;
                 SpawnSlot.Value = CoopWorldManager.AllocateSpawnSlot(this);
                 IsLeader.Value = !CoopSessionConfig.IsDedicatedServer && OwnerClientId == NetworkManager.ServerClientId;
                 MaxHealth.Value = 100;
                 Health.Value = 100;
                 Level.Value = 1;
-                if ((CoopSessionConfig.IsDedicatedServer || OwnerClientId != NetworkManager.ServerClientId) && transform.position.sqrMagnitude < 0.1f)
+                EquippedWeaponId.Value = new FixedString64Bytes("starter-axe");
+                EquippedArmorId.Value = new FixedString64Bytes("");
+                EquippedTrinketId.Value = new FixedString64Bytes("");
+
+                if (CoopWorldManager.TryConsumePendingRealmIdentity(OwnerClientId, out var pending))
+                {
+                    serverAssignedAccountId = pending.AccountId;
+                    PlayerName.Value = new FixedString64Bytes(string.IsNullOrWhiteSpace(pending.CharacterName) ? $"Player {OwnerClientId}" : pending.CharacterName);
+                    Race.Value = new FixedString32Bytes(pending.Race);
+                    ClassName.Value = new FixedString32Bytes(pending.ClassName);
+                    serverFaction = pending.Faction;
+                    serverIdentityResolved = true;
+                }
+
+                if ((CoopSessionConfig.IsDedicatedServer || OwnerClientId != NetworkManager.ServerClientId) && transform.position.sqrMagnitude < 0.1f && !serverIdentityResolved)
                 {
                     Vector3 basePos = CoopWorldManager.GetRealmSpawnAnchor("Human");
                     Vector3 slotPos = ComputeSpawnPosition(basePos, SpawnSlot.Value);
                     AuthorizeHostTeleport(slotPos);
                 }
-                HydrateServerRealmCharacterIfInitialized();
+
+                if (serverIdentityResolved)
+                {
+                    if (RealmPersistenceService.IsInitialized)
+                        HydrateServerRealmCharacterIfInitialized();
+                    else
+                    {
+                        RecalculateServerVitals(preserveCurrentHp: false);
+                        serverHydrated = true;
+                    }
+                }
+                else if (!RealmPersistenceService.IsInitialized)
+                {
+                    RecalculateServerVitals(preserveCurrentHp: false);
+                }
             }
 
             if (IsOwner)
             {
                 LocalOwner = this;
                 Gold.OnValueChanged += OnAuthoritativeGoldChanged;
+                EquippedWeaponId.OnValueChanged += OnEquippedWeaponChanged;
+                EquippedArmorId.OnValueChanged += OnEquippedArmorChanged;
+                EquippedTrinketId.OnValueChanged += OnEquippedTrinketChanged;
+                Level.OnValueChanged += OnAuthoritativeLevelOrXpChanged;
+                Experience.OnValueChanged += OnAuthoritativeLevelOrXpChanged;
+                Health.OnValueChanged += OnAuthoritativeHealthChanged;
+                MaxHealth.OnValueChanged += OnAuthoritativeMaxHealthChanged;
                 BindToLocalPlayer();
             }
             else
@@ -262,6 +413,8 @@ namespace Riftbound.Network
                 IsMounted.OnValueChanged += OnMountChanged;
                 MountId.OnValueChanged += OnMountIdChanged;
                 EquippedWeaponId.OnValueChanged += OnEquippedWeaponChanged;
+                EquippedArmorId.OnValueChanged += OnEquippedArmorChanged;
+                EquippedTrinketId.OnValueChanged += OnEquippedTrinketChanged;
                 Health.OnValueChanged += OnRemoteHealthChanged;
                 RebuildRemoteVisual();
             }
@@ -274,7 +427,8 @@ namespace Riftbound.Network
             serverSprintUntil = -10f;
             if (IsServer)
             {
-                PersistServerRealmCharacterIfInitialized();
+                if (serverIdentityResolved || serverHydrated)
+                    PersistServerRealmCharacterIfInitialized();
                 if (IsSprinting.Value) IsSprinting.Value = false;
                 if (IsLeader.Value && OwnerClientId != NetworkManager.ServerClientId)
                 {
@@ -290,6 +444,12 @@ namespace Riftbound.Network
             IsMounted.OnValueChanged -= OnMountChanged;
             MountId.OnValueChanged -= OnMountIdChanged;
             EquippedWeaponId.OnValueChanged -= OnEquippedWeaponChanged;
+            EquippedArmorId.OnValueChanged -= OnEquippedArmorChanged;
+            EquippedTrinketId.OnValueChanged -= OnEquippedTrinketChanged;
+            Level.OnValueChanged -= OnAuthoritativeLevelOrXpChanged;
+            Experience.OnValueChanged -= OnAuthoritativeLevelOrXpChanged;
+            Health.OnValueChanged -= OnAuthoritativeHealthChanged;
+            MaxHealth.OnValueChanged -= OnAuthoritativeMaxHealthChanged;
             Health.OnValueChanged -= OnRemoteHealthChanged;
             ClearRemoteMountVisual();
             ReleaseRemoteGroundingObserver();
@@ -304,7 +464,26 @@ namespace Riftbound.Network
 
         void OnAuthoritativeGoldChanged(int prev, int next)
         {
-            if (IsOwner && localPlayer) localPlayer.SetAuthoritativeGold(next);
+            if (IsOwner && localPlayer && (!CoopSessionConfig.IsRealmClient || localPlayer.IsRealmHydrated))
+                localPlayer.SetAuthoritativeGold(next);
+        }
+
+        void OnAuthoritativeHealthChanged(int prev, int next)
+        {
+            if (IsOwner && localPlayer && localPlayer.Stats && (!CoopSessionConfig.IsRealmClient || localPlayer.IsRealmHydrated))
+                localPlayer.Stats.SetReplicatedHealth(next, MaxHealth.Value);
+        }
+
+        void OnAuthoritativeMaxHealthChanged(int prev, int next)
+        {
+            if (IsOwner && localPlayer && localPlayer.Stats && (!CoopSessionConfig.IsRealmClient || localPlayer.IsRealmHydrated))
+                localPlayer.Stats.SetReplicatedHealth(Health.Value, next);
+        }
+
+        void OnAuthoritativeLevelOrXpChanged(int prev, int next)
+        {
+            if (IsOwner && CoopSessionConfig.IsRealmClient && localPlayer && localPlayer.IsRealmHydrated)
+                localPlayer.SetAuthoritativeServerProgress(Level.Value, Experience.Value);
         }
 
         void OnIdentityChanged(FixedString32Bytes prev, FixedString32Bytes next)
@@ -325,6 +504,20 @@ namespace Riftbound.Network
         void OnEquippedWeaponChanged(FixedString64Bytes prev, FixedString64Bytes next)
         {
             if (!IsOwner) ApplyRemoteWeaponVisual();
+            else if (localPlayer && (!CoopSessionConfig.IsRealmClient || localPlayer.IsRealmHydrated))
+                localPlayer.ApplyAuthorizedEquippedSlot(GearSlot.Weapon, next.ToString(), Health.Value, MaxHealth.Value);
+        }
+
+        void OnEquippedArmorChanged(FixedString64Bytes prev, FixedString64Bytes next)
+        {
+            if (IsOwner && localPlayer && (!CoopSessionConfig.IsRealmClient || localPlayer.IsRealmHydrated))
+                localPlayer.ApplyAuthorizedEquippedSlot(GearSlot.Armor, next.ToString(), Health.Value, MaxHealth.Value);
+        }
+
+        void OnEquippedTrinketChanged(FixedString64Bytes prev, FixedString64Bytes next)
+        {
+            if (IsOwner && localPlayer && (!CoopSessionConfig.IsRealmClient || localPlayer.IsRealmHydrated))
+                localPlayer.ApplyAuthorizedEquippedSlot(GearSlot.Trinket, next.ToString(), Health.Value, MaxHealth.Value);
         }
 
         void ApplyRemoteWeaponVisual()
@@ -397,6 +590,8 @@ namespace Riftbound.Network
             string pRace = string.IsNullOrWhiteSpace(localPlayer.CharacterRace) ? "Human" : localPlayer.CharacterRace;
             string pClass = string.IsNullOrWhiteSpace(localPlayer.CharacterClass) ? "Warrior" : localPlayer.CharacterClass;
             SubmitCharacterIdentityServerRpc(pName, pRace, pClass);
+            if (hasReadyClientHydrationSnapshot && localPlayer && !localPlayer.IsRealmHydrated)
+                ApplyPendingHydrationToLocalPlayer();
         }
 
         public static Vector3 ComputeSpawnPosition(Vector3 basePos, int slot)
@@ -800,15 +995,296 @@ namespace Riftbound.Network
         [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Owner)]
         void SubmitCharacterIdentityServerRpc(string pName, string race, string cls)
         {
-            // Only accept valid race/class strings; host owns starting combat vitals/progression
+            string cleanName = string.IsNullOrWhiteSpace(pName) ? $"Player {OwnerClientId}" : pName.Trim();
             string cleanRace = string.IsNullOrWhiteSpace(race) ? "Human" : race.Trim();
             string cleanClass = string.IsNullOrWhiteSpace(cls) ? "Warrior" : cls.Trim();
-            PlayerName.Value = new FixedString64Bytes(string.IsNullOrWhiteSpace(pName) ? $"Player {OwnerClientId}" : pName.Trim());
-            Race.Value = new FixedString32Bytes(cleanRace);
-            ClassName.Value = new FixedString32Bytes(cleanClass);
-            int baseHp = cleanClass == "Warrior" || cleanClass == "Paladin" ? 130 : (cleanClass == "Mage" ? 90 : 105);
-            MaxHealth.Value = baseHp + (Level.Value - 1) * 15;
-            Health.Value = MaxHealth.Value;
+
+            if (!serverIdentityResolved)
+            {
+                PlayerName.Value = new FixedString64Bytes(cleanName);
+                Race.Value = new FixedString32Bytes(cleanRace);
+                ClassName.Value = new FixedString32Bytes(cleanClass);
+                serverFaction = (cleanRace == "Orc" || cleanRace == "Brute" || cleanRace == "Undead" || cleanRace == "Goblin") ? "Horde" : "Alliance";
+                serverIdentityResolved = true;
+            }
+
+            if (!serverHydrated)
+            {
+                if (RealmPersistenceService.IsInitialized)
+                    HydrateServerRealmCharacterIfInitialized();
+                else
+                {
+                    RecalculateServerVitals(preserveCurrentHp: false);
+                    serverHydrated = true;
+                }
+            }
+
+            SendCharacterHydrationSnapshotToOwner();
+        }
+
+        void SendCharacterHydrationSnapshotToOwner()
+        {
+            if (!IsServer || !IsSpawned) return;
+
+            var claimedChests = new List<string>(serverClaimedChests);
+            var claimedQuests = new List<string>(serverCompletedFactionQuests);
+            var defeatedEnemies = new List<string>(serverDefeatedEnemyKeys);
+            var landmarks = new List<string>(serverDiscoveredLandmarks);
+            var bossKills = new List<string>();
+
+            if (RealmPersistenceService.IsInitialized)
+            {
+                string charKey = ResolveCharacterRewardKey();
+                var save = RealmPersistenceService.LoadOrCreateCharacter(ResolveServerAccountId(), charKey, Race.Value.ToString(), ClassName.Value.ToString(), serverFaction);
+                if (save != null)
+                {
+                    if (save.claimedChests != null)
+                    {
+                        for (int i = 0; i < save.claimedChests.Count; i++)
+                            if (!string.IsNullOrEmpty(save.claimedChests[i]) && !claimedChests.Contains(save.claimedChests[i]))
+                                claimedChests.Add(save.claimedChests[i]);
+                    }
+                    if (save.claimedQuests != null)
+                    {
+                        for (int i = 0; i < save.claimedQuests.Count; i++)
+                            if (!string.IsNullOrEmpty(save.claimedQuests[i]) && !claimedQuests.Contains(save.claimedQuests[i]))
+                                claimedQuests.Add(save.claimedQuests[i]);
+                    }
+                    if (save.defeatedEnemies != null)
+                    {
+                        for (int i = 0; i < save.defeatedEnemies.Count; i++)
+                            if (!string.IsNullOrEmpty(save.defeatedEnemies[i]) && !defeatedEnemies.Contains(save.defeatedEnemies[i]))
+                                defeatedEnemies.Add(save.defeatedEnemies[i]);
+                    }
+                    if (save.discoveredLandmarks != null)
+                    {
+                        for (int i = 0; i < save.discoveredLandmarks.Count; i++)
+                            if (!string.IsNullOrEmpty(save.discoveredLandmarks[i]) && !landmarks.Contains(save.discoveredLandmarks[i]))
+                                landmarks.Add(save.discoveredLandmarks[i]);
+                    }
+                    if (save.claimedBossKills != null)
+                    {
+                        for (int i = 0; i < save.claimedBossKills.Count; i++)
+                            if (!string.IsNullOrEmpty(save.claimedBossKills[i]) && !bossKills.Contains(save.claimedBossKills[i]))
+                                bossKills.Add(save.claimedBossKills[i]);
+                    }
+                }
+            }
+
+            var chunks = new List<(byte kind, FixedString512Bytes csv)>();
+            PackCsvChunks(1, serverOwnedItems, chunks);
+            PackCsvChunks(2, claimedChests, chunks);
+            PackCsvChunks(3, claimedQuests, chunks);
+            PackCsvChunks(4, defeatedEnemies, chunks);
+            PackCsvChunks(5, landmarks, chunks);
+            PackCsvChunks(6, bossKills, chunks);
+            var reagentEntries = BuildServerReagentEntries();
+            PackCsvChunks(7, reagentEntries, chunks);
+
+            uint seq = ++serverHydrationSeq;
+            var header = new RealmHydrationHeader
+            {
+                snapshotSeq = seq,
+                accountId = new FixedString64Bytes(TruncateUtf8(ResolveServerAccountId(), 60)),
+                charName = PlayerName.Value,
+                activeTitle = new FixedString64Bytes(TruncateUtf8(serverActiveTitle, 60)),
+                race = Race.Value,
+                className = ClassName.Value,
+                faction = new FixedString32Bytes(TruncateUtf8(serverFaction, 28)),
+                equippedWeaponId = EquippedWeaponId.Value,
+                equippedArmorId = EquippedArmorId.Value,
+                equippedTrinketId = EquippedTrinketId.Value,
+                mountId = new FixedString64Bytes(MountId.Value.ToString()),
+                level = Mathf.Max(1, Level.Value),
+                remainderXp = Mathf.Max(0, Experience.Value),
+                gold = Mathf.Max(0, Gold.Value),
+                health = Mathf.Clamp(Health.Value, 0, Mathf.Max(1, MaxHealth.Value)),
+                maxHealth = Mathf.Max(1, MaxHealth.Value),
+                potions = Mathf.Clamp(serverPotions, 0, 10),
+                boneShards = Mathf.Max(0, serverBoneShards),
+                questIndex = Mathf.Clamp(QuestIndex.Value, 0, 3),
+                questKills = Mathf.Max(0, QuestKills.Value),
+                alchemySkill = Mathf.Clamp(serverAlchemySkill, 0, ProfessionSystem.MaxSkill),
+                blacksmithingSkill = Mathf.Clamp(serverBlacksmithingSkill, 0, ProfessionSystem.MaxSkill),
+                engineeringSkill = Mathf.Clamp(serverEngineeringSkill, 0, ProfessionSystem.MaxSkill),
+                temperedWeapon = serverTemperedWeapon,
+                questAccepted = QuestAccepted.Value,
+                expectChunks = chunks.Count > 0
+            };
+
+            if (IsOwner)
+            {
+                BeginPendingHydration(header);
+                for (int i = 0; i < chunks.Count; i++)
+                    AppendPendingHydrationChunk(seq, chunks[i].kind, chunks[i].csv, i == chunks.Count - 1);
+                if (!header.expectChunks)
+                    FinalizePendingHydration();
+                return;
+            }
+
+            if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening)
+            {
+                var rpcTarget = RpcTarget.Single(OwnerClientId, RpcTargetUse.Temp);
+                HydrateCharacterSnapshotClientRpc(header, rpcTarget);
+                for (int i = 0; i < chunks.Count; i++)
+                    HydrateCharacterListChunkClientRpc(seq, chunks[i].kind, chunks[i].csv, i == chunks.Count - 1, rpcTarget);
+            }
+        }
+
+        static string TruncateUtf8(string value, int maxBytes)
+        {
+            if (string.IsNullOrEmpty(value)) return "";
+            if (Encoding.UTF8.GetByteCount(value) <= maxBytes) return value;
+            var sb = new StringBuilder(value.Length);
+            int bytes = 0;
+            foreach (char c in value)
+            {
+                int cb = Encoding.UTF8.GetByteCount(new[] { c });
+                if (bytes + cb > maxBytes) break;
+                sb.Append(c);
+                bytes += cb;
+            }
+            return sb.ToString();
+        }
+
+        static void PackCsvChunks(byte listKind, IReadOnlyList<string> items, List<(byte kind, FixedString512Bytes csv)> chunks)
+        {
+            if (items == null || items.Count == 0) return;
+            var sb = new StringBuilder(440);
+            int curBytes = 0;
+            for (int i = 0; i < items.Count; i++)
+            {
+                string raw = items[i];
+                if (string.IsNullOrWhiteSpace(raw)) continue;
+                string clean = raw.Trim().Replace(",", "");
+                if (string.IsNullOrEmpty(clean)) continue;
+                int addBytes = Encoding.UTF8.GetByteCount(clean) + (sb.Length > 0 ? 1 : 0);
+                if (curBytes + addBytes > 440 && sb.Length > 0)
+                {
+                    chunks.Add((listKind, new FixedString512Bytes(sb.ToString())));
+                    sb.Clear();
+                    curBytes = 0;
+                    addBytes = Encoding.UTF8.GetByteCount(clean);
+                }
+                if (sb.Length > 0)
+                {
+                    sb.Append(',');
+                    curBytes++;
+                }
+                sb.Append(clean);
+                curBytes += Encoding.UTF8.GetByteCount(clean);
+            }
+            if (sb.Length > 0)
+                chunks.Add((listKind, new FixedString512Bytes(sb.ToString())));
+        }
+
+        [Rpc(SendTo.SpecifiedInParams, InvokePermission = RpcInvokePermission.Server)]
+        void HydrateCharacterSnapshotClientRpc(RealmHydrationHeader header, RpcParams rpcParams = default)
+        {
+            if (!IsOwner) return;
+            BeginPendingHydration(header);
+            if (!header.expectChunks)
+                FinalizePendingHydration();
+        }
+
+        [Rpc(SendTo.SpecifiedInParams, InvokePermission = RpcInvokePermission.Server)]
+        void HydrateCharacterListChunkClientRpc(uint snapshotSeq, byte listKind, FixedString512Bytes packedCsv, bool isFinalChunk, RpcParams rpcParams = default)
+        {
+            if (!IsOwner) return;
+            AppendPendingHydrationChunk(snapshotSeq, listKind, packedCsv, isFinalChunk);
+        }
+
+        void BeginPendingHydration(RealmHydrationHeader header)
+        {
+            hasPendingHydrationHeader = true;
+            hasReadyClientHydrationSnapshot = false;
+            pendingHydrationHeader = header;
+            pendingHydrationOwnedItems.Clear();
+            pendingHydrationClaimedChests.Clear();
+            pendingHydrationClaimedQuests.Clear();
+            pendingHydrationDefeatedEnemies.Clear();
+            pendingHydrationLandmarks.Clear();
+            pendingHydrationBossKills.Clear();
+            pendingHydrationReagents.Clear();
+        }
+
+        void AppendPendingHydrationChunk(uint snapshotSeq, byte listKind, FixedString512Bytes packedCsv, bool isFinalChunk)
+        {
+            if (!hasPendingHydrationHeader || pendingHydrationHeader.snapshotSeq != snapshotSeq) return;
+            string csv = packedCsv.ToString();
+            if (!string.IsNullOrEmpty(csv))
+            {
+                var targetList = listKind switch
+                {
+                    1 => pendingHydrationOwnedItems,
+                    2 => pendingHydrationClaimedChests,
+                    3 => pendingHydrationClaimedQuests,
+                    4 => pendingHydrationDefeatedEnemies,
+                    5 => pendingHydrationLandmarks,
+                    6 => pendingHydrationBossKills,
+                    7 => pendingHydrationReagents,
+                    _ => null
+                };
+                if (targetList != null)
+                {
+                    string[] parts = csv.Split(',');
+                    for (int i = 0; i < parts.Length; i++)
+                    {
+                        if (!string.IsNullOrWhiteSpace(parts[i]))
+                            targetList.Add(parts[i].Trim());
+                    }
+                }
+            }
+            if (isFinalChunk)
+                FinalizePendingHydration();
+        }
+
+        void FinalizePendingHydration()
+        {
+            if (!hasPendingHydrationHeader) return;
+            hasReadyClientHydrationSnapshot = true;
+            ApplyPendingHydrationToLocalPlayer();
+        }
+
+        void ApplyPendingHydrationToLocalPlayer()
+        {
+            if (!hasReadyClientHydrationSnapshot) return;
+            if (!localPlayer) localPlayer = FindFirstObjectByType<PlayerController>();
+            if (!localPlayer) return;
+
+            hasReadyClientHydrationSnapshot = false;
+            hasPendingHydrationHeader = false;
+            var h = pendingHydrationHeader;
+            localPlayer.ApplyServerRealmHydration(
+                h.charName.ToString(),
+                h.race.ToString(),
+                h.className.ToString(),
+                h.faction.ToString(),
+                h.level,
+                h.remainderXp,
+                h.gold,
+                h.health,
+                h.maxHealth,
+                h.potions,
+                h.temperedWeapon,
+                h.boneShards,
+                h.questIndex,
+                h.questAccepted,
+                h.questKills,
+                pendingHydrationOwnedItems,
+                h.equippedWeaponId.ToString(),
+                h.equippedArmorId.ToString(),
+                h.equippedTrinketId.ToString(),
+                pendingHydrationClaimedChests,
+                pendingHydrationBossKills,
+                pendingHydrationClaimedQuests,
+                pendingHydrationDefeatedEnemies,
+                pendingHydrationLandmarks,
+                h.activeTitle.ToString(),
+                h.alchemySkill,
+                h.blacksmithingSkill,
+                h.engineeringSkill,
+                pendingHydrationReagents);
         }
 
         // ── O-01 Authoritative Movement ─────────────────────────────────────────────────
@@ -917,22 +1393,88 @@ namespace Riftbound.Network
             RequestSetMountServerRpc(mounted, string.IsNullOrEmpty(mountId) ? "horse" : mountId);
         }
 
-        public void RequestSetEquippedWeapon(string weaponId)
+        public void RequestSetEquippedWeapon(string weaponId) => RequestEquipItem(weaponId);
+
+        public void RequestEquipItem(string itemId)
         {
             if (!CoopSessionConfig.IsMultiplayer || !IsSpawned || !IsOwner) return;
-            string clean = string.IsNullOrWhiteSpace(weaponId) ? "starter-axe" : weaponId.Trim();
-            if (EquippedWeaponId.Value.ToString() == clean) return;
-            SubmitEquippedWeaponServerRpc(new FixedString64Bytes(clean));
+            string clean = string.IsNullOrWhiteSpace(itemId) ? "" : itemId.Trim();
+            if (string.IsNullOrEmpty(clean) || clean.Length > 48) return;
+            if (IsServer)
+                TryEquipItemOnServer(clean);
+            else
+                RequestEquipItemServerRpc(new FixedString64Bytes(clean));
         }
 
         [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Owner)]
-        void SubmitEquippedWeaponServerRpc(FixedString64Bytes weaponId)
+        void RequestEquipItemServerRpc(FixedString64Bytes itemId) =>
+            TryEquipItemOnServer(itemId.ToString());
+
+        [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Owner)]
+        void SubmitEquippedWeaponServerRpc(FixedString64Bytes weaponId) =>
+            TryEquipItemOnServer(weaponId.ToString());
+
+        bool TryEquipItemOnServer(string itemId)
         {
-            string wid = weaponId.ToString().Trim();
-            if (string.IsNullOrEmpty(wid) || wid.Length > 48) return;
-            var item = ItemCatalog.Get(wid);
-            if (item != null && item.slot == GearSlot.Weapon)
-                EquippedWeaponId.Value = new FixedString64Bytes(item.id);
+            if (!IsServer || !IsSpawned || Health.Value <= 0) return false;
+            string clean = string.IsNullOrWhiteSpace(itemId) ? "" : itemId.Trim();
+            if (string.IsNullOrEmpty(clean) || clean.Length > 48) return false;
+            var item = ItemCatalog.Get(clean);
+            if (item == null || !serverOwnedItems.Contains(item.id)) return false;
+
+            if ((item.slot == GearSlot.Armor || item.slot == GearSlot.Trinket) &&
+                (IsInCombat.Value || Time.time - serverLastDamagedAt < 5f))
+                return false;
+
+            switch (item.slot)
+            {
+                case GearSlot.Weapon:
+                    EquippedWeaponId.Value = new FixedString64Bytes(item.id);
+                    break;
+                case GearSlot.Armor:
+                    EquippedArmorId.Value = new FixedString64Bytes(item.id);
+                    break;
+                case GearSlot.Trinket:
+                    EquippedTrinketId.Value = new FixedString64Bytes(item.id);
+                    break;
+            }
+
+            RecalculateServerVitals(preserveCurrentHp: true);
+            PersistServerRealmCharacterIfInitialized();
+            return true;
+        }
+
+        int GetServerArmorRating()
+        {
+            var armor = ItemCatalog.Get(EquippedArmorId.Value.ToString());
+            var trinket = ItemCatalog.Get(EquippedTrinketId.Value.ToString());
+            int raceArmor = Race.Value.ToString() == "Undead" ? 3 : 0;
+            return (armor != null ? armor.armor : 0) + (trinket != null ? trinket.armor : 0) + raceArmor;
+        }
+
+        int GetServerWeaponDamageBonus()
+        {
+            var weapon = ItemCatalog.Get(EquippedWeaponId.Value.ToString());
+            var trinket = ItemCatalog.Get(EquippedTrinketId.Value.ToString());
+            return (weapon != null ? weapon.damage : 0) + (trinket != null ? trinket.damage : 0) + (serverTemperedWeapon ? 4 : 0);
+        }
+
+        void RecalculateServerVitals(bool preserveCurrentHp)
+        {
+            if (!IsServer) return;
+            string cls = ClassName.Value.ToString();
+            int baseHp = cls == "Warrior" || cls == "Paladin" ? 130 : (cls == "Mage" ? 90 : 105);
+            int levelHp = (Mathf.Max(1, Level.Value) - 1) * 15;
+            int raceHp = Race.Value.ToString() == "Brute" ? 25 : 0;
+            var armor = ItemCatalog.Get(EquippedArmorId.Value.ToString());
+            var trinket = ItemCatalog.Get(EquippedTrinketId.Value.ToString());
+            int gearHp = (armor != null ? armor.health : 0) + (trinket != null ? trinket.health : 0);
+            int newMax = Mathf.Max(1, baseHp + levelHp + raceHp + gearHp);
+            MaxHealth.Value = newMax;
+            if (preserveCurrentHp)
+                Health.Value = Mathf.Clamp(Health.Value, 0, newMax);
+            else
+                Health.Value = newMax;
         }
 
         int ServerGreenhollowCount() =>
@@ -1288,7 +1830,7 @@ namespace Riftbound.Network
                 "eviscerate" => 46f,
                 _ => 18f
             };
-            float computedDamage = baseDmg + (Level.Value - 1) * 4f;
+            float computedDamage = baseDmg + (Level.Value - 1) * 4f + GetServerWeaponDamageBonus();
             if (Race.Value.ToString() == "Brute") computedDamage *= 1.15f;
 
             float hpBeforeHit = stats.Health;
@@ -1534,7 +2076,7 @@ namespace Riftbound.Network
                 }
 
                 serverAbilityCooldowns["fireball"] = Time.time + 1.1f;
-                float computedDamage = 34f + (Level.Value - 1) * 4f;
+                float computedDamage = 34f + (Level.Value - 1) * 4f + GetServerWeaponDamageBonus();
                 if (Race.Value.ToString() == "Brute") computedDamage *= 1.15f;
 
                 float hpBeforeHit = stats.Health;
@@ -1927,7 +2469,7 @@ namespace Riftbound.Network
                 return;
             }
 
-            float mitigated = damage;
+            float mitigated = Mathf.Max(1f, damage - avatar.GetServerArmorRating());
             if (avatar.IsServerBlocking) mitigated *= 0.5f;
             int dmgInt = Mathf.Max(1, Mathf.RoundToInt(mitigated));
             avatar.serverLastDamagedAt = Time.time;
@@ -2011,6 +2553,242 @@ namespace Riftbound.Network
             localPlayer.ApplyAuthorizedPotionUse(remainingPotions, newHealth);
         }
 
+        static readonly Dictionary<string, float> ServerNodeCooldowns = new Dictionary<string, float>(StringComparer.Ordinal);
+
+        List<string> BuildServerReagentEntries()
+        {
+            var entries = new List<string>(serverReagents.Count);
+            foreach (var kv in serverReagents)
+            {
+                string clean = ProfessionSystem.NormalizeReagentName(kv.Key);
+                if (!string.IsNullOrEmpty(clean) && kv.Value > 0)
+                    entries.Add($"{clean}={Mathf.Clamp(kv.Value, 0, 9999)}");
+            }
+            return entries;
+        }
+
+        int GetServerProfessionSkill(CraftCategory category) => category switch
+        {
+            CraftCategory.Alchemy => serverAlchemySkill,
+            CraftCategory.Blacksmithing => serverBlacksmithingSkill,
+            CraftCategory.Engineering => serverEngineeringSkill,
+            _ => 0
+        };
+
+        void SetServerProfessionSkill(CraftCategory category, int value)
+        {
+            int clamped = Mathf.Clamp(value, 0, ProfessionSystem.MaxSkill);
+            switch (category)
+            {
+                case CraftCategory.Alchemy:
+                    serverAlchemySkill = clamped;
+                    break;
+                case CraftCategory.Blacksmithing:
+                    serverBlacksmithingSkill = clamped;
+                    break;
+                case CraftCategory.Engineering:
+                    serverEngineeringSkill = clamped;
+                    break;
+            }
+        }
+
+        int GetServerReagentCount(string reagentName)
+        {
+            string clean = ProfessionSystem.NormalizeReagentName(reagentName);
+            return !string.IsNullOrEmpty(clean) && serverReagents.TryGetValue(clean, out int count) ? count : 0;
+        }
+
+        public void RequestCraftRecipe(string recipeId)
+        {
+            if (!CoopSessionConfig.IsMultiplayer || !IsSpawned || !IsOwner || string.IsNullOrEmpty(recipeId)) return;
+            if (IsServer)
+            {
+                if (ExecuteServerCraftRecipe(recipeId, out string outputItemId) && localPlayer)
+                {
+                    localPlayer.ApplyAuthorizedCraftRecipe(
+                        recipeId.Trim().ToLowerInvariant(),
+                        outputItemId,
+                        serverPotions,
+                        serverAlchemySkill,
+                        serverBlacksmithingSkill,
+                        serverEngineeringSkill,
+                        ProfessionSystem.EncodeReagentsCsv(serverReagents));
+                }
+            }
+            else
+            {
+                RequestCraftRecipeServerRpc(recipeId);
+            }
+        }
+
+        [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Owner)]
+        void RequestCraftRecipeServerRpc(string recipeId)
+        {
+            if (ExecuteServerCraftRecipe(recipeId, out string outputItemId))
+            {
+                ApproveCraftRecipeClientRpc(
+                    recipeId.Trim().ToLowerInvariant(),
+                    outputItemId,
+                    serverPotions,
+                    serverAlchemySkill,
+                    serverBlacksmithingSkill,
+                    serverEngineeringSkill,
+                    ProfessionSystem.EncodeReagentsCsv(serverReagents),
+                    RpcTarget.Single(OwnerClientId, RpcTargetUse.Temp));
+            }
+        }
+
+        bool ExecuteServerCraftRecipe(string recipeId, out string outputItemId)
+        {
+            outputItemId = "";
+            if (!IsServer || Health.Value <= 0 || string.IsNullOrWhiteSpace(recipeId)) return false;
+            string clean = recipeId.Trim().ToLowerInvariant();
+            if (!ProfessionSystem.TryGetRecipeSpec(clean, out var recipe) || recipe == null) return false;
+
+            int curSkill = GetServerProfessionSkill(recipe.category);
+            if (curSkill < recipe.requiredSkill) return false;
+
+            if (recipe.reagents != null)
+            {
+                for (int i = 0; i < recipe.reagents.Length; i++)
+                {
+                    var r = recipe.reagents[i];
+                    if (GetServerReagentCount(r.matId) < r.count)
+                        return false;
+                }
+                for (int i = 0; i < recipe.reagents.Length; i++)
+                {
+                    var r = recipe.reagents[i];
+                    string cleanMat = ProfessionSystem.NormalizeReagentName(r.matId);
+                    int nextCount = Mathf.Max(0, GetServerReagentCount(cleanMat) - r.count);
+                    serverReagents[cleanMat] = nextCount;
+                }
+            }
+
+            if (curSkill < ProfessionSystem.MaxSkill)
+            {
+                int gain = (recipe.requiredSkill + 15 >= curSkill) ? 2 : 1;
+                SetServerProfessionSkill(recipe.category, Mathf.Min(ProfessionSystem.MaxSkill, curSkill + gain));
+            }
+
+            outputItemId = recipe.outputItemId ?? "";
+            if (outputItemId == "potion")
+            {
+                serverPotions = Mathf.Min(10, serverPotions + Mathf.Max(1, recipe.outputCount));
+            }
+            else if (outputItemId == "copper-dagger" ||
+                     outputItemId == "bronze-broadsword" ||
+                     outputItemId == "iron-buckler" ||
+                     outputItemId == "truesilver-blade")
+            {
+                GrantServerItem(outputItemId, equipIfBetter: false, persist: false);
+            }
+
+            PersistServerRealmCharacterIfInitialized();
+            return true;
+        }
+
+        [Rpc(SendTo.SpecifiedInParams)]
+        void ApproveCraftRecipeClientRpc(string recipeId, string outputItemId, int newPotions, int alchemySkill, int blacksmithingSkill, int engineeringSkill, string reagentsCsv, RpcParams rpcParams = default)
+        {
+            if (!IsOwner || !localPlayer) return;
+            localPlayer.ApplyAuthorizedCraftRecipe(recipeId, outputItemId, newPotions, alchemySkill, blacksmithingSkill, engineeringSkill, reagentsCsv);
+        }
+
+        public void RequestGatherNode(string nodeName, Vector3 nodePos)
+        {
+            if (!CoopSessionConfig.IsMultiplayer || !IsSpawned || !IsOwner || string.IsNullOrWhiteSpace(nodeName)) return;
+            if (IsServer)
+            {
+                if (ExecuteServerGatherNode(nodeName, nodePos, out string reagentName, out int count, out int xpGranted, out int goldGranted, out Vector3 authoritativeNodePos) && localPlayer)
+                {
+                    localPlayer.ApplyAuthorizedGatherNode(
+                        reagentName,
+                        count,
+                        Gold.Value,
+                        Level.Value,
+                        Experience.Value,
+                        xpGranted,
+                        goldGranted,
+                        ProfessionSystem.EncodeReagentsCsv(serverReagents),
+                        authoritativeNodePos);
+                }
+            }
+            else
+            {
+                RequestGatherNodeServerRpc(nodeName, nodePos);
+            }
+        }
+
+        [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Owner)]
+        void RequestGatherNodeServerRpc(string nodeName, Vector3 nodePos)
+        {
+            if (ExecuteServerGatherNode(nodeName, nodePos, out string reagentName, out int count, out int xpGranted, out int goldGranted, out Vector3 authoritativeNodePos))
+            {
+                ApproveGatherNodeClientRpc(
+                    reagentName,
+                    count,
+                    Gold.Value,
+                    Level.Value,
+                    Experience.Value,
+                    xpGranted,
+                    goldGranted,
+                    ProfessionSystem.EncodeReagentsCsv(serverReagents),
+                    authoritativeNodePos,
+                    RpcTarget.Single(OwnerClientId, RpcTargetUse.Temp));
+            }
+        }
+
+        bool ExecuteServerGatherNode(string nodeName, Vector3 nodePos, out string reagentName, out int count, out int xpGranted, out int goldGranted, out Vector3 authoritativeNodePos)
+        {
+            reagentName = "";
+            count = 0;
+            xpGranted = 0;
+            goldGranted = 0;
+            authoritativeNodePos = nodePos;
+            if (!IsServer || Health.Value <= 0 || string.IsNullOrWhiteSpace(nodeName)) return false;
+
+            GatheringNode matchedNode = null;
+            float bestDist = 3.5f;
+            foreach (var node in FindObjectsByType<GatheringNode>(FindObjectsSortMode.None))
+            {
+                if (!node || !node.gameObject.activeInHierarchy) continue;
+                if (!string.Equals(node.nodeName, nodeName.Trim(), StringComparison.OrdinalIgnoreCase)) continue;
+                float dToHint = Vector3.Distance(node.transform.position, nodePos);
+                if (dToHint <= bestDist && Vector3.Distance(transform.position, node.transform.position) <= 6.0f)
+                {
+                    bestDist = dToHint;
+                    matchedNode = node;
+                }
+            }
+            if (matchedNode == null) return false;
+            authoritativeNodePos = matchedNode.transform.position;
+
+            string nodeKey = $"{matchedNode.nodeName}@{matchedNode.transform.position.x:F1},{matchedNode.transform.position.z:F1}";
+            if (ServerNodeCooldowns.TryGetValue(nodeKey, out float readyAt) && Time.time < readyAt)
+                return false;
+            ServerNodeCooldowns[nodeKey] = Time.time + Mathf.Max(5f, matchedNode.respawnDelay * 0.5f);
+
+            reagentName = ProfessionSystem.NormalizeReagentName(matchedNode.nodeName);
+            if (string.IsNullOrEmpty(reagentName)) return false;
+            count = 1;
+            int cur = GetServerReagentCount(reagentName);
+            serverReagents[reagentName] = Mathf.Clamp(cur + count, 0, 9999);
+
+            xpGranted = Mathf.Max(0, matchedNode.rewardXp);
+            goldGranted = Mathf.Max(0, matchedNode.rewardGold);
+            GrantAuthoritativeProgress(xpGranted, goldGranted);
+            PersistServerRealmCharacterIfInitialized();
+            return true;
+        }
+
+        [Rpc(SendTo.SpecifiedInParams)]
+        void ApproveGatherNodeClientRpc(string reagentName, int count, int newGold, int newLevel, int newRemainderXp, int rewardXp, int rewardGold, string reagentsCsv, Vector3 nodePos, RpcParams rpcParams = default)
+        {
+            if (!IsOwner || !localPlayer) return;
+            localPlayer.ApplyAuthorizedGatherNode(reagentName, count, newGold, newLevel, newRemainderXp, rewardXp, rewardGold, reagentsCsv, nodePos);
+        }
+
         public void RequestTransaction(string txId)
         {
             if (!CoopSessionConfig.IsMultiplayer || !IsSpawned || string.IsNullOrEmpty(txId)) return;
@@ -2040,6 +2818,7 @@ namespace Riftbound.Network
                 if (Gold.Value < 10 || serverPotions >= 10) return false;
                 serverPotions++;
                 Gold.Value -= 10;
+                PersistServerRealmCharacterIfInitialized();
                 return true;
             }
             if (txId == "temper_weapon")
@@ -2047,6 +2826,7 @@ namespace Riftbound.Network
                 if (Gold.Value < 45 || serverTemperedWeapon) return false;
                 serverTemperedWeapon = true;
                 Gold.Value -= 45;
+                PersistServerRealmCharacterIfInitialized();
                 return true;
             }
             if (txId == "rest")
@@ -2054,6 +2834,15 @@ namespace Riftbound.Network
                 if (Gold.Value < 5 || Health.Value >= MaxHealth.Value) return false;
                 Gold.Value -= 5;
                 Health.Value = MaxHealth.Value;
+                PersistServerRealmCharacterIfInitialized();
+                return true;
+            }
+            if (txId == "sell_shards")
+            {
+                if (serverBoneShards <= 0) return false;
+                Gold.Value += serverBoneShards * 2;
+                serverBoneShards = 0;
+                PersistServerRealmCharacterIfInitialized();
                 return true;
             }
             return false;
@@ -2098,6 +2887,7 @@ namespace Riftbound.Network
             bool greenhollowComplete = (landmarkId == "willow-crossing" || landmarkId == "greenhollow-post" || landmarkId == "ancient-grove") && ServerGreenhollowCount() == 3;
             xpGranted = (landmarkId == "scarlet-crypts" || landmarkId == "redridge-frontier") ? 60 : (greenhollowComplete ? 85 : 35);
             GrantAuthoritativeProgress(xpGranted, 15);
+            PersistServerRealmCharacterIfInitialized();
             return true;
         }
 
@@ -2130,6 +2920,35 @@ namespace Riftbound.Network
                         cp.serverDefeatedEnemyKeys.Add(enemy.NetworkKey);
                         if (cp.QuestAccepted.Value) cp.QuestKills.Value++;
                         cp.GrantAuthoritativeProgress(25, 8);
+
+                        int corpseGold = enemy.NetworkKey == "boss-abbot-vael" ? 45
+                            : enemy.NetworkKey == "boss-malakar" ? 35
+                            : enemy.NetworkKey == "vermithrax-boss" ? 85
+                            : (enemy.isBoss ? 20 : enemy.campGuard ? 5 : 3);
+                        int corpseShards = enemy.NetworkKey == "boss-abbot-vael" ? 8
+                            : enemy.NetworkKey == "boss-malakar" ? 6
+                            : enemy.NetworkKey == "vermithrax-boss" ? 25
+                            : (enemy.isBoss ? 5 : enemy.campGuard ? 2 : 1);
+                        var drops = SharedRewardCatalog.GetEnemyDropItemIds(enemy.NetworkKey);
+                        var validDrops = new List<string>();
+                        if (drops != null)
+                        {
+                            for (int i = 0; i < drops.Count; i++)
+                            {
+                                string d = drops[i];
+                                if (!string.IsNullOrEmpty(d) && ItemCatalog.Get(d) != null && !validDrops.Contains(d))
+                                    validDrops.Add(d);
+                            }
+                        }
+                        cp.serverPendingCorpseLoot[enemy.NetworkKey] = new ServerPendingCorpse
+                        {
+                            enemyKey = enemy.NetworkKey,
+                            position = enemy.transform.position,
+                            gold = corpseGold,
+                            boneShards = corpseShards,
+                            items = validDrops
+                        };
+                        cp.PersistServerRealmCharacterIfInitialized();
                         cp.ReceiveEnemyDefeatedClientRpc(enemy.NetworkKey, cp.RpcTarget.Single(cp.OwnerClientId, RpcTargetUse.Temp));
                     }
                 }
@@ -2142,14 +2961,16 @@ namespace Riftbound.Network
             Experience.Value += Mathf.Max(0, xp);
             Gold.Value += Mathf.Max(0, gold);
             int xpNeeded = Level.Value * 100;
+            bool leveled = false;
             while (Experience.Value >= xpNeeded)
             {
                 Experience.Value -= xpNeeded;
                 Level.Value++;
-                MaxHealth.Value += 15;
-                Health.Value = MaxHealth.Value;
+                leveled = true;
                 xpNeeded = Level.Value * 100;
             }
+            if (leveled)
+                RecalculateServerVitals(preserveCurrentHp: false);
         }
 
         [Rpc(SendTo.SpecifiedInParams)]
@@ -2157,7 +2978,110 @@ namespace Riftbound.Network
         {
             if (!IsOwner || !localPlayer) return;
             var enemy = EnemyController.FindByKey(enemyKey);
-            if (enemy) localPlayer.RecordEnemyDefeat(enemy);
+            if (enemy)
+            {
+                localPlayer.RecordEnemyDefeat(enemy);
+                if (!IsServer &&
+                    (enemy.enemyId == "boss-abbot-vael" || enemy.enemyId == "boss-malakar" || enemy.enemyId == "vermithrax-boss") &&
+                    (LootDropSystem.Instance == null || LootDropSystem.Instance.FindCorpseByEnemyKey(enemy.NetworkKey) == null))
+                {
+                    int g = enemy.enemyId == "boss-abbot-vael" ? 45 : enemy.enemyId == "boss-malakar" ? 35 : 85;
+                    int s = enemy.enemyId == "boss-abbot-vael" ? 8 : enemy.enemyId == "boss-malakar" ? 6 : 25;
+                    string title = enemy.enemyId == "boss-abbot-vael" ? "Dread Abbot Vael"
+                        : enemy.enemyId == "boss-malakar" ? "High Inquisitor Malakar"
+                        : "Vermithrax the Ember Sovereign";
+                    LootDropSystem.SpawnLootItems(enemy.transform.position, title, g, s, SharedRewardCatalog.GetEnemyDropItemIds(enemy.enemyId), enemy.NetworkKey);
+                }
+            }
+        }
+
+        public void RequestLootCorpse(string enemyKey, string itemId, bool lootAll, bool lootCoins)
+        {
+            if (!CoopSessionConfig.IsMultiplayer || !IsSpawned || !IsOwner || string.IsNullOrEmpty(enemyKey)) return;
+            if (IsServer)
+            {
+                if (ExecuteServerLootCorpse(enemyKey, itemId, lootAll, lootCoins, out string[] granted, out int goldDelta, out int shardDelta, out bool cleared))
+                    LootDropSystem.Instance?.ApplyAuthorizedLootCorpse(enemyKey, granted, goldDelta, shardDelta, Gold.Value, serverBoneShards, cleared);
+            }
+            else
+            {
+                RequestLootCorpseServerRpc(enemyKey, itemId ?? "", lootAll, lootCoins);
+            }
+        }
+
+        [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Owner)]
+        void RequestLootCorpseServerRpc(string enemyKey, string itemId, bool lootAll, bool lootCoins)
+        {
+            if (ExecuteServerLootCorpse(enemyKey, itemId, lootAll, lootCoins, out string[] granted, out int goldDelta, out int shardDelta, out bool cleared))
+            {
+                string csv = granted != null && granted.Length > 0 ? string.Join(",", granted) : "";
+                ApproveLootCorpseClientRpc(enemyKey, csv, goldDelta, shardDelta, Gold.Value, serverBoneShards, cleared, RpcTarget.Single(OwnerClientId, RpcTargetUse.Temp));
+            }
+        }
+
+        bool ExecuteServerLootCorpse(string enemyKey, string itemId, bool lootAll, bool lootCoins, out string[] grantedItems, out int goldDelta, out int shardDelta, out bool corpseCleared)
+        {
+            grantedItems = Array.Empty<string>();
+            goldDelta = 0;
+            shardDelta = 0;
+            corpseCleared = false;
+            if (!IsServer || Health.Value <= 0 || string.IsNullOrEmpty(enemyKey)) return false;
+            if (!serverPendingCorpseLoot.TryGetValue(enemyKey, out var pending)) return false;
+            if (Vector3.Distance(transform.position, pending.position) > 6.5f) return false;
+
+            if ((lootAll || lootCoins) && pending.gold > 0)
+            {
+                int g = Race.Value.ToString() == "Human" ? Mathf.RoundToInt(pending.gold * 1.25f) : pending.gold;
+                Gold.Value += g;
+                goldDelta = g;
+                pending.gold = 0;
+            }
+            if (lootAll && pending.boneShards > 0)
+            {
+                shardDelta = pending.boneShards;
+                serverBoneShards += pending.boneShards;
+                pending.boneShards = 0;
+            }
+
+            var grantedList = new List<string>();
+            if (lootAll)
+            {
+                for (int i = 0; i < pending.items.Count; i++)
+                {
+                    string id = pending.items[i];
+                    if (ItemCatalog.Get(id) != null)
+                    {
+                        GrantServerItem(id, equipIfBetter: false, persist: false);
+                        grantedList.Add(id);
+                    }
+                }
+                pending.items.Clear();
+            }
+            else if (!string.IsNullOrWhiteSpace(itemId))
+            {
+                string clean = itemId.Trim();
+                if (pending.items.Remove(clean) && ItemCatalog.Get(clean) != null)
+                {
+                    GrantServerItem(clean, equipIfBetter: false, persist: false);
+                    grantedList.Add(clean);
+                }
+            }
+
+            corpseCleared = pending.gold <= 0 && pending.boneShards <= 0 && pending.items.Count == 0;
+            if (corpseCleared)
+                serverPendingCorpseLoot.Remove(enemyKey);
+
+            grantedItems = grantedList.ToArray();
+            PersistServerRealmCharacterIfInitialized();
+            return goldDelta > 0 || shardDelta > 0 || grantedItems.Length > 0 || corpseCleared;
+        }
+
+        [Rpc(SendTo.SpecifiedInParams)]
+        void ApproveLootCorpseClientRpc(string enemyKey, string grantedCsv, int goldDelta, int shardDelta, int newGold, int newBoneShards, bool corpseCleared, RpcParams rpcParams = default)
+        {
+            if (!IsOwner) return;
+            string[] granted = string.IsNullOrEmpty(grantedCsv) ? Array.Empty<string>() : grantedCsv.Split(',');
+            LootDropSystem.Instance?.ApplyAuthorizedLootCorpse(enemyKey, granted, goldDelta, shardDelta, newGold, newBoneShards, corpseCleared);
         }
 
         public bool RequestOpenChestServerValidated(LootChest chest)
@@ -2167,7 +3091,19 @@ namespace Riftbound.Network
                 return true;
 
             if (IsServer)
-                return ValidateChestClaimOnServer(chest);
+            {
+                if (!ValidateChestClaimOnServer(chest, out string[] grantedItems)) return false;
+                if (IsOwner)
+                {
+                    if (!localPlayer) localPlayer = FindFirstObjectByType<PlayerController>();
+                    if (localPlayer)
+                    {
+                        localPlayer.ApplyAuthorizedChestOpen(chest, grantedItems, Gold.Value, Level.Value, Experience.Value, serverPotions, fromServer: true);
+                        chest.Refresh();
+                    }
+                }
+                return true;
+            }
 
             RequestOpenChestServerRpc(chest.chestId);
             return false;
@@ -2181,12 +3117,14 @@ namespace Riftbound.Network
         {
             ServerClaimedWorldBossKills.Clear();
             ServerClaimedWorldBossChests.Clear();
+            ServerNodeCooldowns.Clear();
         }
 
         public static void ResetServerWorldBossClaimsForTest()
         {
             ServerClaimedWorldBossKills.Clear();
             ServerClaimedWorldBossChests.Clear();
+            ServerNodeCooldowns.Clear();
         }
 
         string ResolveCharacterRewardKey()
@@ -2195,23 +3133,77 @@ namespace Riftbound.Network
             return !string.IsNullOrWhiteSpace(n) ? n.Trim() : $"client:{OwnerClientId}";
         }
 
+        string ResolveWorldBossClaimKey()
+        {
+            string acct = ResolveServerAccountId().Trim().ToLowerInvariant();
+            string ch = ResolveCharacterRewardKey().Trim().ToLowerInvariant();
+            return $"{acct}__{ch}";
+        }
+
+        public string ResolveNextGorgonaxKillItem()
+        {
+            return SharedRewardCatalog.ResolveGorgonaxKillItem(id => serverOwnedItems.Contains(id));
+        }
+
+        static int ServerGearValue(GearItem item) => item.damage * 10 + item.armor * 10 + item.health;
+
+        bool GrantServerItem(string itemId, bool equipIfBetter = false, bool persist = true)
+        {
+            if (!IsServer || string.IsNullOrWhiteSpace(itemId)) return false;
+            string clean = itemId.Trim();
+            var item = ItemCatalog.Get(clean);
+            if (item == null) return false;
+
+            bool added = !serverOwnedItems.Contains(clean);
+            if (added) serverOwnedItems.Add(clean);
+
+            if (equipIfBetter)
+            {
+                string curId = item.slot == GearSlot.Weapon ? EquippedWeaponId.Value.ToString()
+                    : item.slot == GearSlot.Armor ? EquippedArmorId.Value.ToString()
+                    : EquippedTrinketId.Value.ToString();
+                var curItem = ItemCatalog.Get(curId);
+                if (curItem == null || ServerGearValue(item) > ServerGearValue(curItem))
+                {
+                    if (item.slot == GearSlot.Weapon) EquippedWeaponId.Value = new FixedString64Bytes(clean);
+                    else if (item.slot == GearSlot.Armor) EquippedArmorId.Value = new FixedString64Bytes(clean);
+                    else EquippedTrinketId.Value = new FixedString64Bytes(clean);
+                    RecalculateServerVitals(preserveCurrentHp: true);
+                }
+            }
+
+            if (persist)
+                PersistServerRealmCharacterIfInitialized();
+            return added;
+        }
+
         public bool GrantServerWorldBossKillReward(int xp, int gold, string itemId, string title)
         {
             if (!IsServer || !IsSpawned || Health.Value <= 0) return false;
             string charKey = ResolveCharacterRewardKey();
-            if (!ServerClaimedWorldBossKills.Add(charKey)) return false;
+            string claimKey = ResolveWorldBossClaimKey();
+            if (ServerClaimedWorldBossKills.Contains(claimKey)) return false;
             if (RealmPersistenceService.IsInitialized)
             {
                 if (!RealmPersistenceService.TryClaimBossKillOnce(ResolveServerAccountId(), charKey, "worldboss-gorgonax", Mathf.Max(0, gold), Mathf.Max(0, xp)))
                     return false;
             }
+            ServerClaimedWorldBossKills.Add(claimKey);
+
+            string resolvedItem = !string.IsNullOrEmpty(itemId) && !serverOwnedItems.Contains(itemId)
+                ? itemId
+                : ResolveNextGorgonaxKillItem();
+            if (!string.IsNullOrEmpty(resolvedItem))
+                GrantServerItem(resolvedItem, equipIfBetter: false, persist: false);
+            if (!string.IsNullOrWhiteSpace(title))
+                serverActiveTitle = title.Trim();
 
             GrantAuthoritativeProgress(Mathf.Max(0, xp), Mathf.Max(0, gold));
             PersistServerRealmCharacterIfInitialized();
             if (IsOwner && localPlayer)
-                ApplyAuthorizedWorldBossKillReward(itemId, title);
+                ApplyAuthorizedWorldBossKillReward(resolvedItem, title);
             else if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening)
-                ReceiveWorldBossKillRewardClientRpc(itemId ?? string.Empty, title ?? string.Empty, RpcTarget.Single(OwnerClientId, RpcTargetUse.Temp));
+                ReceiveWorldBossKillRewardClientRpc(resolvedItem ?? string.Empty, title ?? string.Empty, RpcTarget.Single(OwnerClientId, RpcTargetUse.Temp));
             return true;
         }
 
@@ -2243,8 +3235,9 @@ namespace Riftbound.Network
             }
         }
 
-        bool ValidateChestClaimOnServer(LootChest chest)
+        bool ValidateChestClaimOnServer(LootChest chest, out string[] grantedItems)
         {
+            grantedItems = Array.Empty<string>();
             if (Health.Value <= 0 || !chest || string.IsNullOrEmpty(chest.chestId)) return false;
             if (Vector3.Distance(transform.position, chest.transform.position) > 4.5f) return false;
             if (chest.chestId == RiverReaverCamp.CacheId && !serverDefeatedEnemyKeys.Contains(RiverReaverCamp.CaptainId)) return false;
@@ -2257,24 +3250,47 @@ namespace Riftbound.Network
             if (chest.requiresWardenDefeated && !serverDefeatedEnemyKeys.Contains("crypt-warden")) return false;
 
             string charKey = ResolveCharacterRewardKey();
+            string claimKey = ResolveWorldBossClaimKey();
+            if (serverClaimedChests.Contains(chest.chestId)) return false;
+            if (chest.chestId == WorldBossEncounter.HoardChestId && ServerClaimedWorldBossChests.Contains(claimKey))
+                return false;
+            if (CoopWorldManager.Instance != null && CoopWorldManager.Instance.HasClaimedChestForClient(OwnerClientId, chest.chestId))
+                return false;
+
             if (RealmPersistenceService.IsInitialized)
             {
                 if (!RealmPersistenceService.TryClaimChestOnce(ResolveServerAccountId(), charKey, chest.chestId, chest.gold, chest.experience))
                     return false;
             }
 
+            if (CoopWorldManager.Instance != null)
+                CoopWorldManager.Instance.TryClaimChestForClient(OwnerClientId, chest.chestId);
             if (chest.chestId == WorldBossEncounter.HoardChestId)
-            {
-                if (ServerClaimedWorldBossChests.Contains(charKey)) return false;
-                if (CoopWorldManager.Instance != null && !CoopWorldManager.Instance.TryClaimChestForClient(OwnerClientId, chest.chestId))
-                    return false;
-                ServerClaimedWorldBossChests.Add(charKey);
-            }
-            else if (CoopWorldManager.Instance != null && !CoopWorldManager.Instance.TryClaimChestForClient(OwnerClientId, chest.chestId))
-            {
-                return false;
-            }
+                ServerClaimedWorldBossChests.Add(claimKey);
+            serverClaimedChests.Add(chest.chestId);
 
+            IReadOnlyList<string> toGrant = chest.chestId == WorldBossEncounter.HoardChestId
+                ? (IReadOnlyList<string>)SharedRewardCatalog.ResolveGorgonaxChestItems(id => serverOwnedItems.Contains(id))
+                : SharedRewardCatalog.GetChestItemIds(chest.chestId);
+
+            var grantedList = new List<string>();
+            if (toGrant != null)
+            {
+                for (int i = 0; i < toGrant.Count; i++)
+                {
+                    string id = toGrant[i];
+                    if (string.IsNullOrWhiteSpace(id)) continue;
+                    string clean = id.Trim();
+                    if (ItemCatalog.Get(clean) != null)
+                    {
+                        GrantServerItem(clean, equipIfBetter: false, persist: false);
+                        grantedList.Add(clean);
+                    }
+                }
+            }
+            grantedItems = grantedList.ToArray();
+
+            serverPotions = Mathf.Min(10, serverPotions + 1);
             GrantAuthoritativeProgress(chest.experience, chest.gold);
             PersistServerRealmCharacterIfInitialized();
             return true;
@@ -2286,6 +3302,8 @@ namespace Riftbound.Network
         {
             if (!IsServer) return;
             serverAssignedAccountId = string.IsNullOrWhiteSpace(accountId) ? "" : accountId.Trim();
+            serverIdentityResolved = true;
+            serverHydrated = false;
             HydrateServerRealmCharacterIfInitialized();
         }
 
@@ -2299,23 +3317,112 @@ namespace Riftbound.Network
         {
             if (!IsServer || !RealmPersistenceService.IsInitialized) return;
             string charKey = ResolveCharacterRewardKey();
-            var save = RealmPersistenceService.LoadOrCreateCharacter(ResolveServerAccountId(), charKey, Race.Value.ToString(), ClassName.Value.ToString(), "Alliance");
-            if (save.level > Level.Value) Level.Value = save.level;
-            if (save.experience > Experience.Value) Experience.Value = save.experience;
-            if (save.gold > Gold.Value) Gold.Value = save.gold;
-            if (save.maxHealth > MaxHealth.Value) MaxHealth.Value = save.maxHealth;
-            if (save.health > 0 && save.health <= MaxHealth.Value) Health.Value = save.health;
+            string accountId = ResolveServerAccountId();
+            var save = RealmPersistenceService.LoadOrCreateCharacter(accountId, charKey, Race.Value.ToString(), ClassName.Value.ToString(), serverFaction);
+
+            if (!string.IsNullOrWhiteSpace(save.faction)) serverFaction = save.faction.Trim();
+            serverActiveTitle = save.activeTitle ?? "";
+
+            serverOwnedItems.Clear();
+            serverOwnedItems.Add("starter-axe");
+            if (save.ownedItems != null)
+            {
+                for (int i = 0; i < save.ownedItems.Count; i++)
+                {
+                    string id = save.ownedItems[i];
+                    if (!string.IsNullOrWhiteSpace(id) && ItemCatalog.Get(id.Trim()) != null && !serverOwnedItems.Contains(id.Trim()))
+                        serverOwnedItems.Add(id.Trim());
+                }
+            }
+
+            string wId = !string.IsNullOrWhiteSpace(save.equippedWeaponId) && serverOwnedItems.Contains(save.equippedWeaponId) && ItemCatalog.Get(save.equippedWeaponId)?.slot == GearSlot.Weapon
+                ? save.equippedWeaponId : "starter-axe";
+            string aId = !string.IsNullOrWhiteSpace(save.equippedArmorId) && serverOwnedItems.Contains(save.equippedArmorId) && ItemCatalog.Get(save.equippedArmorId)?.slot == GearSlot.Armor
+                ? save.equippedArmorId : "";
+            string tId = !string.IsNullOrWhiteSpace(save.equippedTrinketId) && serverOwnedItems.Contains(save.equippedTrinketId) && ItemCatalog.Get(save.equippedTrinketId)?.slot == GearSlot.Trinket
+                ? save.equippedTrinketId : "";
+
+            EquippedWeaponId.Value = new FixedString64Bytes(wId);
+            EquippedArmorId.Value = new FixedString64Bytes(aId);
+            EquippedTrinketId.Value = new FixedString64Bytes(tId);
+
+            Level.Value = Mathf.Max(1, save.level);
+            Experience.Value = Mathf.Max(0, save.experience);
+            Gold.Value = Mathf.Max(0, save.gold);
+            serverPotions = Mathf.Clamp(save.potions, 0, 10);
+            serverTemperedWeapon = save.temperedWeapon;
+            serverBoneShards = Mathf.Max(0, save.boneShards);
+            serverAlchemySkill = Mathf.Clamp(save.alchemySkill, 0, ProfessionSystem.MaxSkill);
+            serverBlacksmithingSkill = Mathf.Clamp(save.blacksmithingSkill, 0, ProfessionSystem.MaxSkill);
+            serverEngineeringSkill = Mathf.Clamp(save.engineeringSkill, 0, ProfessionSystem.MaxSkill);
+            serverReagents.Clear();
+            if (save.reagents != null)
+            {
+                for (int i = 0; i < save.reagents.Count; i++)
+                {
+                    if (ProfessionSystem.TryParseReagentEntry(save.reagents[i], out string rName, out int rCount) && rCount > 0)
+                        serverReagents[rName] = rCount;
+                }
+            }
+            QuestIndex.Value = Mathf.Clamp(save.questIndex, 0, 3);
+            QuestAccepted.Value = QuestIndex.Value < 3 && save.questAccepted;
+            QuestKills.Value = Mathf.Max(0, save.questKills);
+
+            serverClaimedChests.Clear();
+            if (save.claimedChests != null)
+            {
+                for (int i = 0; i < save.claimedChests.Count; i++)
+                    if (!string.IsNullOrWhiteSpace(save.claimedChests[i])) serverClaimedChests.Add(save.claimedChests[i].Trim());
+            }
+
+            serverDiscoveredLandmarks.Clear();
+            if (save.discoveredLandmarks != null)
+            {
+                for (int i = 0; i < save.discoveredLandmarks.Count; i++)
+                    if (!string.IsNullOrWhiteSpace(save.discoveredLandmarks[i])) serverDiscoveredLandmarks.Add(save.discoveredLandmarks[i].Trim());
+            }
+
+            serverDefeatedEnemyKeys.Clear();
+            if (save.defeatedEnemies != null)
+            {
+                for (int i = 0; i < save.defeatedEnemies.Count; i++)
+                    if (!string.IsNullOrWhiteSpace(save.defeatedEnemies[i])) serverDefeatedEnemyKeys.Add(save.defeatedEnemies[i].Trim());
+            }
+
+            serverCompletedFactionQuests.Clear();
+            if (save.claimedQuests != null)
+            {
+                for (int i = 0; i < save.claimedQuests.Count; i++)
+                {
+                    string q = save.claimedQuests[i];
+                    if (string.IsNullOrWhiteSpace(q)) continue;
+                    string cleanQ = q.Trim();
+                    if (cleanQ.StartsWith("faction_quest_", StringComparison.Ordinal))
+                        serverCompletedFactionQuests.Add(cleanQ.Substring("faction_quest_".Length));
+                }
+            }
+
+            RecalculateServerVitals(preserveCurrentHp: false);
+            if (save.health > 0)
+                Health.Value = Mathf.Clamp(save.health, 1, MaxHealth.Value);
+
+            string claimKey = ResolveWorldBossClaimKey();
             if (save.claimedBossKills != null && save.claimedBossKills.Contains("worldboss-gorgonax"))
-                ServerClaimedWorldBossKills.Add(charKey);
-            if (save.claimedChests != null && save.claimedChests.Contains(WorldBossEncounter.HoardChestId))
-                ServerClaimedWorldBossChests.Add(charKey);
+                ServerClaimedWorldBossKills.Add(claimKey);
+            if (serverClaimedChests.Contains(WorldBossEncounter.HoardChestId))
+                ServerClaimedWorldBossChests.Add(claimKey);
+
+            serverHydrated = true;
         }
 
         void PersistServerRealmCharacterIfInitialized()
         {
             if (!IsServer || !RealmPersistenceService.IsInitialized) return;
             string charKey = ResolveCharacterRewardKey();
-            var save = RealmPersistenceService.LoadOrCreateCharacter(ResolveServerAccountId(), charKey, Race.Value.ToString(), ClassName.Value.ToString(), "Alliance");
+            var save = RealmPersistenceService.LoadOrCreateCharacter(ResolveServerAccountId(), charKey, Race.Value.ToString(), ClassName.Value.ToString(), serverFaction);
+            save.race = Race.Value.ToString();
+            save.className = ClassName.Value.ToString();
+            save.faction = serverFaction;
             save.level = Mathf.Max(1, Level.Value);
             save.experience = Mathf.Max(0, Experience.Value);
             save.gold = Mathf.Max(0, Gold.Value);
@@ -2324,6 +3431,39 @@ namespace Riftbound.Network
             save.posX = transform.position.x;
             save.posY = transform.position.y;
             save.posZ = transform.position.z;
+
+            save.ownedItems = new List<string>(serverOwnedItems);
+            if (!save.ownedItems.Contains("starter-axe")) save.ownedItems.Insert(0, "starter-axe");
+            save.equippedWeaponId = EquippedWeaponId.Value.ToString();
+            save.equippedArmorId = EquippedArmorId.Value.ToString();
+            save.equippedTrinketId = EquippedTrinketId.Value.ToString();
+            save.potions = Mathf.Clamp(serverPotions, 0, 10);
+            save.temperedWeapon = serverTemperedWeapon;
+            save.boneShards = Mathf.Max(0, serverBoneShards);
+            save.alchemySkill = Mathf.Clamp(serverAlchemySkill, 0, ProfessionSystem.MaxSkill);
+            save.blacksmithingSkill = Mathf.Clamp(serverBlacksmithingSkill, 0, ProfessionSystem.MaxSkill);
+            save.engineeringSkill = Mathf.Clamp(serverEngineeringSkill, 0, ProfessionSystem.MaxSkill);
+            save.professionInitialized = true;
+            save.reagents = BuildServerReagentEntries();
+            save.questIndex = Mathf.Clamp(QuestIndex.Value, 0, 3);
+            save.questAccepted = save.questIndex < 3 && QuestAccepted.Value;
+            save.questKills = Mathf.Max(0, QuestKills.Value);
+            save.activeTitle = serverActiveTitle ?? "";
+            save.discoveredLandmarks = new List<string>(serverDiscoveredLandmarks);
+            save.defeatedEnemies = new List<string>(serverDefeatedEnemyKeys);
+
+            save.claimedChests ??= new List<string>();
+            foreach (var c in serverClaimedChests)
+                if (!string.IsNullOrEmpty(c) && !save.claimedChests.Contains(c)) save.claimedChests.Add(c);
+
+            save.claimedQuests ??= new List<string>();
+            foreach (var fq in serverCompletedFactionQuests)
+            {
+                string fullId = $"faction_quest_{fq}";
+                if (!string.IsNullOrEmpty(fq) && !save.claimedQuests.Contains(fullId) && !save.claimedQuests.Contains(fq))
+                    save.claimedQuests.Add(fullId);
+            }
+
             RealmPersistenceService.SaveCharacter(save);
         }
 
@@ -2366,21 +3506,25 @@ namespace Riftbound.Network
             foreach (var c in FindObjectsByType<LootChest>(FindObjectsSortMode.None))
                 if (c && c.chestId == chestId) { targetChest = c; break; }
 
-            if (ValidateChestClaimOnServer(targetChest))
+            if (ValidateChestClaimOnServer(targetChest, out string[] grantedItems))
             {
-                ApproveOpenChestClientRpc(chestId, RpcTarget.Single(OwnerClientId, RpcTargetUse.Temp));
+                string csv = grantedItems != null && grantedItems.Length > 0 ? string.Join(",", grantedItems) : "";
+                ApproveOpenChestClientRpc(chestId, csv, Gold.Value, Level.Value, Experience.Value, serverPotions, RpcTarget.Single(OwnerClientId, RpcTargetUse.Temp));
             }
         }
 
         [Rpc(SendTo.SpecifiedInParams)]
-        void ApproveOpenChestClientRpc(string chestId, RpcParams rpcParams = default)
+        void ApproveOpenChestClientRpc(string chestId, string grantedCsv, int newGold, int newLevel, int newRemainderXp, int newPotions, RpcParams rpcParams = default)
         {
-            if (!IsOwner || !localPlayer) return;
+            if (!IsOwner) return;
+            if (!localPlayer) localPlayer = FindFirstObjectByType<PlayerController>();
+            if (!localPlayer) return;
+            string[] granted = string.IsNullOrEmpty(grantedCsv) ? Array.Empty<string>() : grantedCsv.Split(',');
             foreach (var c in FindObjectsByType<LootChest>(FindObjectsSortMode.None))
             {
                 if (c && c.chestId == chestId)
                 {
-                    localPlayer.ApplyAuthorizedChestOpen(c);
+                    localPlayer.ApplyAuthorizedChestOpen(c, granted, newGold, newLevel, newRemainderXp, newPotions, fromServer: true);
                     c.Refresh();
                     break;
                 }
@@ -2403,6 +3547,7 @@ namespace Riftbound.Network
             if (!IsNearQuestGiver()) return;
             QuestAccepted.Value = true;
             QuestKills.Value = 0;
+            PersistServerRealmCharacterIfInitialized();
         }
 
         bool IsNearQuestGiver()
@@ -2418,7 +3563,15 @@ namespace Riftbound.Network
                 return true;
 
             if (IsServer)
-                return ValidateCompleteQuestOnServer(questIndex);
+            {
+                if (!ValidateCompleteQuestOnServer(questIndex)) return false;
+                if (IsOwner)
+                {
+                    if (!localPlayer) localPlayer = FindFirstObjectByType<PlayerController>();
+                    localPlayer?.ApplyAuthorizedCompleteQuest(questIndex, Gold.Value, Level.Value, Experience.Value, serverPotions, fromServer: true);
+                }
+                return true;
+            }
 
             RequestCompleteQuestServerRpc(questIndex);
             return false;
@@ -2433,16 +3586,35 @@ namespace Riftbound.Network
             int requiredKills = questIndex == 2 ? 1 : 3;
             if (QuestKills.Value < requiredKills) return false;
 
-            if (CoopWorldManager.Instance != null && !CoopWorldManager.Instance.TryClaimQuestForClient(OwnerClientId, questIndex))
+            int baseGold = questIndex == 0 ? 25 : (questIndex == 1 ? 35 : 60);
+            int gold = Race.Value.ToString() == "Human" ? Mathf.RoundToInt(baseGold * 1.25f) : baseGold;
+            int xp = questIndex == 0 ? 80 : (questIndex == 1 ? 100 : 180);
+
+            if (CoopWorldManager.Instance != null && CoopWorldManager.Instance.HasClaimedQuestForClient(OwnerClientId, questIndex))
                 return false;
 
-            int gold = questIndex == 0 ? 25 : (questIndex == 1 ? 35 : 60);
-            int xp = questIndex == 0 ? 80 : (questIndex == 1 ? 100 : 180);
+            if (RealmPersistenceService.IsInitialized)
+            {
+                if (!RealmPersistenceService.TryClaimQuestOnce(ResolveServerAccountId(), ResolveCharacterRewardKey(), $"main_quest_{questIndex}", gold, xp))
+                    return false;
+            }
+
+            if (CoopWorldManager.Instance != null)
+                CoopWorldManager.Instance.TryClaimQuestForClient(OwnerClientId, questIndex);
+
             GrantAuthoritativeProgress(xp, gold);
+            serverPotions = Mathf.Min(10, serverPotions + 1);
             QuestIndex.Value++;
             QuestAccepted.Value = false;
             QuestKills.Value = 0;
+            if (questIndex == 2)
+            {
+                GrantServerItem("emberwatch-axe", equipIfBetter: true, persist: false);
+                GrantServerItem("emberwatch-sigil", equipIfBetter: true, persist: false);
+                RecalculateServerVitals(preserveCurrentHp: false);
+            }
             Health.Value = MaxHealth.Value;
+            PersistServerRealmCharacterIfInitialized();
             return true;
         }
 
@@ -2451,15 +3623,15 @@ namespace Riftbound.Network
         {
             if (ValidateCompleteQuestOnServer(questIndex))
             {
-                ApproveCompleteQuestClientRpc(questIndex, RpcTarget.Single(OwnerClientId, RpcTargetUse.Temp));
+                ApproveCompleteQuestClientRpc(questIndex, Gold.Value, Level.Value, Experience.Value, serverPotions, RpcTarget.Single(OwnerClientId, RpcTargetUse.Temp));
             }
         }
 
         [Rpc(SendTo.SpecifiedInParams)]
-        void ApproveCompleteQuestClientRpc(int questIndex, RpcParams rpcParams = default)
+        void ApproveCompleteQuestClientRpc(int questIndex, int newGold, int newLevel, int newRemainderXp, int newPotions, RpcParams rpcParams = default)
         {
             if (!IsOwner || !localPlayer) return;
-            localPlayer.ApplyAuthorizedCompleteQuest(questIndex);
+            localPlayer.ApplyAuthorizedCompleteQuest(questIndex, newGold, newLevel, newRemainderXp, newPotions, fromServer: true);
         }
 
         public bool RequestCompleteFactionQuestServerValidated(string questId)
@@ -2521,17 +3693,37 @@ namespace Riftbound.Network
             }
             else if (q.targetType == "defeat_enemy")
             {
-                bool exactBoss = q.targetId == RiverReaverCamp.CaptainId || q.targetId == "redridge-outcast-boss" || q.targetId == "vermithrax-boss";
+                bool exactBoss = q.targetId == RiverReaverCamp.CaptainId
+                    || q.targetId == "redridge-outcast-boss"
+                    || q.targetId == "vermithrax-boss"
+                    || q.targetId == PinewatchWoodsZone.BossId
+                    || q.targetId == AshenmawCavernZone.BossId
+                    || q.targetId == SunstoneAbbeyZone.BossId
+                    || q.targetId == IronmawQuarryZone.BossId;
                 if (exactBoss ? !serverDefeatedEnemyKeys.Contains(q.targetId) : serverDefeatedEnemyKeys.Count < q.requiredCount)
+                    return false;
+            }
+
+            goldGain = Race.Value.ToString() == "Human" ? Mathf.RoundToInt(q.rewardGold * 1.25f) : q.rewardGold;
+            xpGain = q.rewardXP;
+
+            if (RealmPersistenceService.IsInitialized)
+            {
+                if (!RealmPersistenceService.TryClaimQuestOnce(ResolveServerAccountId(), ResolveCharacterRewardKey(), $"faction_quest_{questId}", goldGain, xpGain))
                     return false;
             }
 
             if (!serverCompletedFactionQuests.Add(questId)) return false;
 
-            goldGain = Race.Value.ToString() == "Human" ? Mathf.RoundToInt(q.rewardGold * 1.25f) : q.rewardGold;
-            xpGain = q.rewardXP;
+            if (!string.IsNullOrEmpty(q.rewardItem))
+            {
+                GrantServerItem(q.rewardItem, equipIfBetter: true, persist: false);
+                RecalculateServerVitals(preserveCurrentHp: false);
+            }
+
             GrantAuthoritativeProgress(xpGain, goldGain);
             Health.Value = MaxHealth.Value;
+            PersistServerRealmCharacterIfInitialized();
             return true;
         }
 
@@ -2656,7 +3848,8 @@ namespace Riftbound.Network
         void ReceiveWorldEventRewardClientRpc(string eventId, int xp, int gold, bool firstClear, RpcParams rpcParams = default)
         {
             if (!IsOwner || !localPlayer) return;
-            localPlayer.AddExperience(xp);
+            if (!CoopSessionConfig.IsRealmClient)
+                localPlayer.AddExperience(xp);
             localPlayer.SetAuthoritativeGold(Gold.Value);
             string tag = firstClear ? "Event Complete" : "Bounty Repeat";
             localPlayer.Message = $"{tag}: +{xp} XP, +{gold} Gold!";

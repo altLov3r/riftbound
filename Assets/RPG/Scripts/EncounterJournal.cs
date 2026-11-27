@@ -123,7 +123,7 @@ namespace Riftbound
                 isInterruptible = false
             });
             malakar.lootTable.Add(new BossLoot { itemId = "scarlet-blade", dropChance = "100%" });
-            malakar.lootTable.Add(new BossLoot { itemId = "cathedral-relic", dropChance = "65%" });
+            malakar.lootTable.Add(new BossLoot { itemId = "cathedral-relic", dropChance = "100% (Altar Chest)" });
             encounters.Add(malakar);
 
             // 2. Dread Abbot Vael
@@ -159,44 +159,53 @@ namespace Riftbound
                 isInterruptible = false
             });
             vael.lootTable.Add(new BossLoot { itemId = "scarlet-aegis", dropChance = "100%" });
-            vael.lootTable.Add(new BossLoot { itemId = "duskwood-shadow-dagger", dropChance = "50%" });
+            vael.lootTable.Add(new BossLoot { itemId = "duskwood-shadow-dagger", dropChance = "100%" });
             encounters.Add(vael);
 
-            // 3. Sandscourge Rex
-            var rex = new BossEncounterDef
+            // 3. Gorgonax the Worldbreaker
+            var gorgonax = new BossEncounterDef
             {
-                id = "rex",
-                name = "Sandscourge Rex",
-                title = "The Desert Colossus",
-                zone = "Redridge Canyons (Barrens)",
+                id = "gorgonax",
+                name = "Gorgonax the Worldbreaker",
+                title = "Magma Colossus",
+                zone = "Breaker Works Crater (Redridge)",
                 roleTag = "World Boss",
-                icon = "🌪",
-                health = 1200,
-                location = "Shifting Dunes (45, 185)",
-                lore = "An ancient armored dread-beast burrowing beneath the red sands of the canyon frontier. Capable of triggering localized sandstorms and devastating earth tremors.",
-                tankTip = "Face Rex facing north away from open roads. Keep boss grounded during submerge phase.",
-                healTip = "Dispel bleeding sands and maintain high defensive shields on the primary tank.",
-                dpsTip = "Attack from the flanks; avoid tail sweep knockbacks and focus during sand-burrow breaches!"
+                icon = "🔥",
+                health = 1600,
+                location = "Breaker Works Crater (180, 300)",
+                lore = "A towering magma colossus forged deep beneath the Redridge caldera. Awakening in the Breaker Works Crater, Gorgonax shatters the frontier earth with seismic stomps and molten meteor strikes.",
+                tankTip = "Hold Gorgonax near the center of the Breaker Works arena and brace for Seismic Stomp.",
+                healTip = "Top off party members after Seismic Stomp (14m AoE) and prepare for Molten Enrage below 35% HP.",
+                dpsTip = "Move out of Molten Meteor impact zones during the 2.4s warning and burst through Enrage below 35% HP!"
             };
-            rex.abilities.Add(new BossAbility
+            gorgonax.abilities.Add(new BossAbility
             {
-                name = "Sandstorm Burrow",
-                icon = "🌪",
-                castTime = "Channeling",
-                description = "Submerges beneath the earth, whipping up choking sand before erupting under unsuspecting adventurers.",
+                name = "Seismic Stomp",
+                icon = "🌋",
+                castTime = "14s Cooldown",
+                description = "Slams the earth, dealing 28 Fire AoE damage to all players within 14m.",
                 isInterruptible = false
             });
-            rex.abilities.Add(new BossAbility
+            gorgonax.abilities.Add(new BossAbility
             {
-                name = "Crushing Cleave",
-                icon = "🔨",
-                castTime = "1.8s Cast (Interruptible)",
-                description = "Heavy frontal slam that fractures armor. Interrupt with [F] to avoid heavy damage.",
-                isInterruptible = true
+                name = "Molten Meteor",
+                icon = "☄",
+                castTime = "2.4s Warning",
+                description = "Summons a meteor crater dealing 45 Fire AoE damage across a 6m impact radius after a 2.4s warning.",
+                isInterruptible = false
             });
-            rex.lootTable.Add(new BossLoot { itemId = "worldbreaker-maul", dropChance = "45%" });
-            rex.lootTable.Add(new BossLoot { itemId = "crown-of-molten-ruin", dropChance = "40%" });
-            encounters.Add(rex);
+            gorgonax.abilities.Add(new BossAbility
+            {
+                name = "Molten Enrage",
+                icon = "🔥",
+                castTime = "Phase 2 (35% HP)",
+                description = "Below 35% HP, Gorgonax enters a molten frenzy, increasing attack speed and melee damage.",
+                isInterruptible = false
+            });
+            gorgonax.lootTable.Add(new BossLoot { itemId = "worldbreaker-maul", dropChance = "100% (Boss Kill)" });
+            gorgonax.lootTable.Add(new BossLoot { itemId = "crown-of-molten-ruin", dropChance = "100% (Hoard Chest)" });
+            gorgonax.lootTable.Add(new BossLoot { itemId = "cinderfury-signet", dropChance = "100% (Hoard Chest)" });
+            encounters.Add(gorgonax);
 
             // 4. Vermithrax the Ember Sovereign
             var vermithrax = new BossEncounterDef
@@ -443,7 +452,7 @@ namespace Riftbound
                     GUI.Label(new Rect(lCard.x + 38f, lCard.y + 24f, 260f, 18f), item.Stats, textStyle);
 
                     // Drop chance badge
-                    GUI.Label(new Rect(lCard.xMax - 85f, lCard.y + 14f, 80f, 20f), drop.dropChance, headerStyle);
+                    GUI.Label(new Rect(lCard.xMax - 145f, lCard.y + 14f, 138f, 20f), drop.dropChance, headerStyle);
 
                     lY += 54f;
                 }

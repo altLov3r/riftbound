@@ -14,6 +14,7 @@ namespace Riftbound
         public int Potions { get; private set; } = 2;
         public bool WeaponUpgraded { get; private set; }
         public bool InventoryOpen { get; set; }
+        public bool IsRealmHydrated { get; private set; }
         public static string SavePathOverride;
         public string CharacterSaveId { get; set; } = "";
         public string CharacterName { get; set; } = "Brute";
@@ -99,10 +100,17 @@ namespace Riftbound
             int expGain = enemy.isBoss ? 120 : enemy.campGuard ? 40 : 30;
             string enemyName = enemy.GetComponent<Combatant>()?.displayName ?? "enemy";
             ChatSystem.LogCombat($"Defeated {enemyName}! +{expGain} XP.");
-            string item = EnemyItem(enemy);
-            int boneCount = enemy.isBoss ? 5 : enemy.campGuard ? 2 : 1;
-            LootDropSystem.SpawnLoot(enemy.transform.position, enemyName, goldGain, boneCount, item);
-            AddExperience(expGain);
+            bool suppressDefaultLoot = enemy.skipDefaultLootDrop
+                || (CathedralBossEncounter.Instance != null && (enemy.enemyId == "boss-malakar" || enemy.enemyId == "boss-abbot-vael"))
+                || (ApexBossEncounter.Instance != null && enemy.enemyId == "vermithrax-boss");
+            if (!suppressDefaultLoot)
+            {
+                string item = EnemyItem(enemy);
+                int boneCount = enemy.isBoss ? 5 : enemy.campGuard ? 2 : 1;
+                LootDropSystem.SpawnLoot(enemy.transform.position, enemyName, goldGain, boneCount, item, enemy.NetworkKey);
+            }
+            if (!Network.CoopSessionConfig.IsRealmClient)
+                AddExperience(expGain);
             Message = enemy.IsMainQuestCaptain ? "Captain defeated! Return to Abe. [E] Loot the remains." : "+XP. [E] Loot the remains. " + QuestObjective;
             SaveAdventure(false);
         }
@@ -166,11 +174,14 @@ namespace Riftbound
             WesternRoadCamps.Ensure(this);
             BrassHollows.Ensure();
             CharacterVisualFactory.ApplyToPlayer(this, CharacterRace, CharacterClass);
-            foreach (var enemy in FindObjectsByType<EnemyController>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+            if (!Network.CoopSessionConfig.IsMultiplayer)
             {
-                bool active = !defeatedEnemies.Contains(enemy.enemyId) && (!enemy.IsMainQuestCaptain || (QuestIndex == 2 && QuestAccepted)) && (!enemy.requiresRunes || RunesFound >= 3);
-                // Preserve an enemy's death animation until the next load.
-                if (active || enemy.GetComponent<Combatant>().Alive || !Application.isPlaying) enemy.gameObject.SetActive(active);
+                foreach (var enemy in FindObjectsByType<EnemyController>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+                {
+                    bool active = !defeatedEnemies.Contains(enemy.enemyId) && (!enemy.IsMainQuestCaptain || (QuestIndex == 2 && QuestAccepted)) && (!enemy.requiresRunes || RunesFound >= 3);
+                    // Preserve an enemy's death animation until the next load.
+                    if (active || enemy.GetComponent<Combatant>().Alive || !Application.isPlaying) enemy.gameObject.SetActive(active);
+                }
             }
             foreach (var supply in FindObjectsByType<SupplyCrate>(FindObjectsInactive.Include, FindObjectsSortMode.None)) supply.Refresh(this);
             foreach (var chest in FindObjectsByType<LootChest>(FindObjectsSortMode.None)) chest.Refresh();
@@ -311,10 +322,18 @@ namespace Riftbound
 
         public void LoadAdventure()
         {
+            IsRealmHydrated = false;
             WesternRoadStage = 0;
             BrassHollowsStage = 0;
             TutorialStep = FirstAdventureStep.Unseen;
             RestoreMilestoneTalents(null, null);
+            if (Network.CoopSessionConfig.IsRealmClient)
+            {
+                Vector3 realmRacialSpawn = GetRacialSpawnPosition();
+                SyncFactionSpawnAndHearth(realmRacialSpawn);
+                Message = $"Connecting to {Network.RealmConfig.Current.displayName}...";
+                return;
+            }
             if (!File.Exists(SavePath))
             {
                 Vector3 racialSpawn = GetRacialSpawnPosition();
@@ -406,6 +425,228 @@ namespace Riftbound
                 Message = $"Welcome back to {activeZone}. " + QuestObjective;
             }
             catch (Exception exception) { Message = "Could not load the save. Starting a fresh session."; Debug.LogWarning("Adventure load: " + exception.Message); }
+        }
+
+        public static int ConvertServerProgressToCumulativeXp(int serverLevel, int remainderXp)
+        {
+            int clampedLevel = Mathf.Clamp(serverLevel, 1, MaxLevel);
+            int floorXp = LevelThresholds[clampedLevel - 1];
+            if (clampedLevel >= MaxLevel)
+                return floorXp + Mathf.Max(0, remainderXp);
+
+            int nextThreshold = LevelThresholds[clampedLevel];
+            int span = Mathf.Max(1, nextThreshold - floorXp);
+            int serverNeeded = Mathf.Max(1, 100 * clampedLevel);
+            float frac = Mathf.Clamp01((float)Mathf.Max(0, remainderXp) / serverNeeded);
+            int localOffset = Mathf.Clamp(Mathf.RoundToInt(frac * span), 0, span - 1);
+            return floorXp + localOffset;
+        }
+
+        public void SetAuthoritativeServerProgress(int serverLevel, int remainderXp)
+        {
+            int prevLevel = Level;
+            Experience = ConvertServerProgressToCumulativeXp(serverLevel, remainderXp);
+            RefreshEquipmentStats();
+            if (Network.CoopSessionConfig.IsMultiplayer &&
+                Network.RiftboundCoopPlayer.LocalOwner != null &&
+                Network.RiftboundCoopPlayer.LocalOwner.MaxHealth.Value > 0)
+            {
+                Stats?.SetReplicatedHealth(
+                    Network.RiftboundCoopPlayer.LocalOwner.Health.Value,
+                    Network.RiftboundCoopPlayer.LocalOwner.MaxHealth.Value);
+            }
+            if (Level > prevLevel && IsRealmHydrated)
+            {
+                SpellFX.CreateLevelUpBurst(transform.position);
+                ZoneBanner.Show($"LEVEL {Level}!", "Health and damage increased");
+                Message = $"Level {Level}! Health and damage increased.";
+                AudioEffects.PlayLevelUp();
+                ChatSystem.LogSystem($"Congratulations! You have reached Level {Level}!");
+            }
+        }
+
+        public void ApplyAuthorizedCraftRecipe(string outputItemId, int newPotions)
+        {
+            Potions = Mathf.Clamp(newPotions, 0, 10);
+            if (!string.IsNullOrEmpty(outputItemId) && outputItemId != "potion")
+            {
+                GrantItem(outputItemId);
+                var item = ItemCatalog.Get(outputItemId);
+                if (item != null)
+                {
+                    ChatSystem.LogLoot($"You forged: [{item.name}]! Open Equipment [I] to equip.");
+                    Message = $"Crafted: {item.name}.";
+                }
+            }
+        }
+
+        public void ApplyAuthorizedCraftRecipe(string recipeId, string outputItemId, int newPotions, int alchemySkill, int blacksmithingSkill, int engineeringSkill, string reagentsCsv)
+        {
+            ApplyAuthorizedCraftRecipe(outputItemId, newPotions);
+            var prof = ProfessionSystem.Instance ?? GetComponent<ProfessionSystem>() ?? gameObject.AddComponent<ProfessionSystem>();
+            if (prof != null)
+                prof.ApplyAuthoritativeCraftResult(recipeId, alchemySkill, blacksmithingSkill, engineeringSkill, reagentsCsv);
+        }
+
+        public void ApplyAuthorizedGatherNode(string reagentName, int count, int newGold, int newLevel, int newRemainderXp, int rewardXp, int rewardGold, string reagentsCsv) =>
+            ApplyAuthorizedGatherNode(reagentName, count, newGold, newLevel, newRemainderXp, rewardXp, rewardGold, reagentsCsv, Vector3.zero, hasNodePos: false);
+
+        public void ApplyAuthorizedGatherNode(string reagentName, int count, int newGold, int newLevel, int newRemainderXp, int rewardXp, int rewardGold, string reagentsCsv, Vector3 nodePos, bool hasNodePos = true)
+        {
+            SetAuthoritativeGold(newGold);
+            if (Network.CoopSessionConfig.IsRealmClient)
+                SetAuthoritativeServerProgress(newLevel, newRemainderXp);
+            else if (rewardXp > 0)
+                AddExperience(rewardXp);
+
+            var prof = ProfessionSystem.Instance ?? GetComponent<ProfessionSystem>() ?? gameObject.AddComponent<ProfessionSystem>();
+            if (prof != null)
+                prof.ApplyAuthoritativeReagentsCsv(reagentsCsv);
+
+            if (rewardXp > 0)
+                CombatTextManager.Spawn(transform.position + Vector3.up * 1.2f, $"+{rewardXp} XP", new Color(0.4f, 0.85f, 1f), false);
+            if (rewardGold > 0)
+                CombatTextManager.Spawn(transform.position + Vector3.up * 1.8f, $"+{rewardGold} Gold", new Color(1f, 0.85f, 0.25f), false);
+            if (!string.IsNullOrEmpty(reagentName) && count > 0)
+            {
+                CombatTextManager.Spawn(transform.position + Vector3.up * 1.5f, $"+{count} {reagentName}", new Color(0.5f, 1f, 0.5f), false);
+                ChatSystem.LogLoot($"Received reagent: [{reagentName}] x{count}.");
+            }
+            ChatSystem.LogSystem($"You gathered [{reagentName}]: received {rewardGold} gold and {rewardXp} experience.");
+            if (hasNodePos)
+                GatheringNode.CompleteAuthorizedGather(nodePos);
+        }
+
+        public void ApplyServerRealmHydration(
+            string characterName,
+            string race,
+            string className,
+            string faction,
+            int level,
+            int remainderXp,
+            int gold,
+            int health,
+            int maxHealth,
+            int potions,
+            bool temperedWeapon,
+            int boneShards,
+            int questIndex,
+            bool questAccepted,
+            int questKills,
+            IReadOnlyList<string> serverOwnedItems,
+            string weaponId,
+            string armorId,
+            string trinketId,
+            IReadOnlyList<string> claimedChests,
+            IReadOnlyList<string> claimedBossKills,
+            IReadOnlyList<string> claimedQuests,
+            IReadOnlyList<string> serverDefeatedEnemies,
+            IReadOnlyList<string> serverDiscoveredLandmarks,
+            string activeTitle,
+            int alchemySkill = -1,
+            int blacksmithingSkill = -1,
+            int engineeringSkill = -1,
+            IReadOnlyList<string> serverReagents = null)
+        {
+            if (!string.IsNullOrWhiteSpace(characterName)) CharacterName = characterName.Trim();
+            if (!string.IsNullOrWhiteSpace(race)) CharacterRace = race.Trim();
+            if (!string.IsNullOrWhiteSpace(className)) CharacterClass = className.Trim();
+            if (!string.IsNullOrWhiteSpace(faction)) CharacterFaction = faction.Trim();
+            if (Stats) Stats.displayName = CharacterName;
+            SyncFactionSpawnAndHearth(GetRacialSpawnPosition());
+
+            ownedItems.Clear();
+            ownedItems.Add("starter-axe");
+            if (serverOwnedItems != null)
+            {
+                for (int i = 0; i < serverOwnedItems.Count; i++)
+                {
+                    string id = serverOwnedItems[i];
+                    if (string.IsNullOrWhiteSpace(id)) continue;
+                    string clean = id.Trim();
+                    if (ItemCatalog.Get(clean) != null && !ownedItems.Contains(clean))
+                        ownedItems.Add(clean);
+                }
+            }
+
+            EquippedWeaponId = ValidEquipment(weaponId, GearSlot.Weapon) ? weaponId : "starter-axe";
+            EquippedArmorId = ValidEquipment(armorId, GearSlot.Armor) ? armorId : "";
+            EquippedTrinketId = ValidEquipment(trinketId, GearSlot.Trinket) ? trinketId : "";
+
+            Experience = ConvertServerProgressToCumulativeXp(level, remainderXp);
+            Gold = Mathf.Max(0, gold);
+            Potions = Mathf.Clamp(potions, 0, 10);
+            TemperedWeapon = temperedWeapon;
+            BoneShards = Mathf.Max(0, boneShards);
+            QuestIndex = Mathf.Clamp(questIndex, 0, 3);
+            QuestComplete = QuestIndex >= 3;
+            QuestAccepted = !QuestComplete && questAccepted;
+            Kills = Mathf.Max(0, questKills);
+            WeaponUpgraded = QuestComplete || ownedItems.Contains("emberwatch-axe");
+
+            openedChests.Clear();
+            if (claimedChests != null)
+            {
+                for (int i = 0; i < claimedChests.Count; i++)
+                    if (!string.IsNullOrWhiteSpace(claimedChests[i])) openedChests.Add(claimedChests[i].Trim());
+            }
+
+            defeatedEnemies.Clear();
+            if (serverDefeatedEnemies != null)
+            {
+                for (int i = 0; i < serverDefeatedEnemies.Count; i++)
+                    if (!string.IsNullOrWhiteSpace(serverDefeatedEnemies[i])) defeatedEnemies.Add(serverDefeatedEnemies[i].Trim());
+            }
+            if (claimedBossKills != null)
+            {
+                for (int i = 0; i < claimedBossKills.Count; i++)
+                    if (!string.IsNullOrWhiteSpace(claimedBossKills[i])) defeatedEnemies.Add(claimedBossKills[i].Trim());
+            }
+            BossDefeated = defeatedEnemies.Contains("ashwood-captain");
+
+            landmarks.Clear();
+            if (serverDiscoveredLandmarks != null)
+            {
+                for (int i = 0; i < serverDiscoveredLandmarks.Count; i++)
+                {
+                    string lm = serverDiscoveredLandmarks[i]?.Trim();
+                    if (!string.IsNullOrEmpty(lm) && ValidLandmark(lm))
+                        landmarks.Add(lm);
+                }
+            }
+
+            FactionQuestSystem.Instance?.ApplyServerRealmHydration(claimedQuests);
+            PlayerTitleSystem.SetActiveTitle(activeTitle ?? "");
+            if (alchemySkill >= 0 || blacksmithingSkill >= 0 || engineeringSkill >= 0 || serverReagents != null)
+            {
+                var prof = ProfessionSystem.Instance ?? GetComponent<ProfessionSystem>() ?? gameObject.AddComponent<ProfessionSystem>();
+                if (prof != null)
+                {
+                    prof.ApplyServerRealmHydration(
+                        alchemySkill >= 0 ? alchemySkill : prof.alchemySkill,
+                        blacksmithingSkill >= 0 ? blacksmithingSkill : prof.blacksmithingSkill,
+                        engineeringSkill >= 0 ? engineeringSkill : prof.engineeringSkill,
+                        serverReagents);
+                }
+            }
+
+            IsRealmHydrated = true;
+            CharacterVisualFactory.ApplyToPlayer(this, CharacterRace, CharacterClass);
+            RefreshEquipmentStats();
+            if (Stats)
+            {
+                int clampedMax = Mathf.Max(1, maxHealth);
+                int clampedHp = Mathf.Clamp(health, 0, clampedMax);
+                Stats.SetReplicatedHealth(clampedHp, clampedMax);
+            }
+
+            foreach (var chest in FindObjectsByType<LootChest>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+                if (chest) chest.Refresh();
+            foreach (var supply in FindObjectsByType<SupplyCrate>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+                if (supply) supply.Refresh(this);
+
+            string activeZone = ZoneManager.GetZoneName(transform.position);
+            Message = $"Connected to {Network.RealmConfig.Current.displayName} ({activeZone}).";
         }
         void OnApplicationQuit() { if (Stats && !FrontendMenu.IsOpen) SaveAdventure(false); }
     }

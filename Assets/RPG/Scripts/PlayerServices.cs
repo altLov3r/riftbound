@@ -308,18 +308,53 @@ namespace Riftbound
             if (chest && chest.requiresWardenDefeated && !HasDefeated("crypt-warden")) { Message = "Defeat the Crypt Warden to unlock the reliquary."; return false; }
             if (!chest || !Stats.Alive || FrontendMenu.IsOpen || DialogueOpen || ShopOpen || MapOpen || JournalOpen || (orbit && orbit.Paused) || Vector3.Distance(transform.position, chest.transform.position) >= 3 || string.IsNullOrEmpty(chest.chestId) || HasOpenedChest(chest.chestId)) return false;
             if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner != null)
-            {
-                if (!Network.RiftboundCoopPlayer.LocalOwner.RequestOpenChestServerValidated(chest)) return false;
-            }
+                return Network.RiftboundCoopPlayer.LocalOwner.RequestOpenChestServerValidated(chest);
             return ApplyAuthorizedChestOpen(chest);
         }
 
-        public bool ApplyAuthorizedChestOpen(LootChest chest)
+        public bool ApplyAuthorizedChestOpen(LootChest chest) =>
+            ApplyAuthorizedChestOpen(chest, null, 0, 0, 0, 0, false);
+
+        public bool ApplyAuthorizedChestOpen(LootChest chest, IReadOnlyList<string> serverGrantedItems, int serverGold, int serverLevel, int serverRemainderXp, int serverPotions, bool fromServer)
         {
             if (!chest || string.IsNullOrEmpty(chest.chestId) || !openedChests.Add(chest.chestId)) return false;
-            Gold += chest.gold; Potions = Mathf.Min(10, Potions + 1); AddExperience(chest.experience);
-            string item = ChestItem(chest.chestId);
-            Message = $"Cache recovered: {chest.gold} gold, {chest.experience} XP." + (item.Length > 0 ? " New item: " + item + " [I]" : ""); SaveAdventure(false); return true;
+            string item = "";
+            if (fromServer)
+            {
+                SetAuthoritativeGold(serverGold);
+                Potions = Mathf.Clamp(serverPotions, 0, 10);
+                if (Network.CoopSessionConfig.IsRealmClient)
+                    SetAuthoritativeServerProgress(serverLevel, serverRemainderXp);
+                else
+                    AddExperience(chest.experience);
+
+                if (serverGrantedItems != null && serverGrantedItems.Count > 0)
+                {
+                    var grantedNames = new List<string>();
+                    for (int i = 0; i < serverGrantedItems.Count; i++)
+                    {
+                        string id = serverGrantedItems[i];
+                        if (string.IsNullOrWhiteSpace(id)) continue;
+                        string clean = id.Trim();
+                        if (GrantItem(clean))
+                        {
+                            var gear = ItemCatalog.Get(clean);
+                            if (gear != null) grantedNames.Add(gear.name);
+                        }
+                    }
+                    item = grantedNames.Count > 0 ? string.Join(", ", grantedNames) : "";
+                }
+            }
+            else
+            {
+                Gold += chest.gold;
+                Potions = Mathf.Min(10, Potions + 1);
+                AddExperience(chest.experience);
+                item = ChestItem(chest.chestId);
+            }
+            Message = $"Cache recovered: {chest.gold} gold, {chest.experience} XP." + (item.Length > 0 ? " New item: " + item + " [I]" : "");
+            SaveAdventure(false);
+            return true;
         }
         public void SetAuthoritativeGold(int value) => Gold = Mathf.Max(0, value);
         public void BuyPotion()
@@ -358,6 +393,12 @@ namespace Riftbound
             if (txId == "buy_potion") { Potions = Mathf.Min(10, Potions + 1); Message = "Purchased a health potion."; }
             else if (txId == "temper_weapon") { TemperedWeapon = true; Message = "Weapon tempered: +4 damage."; }
             else if (txId == "rest") { Stats.Heal(Stats.maxHealth); Message = "Rested at Emberwatch."; }
+            else if (txId == "sell_shards")
+            {
+                int gained = BoneShards * 2;
+                BoneShards = 0;
+                Message = gained > 0 ? $"Sold bone shards for {gained} gold." : "Sold bone shards.";
+            }
         }
     }
 }

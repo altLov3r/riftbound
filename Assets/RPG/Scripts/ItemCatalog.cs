@@ -27,7 +27,17 @@ namespace Riftbound
                     new Color(0.85f, 0.86f, 0.82f);
         }
 
-        public string Stats => slot == GearSlot.Weapon ? $"+{damage} weapon damage" : slot == GearSlot.Armor ? $"{armor} armor / +{health} maximum HP" : $"+{health} maximum HP";
+        public string Stats
+        {
+            get
+            {
+                var parts = new System.Collections.Generic.List<string>(3);
+                if (damage > 0) parts.Add($"+{damage} weapon damage");
+                if (armor > 0) parts.Add($"{armor} armor");
+                if (health > 0) parts.Add($"+{health} maximum HP");
+                return parts.Count > 0 ? string.Join(" / ", parts) : "+0 weapon damage";
+            }
+        }
 
         public string FormattedTooltip
         {
@@ -54,39 +64,41 @@ namespace Riftbound
     {
         public static readonly GearItem[] All = {
             new GearItem("starter-axe", "Brute Axe", GearSlot.Weapon, "Common", 0, 0, 0, 1, "Two-Hand Axe", "A simple woodcutter's axe, worn from years of frontier labor."),
-            new GearItem("raider-cleaver", "Raider Cleaver", GearSlot.Weapon, "Uncommon", 5, 0, 0, 8, "One-Hand Axe", "Taken from an Ashwood river brigand."),
-            new GearItem("captain-axe", "Captain's Greataxe", GearSlot.Weapon, "Rare", 10, 0, 0, 18, "Two-Hand Axe", "Pillaged from Captain Selvek's vanguard encampment."),
-            new GearItem("emberwatch-axe", "Emberwatch Axe", GearSlot.Weapon, "Rare", 8, 0, 0, 16, "Two-Hand Axe", "Issued to the frontier watchmen of Emberwatch Outpost."),
+            new GearItem("raider-cleaver", "Raider Cleaver", GearSlot.Weapon, "Uncommon", 6, 0, 0, 8, "One-Hand Axe", "Taken from an Ashwood river brigand."),
+            new GearItem("captain-axe", "Captain's Greataxe", GearSlot.Weapon, "Rare", 11, 0, 0, 18, "Two-Hand Axe", "Pillaged from Captain Selvek's vanguard encampment."),
+            new GearItem("emberwatch-axe", "Emberwatch Axe", GearSlot.Weapon, "Rare", 8, 0, 0, 14, "Two-Hand Axe", "Issued to the frontier watchmen of Emberwatch Outpost."),
             new GearItem("leather-vest", "Scout's Leather Vest", GearSlot.Armor, "Common", 0, 2, 10, 3, "Leather Chest", "Tough boiled leather, standard issue for border scouts."),
             new GearItem("boneplate", "Boneguard Plate", GearSlot.Armor, "Uncommon", 0, 4, 25, 14, "Plate Chest", "Reinforced with the calcified marrow of crypt ghouls."),
             new GearItem("watchtower-cuirass", "Watchtower Cuirass", GearSlot.Armor, "Rare", 0, 5, 30, 20, "Mail Chest", "Bears the embossed lion crest of the high watchtower."),
             new GearItem("travel-charm", "Traveler's Charm", GearSlot.Trinket, "Uncommon", 0, 0, 20, 10, "Trinket", "A polished river stone blessed for safe wandering."),
             new GearItem("riverwarden-signet", "Riverwarden's Signet", GearSlot.Trinket, "Rare", 0, 0, 30, 18, "Finger Ring", "Awarded for safeguarding the Willow Crossing ferry."),
-            new GearItem("emberwatch-sigil", "Emberwatch Sigil", GearSlot.Trinket, "Rare", 0, 0, 35, 22, "Holy Relic", "Gleams with the fiery vigilance of the border guards."),
-            new GearItem("warden-axe", "Warden's Executioner", GearSlot.Weapon, "Rare", 12, 0, 0, 24, "Two-Hand Axe", "Heavy runic blade wielded by the guardian of the Western Crypt."),
-            new GearItem("crypt-signet", "Signet of the Crypt", GearSlot.Trinket, "Rare", 0, 0, 45, 25, "Finger Ring", "Cold to the touch; echoes with ancient dormant power."),
-            new GearItem("scarlet-blade", "Inquisitor's Sunblade", GearSlot.Weapon, "Epic", 16, 0, 20, 36, "One-Hand Sword", "Blazes with the unyielding fanaticism of the Scarlet Crusade."),
-            new GearItem("scarlet-aegis", "Aegis of the Scarlet Dawn", GearSlot.Armor, "Epic", 0, 8, 50, 38, "Heavy Shield", "Imbued with protective prayers from the Scarlet Cathedral altar."),
-            new GearItem("duskwood-shadow-dagger", "Shadowfang Stiletto", GearSlot.Weapon, "Epic", 18, 0, 10, 35, "Dagger", "Coated in dark venom drawn from the mists of Duskwood."),
+            new GearItem("emberwatch-sigil", "Emberwatch Sigil", GearSlot.Trinket, "Rare", 1, 1, 40, 22, "Holy Relic", "Gleams with the fiery vigilance of the border guards."),
+            new GearItem("warden-axe", "Warden's Executioner", GearSlot.Weapon, "Rare", 13, 0, 0, 24, "Two-Hand Axe", "Heavy runic blade wielded by the guardian of the Western Crypt."),
+            new GearItem("crypt-signet", "Signet of the Crypt", GearSlot.Trinket, "Rare", 2, 1, 50, 26, "Finger Ring", "Cold to the touch; echoes with ancient dormant power."),
+            new GearItem("scarlet-blade", "Inquisitor's Sunblade", GearSlot.Weapon, "Epic", 17, 0, 20, 36, "One-Hand Sword", "Blazes with the unyielding fanaticism of the Scarlet Crusade."),
+            new GearItem("scarlet-aegis", "Aegis of the Scarlet Dawn", GearSlot.Armor, "Epic", 0, 9, 50, 38, "Heavy Shield", "Imbued with protective prayers from the Scarlet Cathedral altar."),
+            new GearItem("duskwood-shadow-dagger", "Shadowfang Stiletto", GearSlot.Weapon, "Epic", 19, 0, 15, 38, "Dagger", "Coated in dark venom drawn from the mists of Duskwood."),
             new GearItem("cathedral-relic", "Censer of the Pure Light", GearSlot.Trinket, "Epic", 4, 3, 60, 40, "Holy Relic", "Burns sacred incense that purifies dark hexes."),
-            new GearItem("bloodrock-waraxe", "Bloodrock Decapitator", GearSlot.Weapon, "Rare", 14, 0, 15, 26, "Two-Hand Axe", "Forged in the blood red canyons of the Ashen Horde."),
+            new GearItem("bloodrock-waraxe", "Bloodrock Decapitator", GearSlot.Weapon, "Rare", 15, 0, 15, 26, "Two-Hand Axe", "Forged in the blood red canyons of the Ashen Horde."),
             new GearItem("ember-drake-scale", "Heart of the Ember Drake", GearSlot.Trinket, "Legendary", 8, 6, 120, 55, "Dragon Heart", "Pulsates with the eternal subterranean magma of Wyrmcrest summit."),
-            new GearItem("wyrmtooth-edge", "Wyrmtooth Cleaver", GearSlot.Weapon, "Legendary", 22, 0, 40, 58, "Two-Hand Cleaver", "Honed from the obsidian fang of Vermithrax the Ember Sovereign."),
-            new GearItem("horde-war-banner", "Bloodrock War Standard", GearSlot.Trinket, "Epic", 5, 4, 75, 42, "War Banner", "Instills savage battle fury in all warriors of the Horde."),
+            new GearItem("wyrmtooth-edge", "Wyrmtooth Cleaver", GearSlot.Weapon, "Legendary", 30, 0, 60, 58, "Two-Hand Cleaver", "Honed from the obsidian fang of Vermithrax the Ember Sovereign."),
+            new GearItem("horde-war-banner", "Bloodrock War Standard", GearSlot.Trinket, "Rare", 2, 2, 35, 20, "War Banner", "Instills savage battle fury in all warriors of the Horde."),
+            new GearItem("alliance-war-banner", "Highspire War Standard", GearSlot.Trinket, "Rare", 2, 2, 35, 20, "War Banner", "Royal lion standard bestowed upon envoys to Highspire Keep."),
             // Blacksmithing Crafted Gear
-            new GearItem("copper-dagger", "Sharpened Copper Dagger", GearSlot.Weapon, "Common", 8, 0, 0, 5, "Dagger", "Carefully ground copper edge, ideal for novice adventurers."),
-            new GearItem("bronze-broadsword", "Tempered Bronze Broadsword", GearSlot.Weapon, "Uncommon", 16, 0, 15, 16, "Two-Hand Sword", "Alloyed bronze forged over an anvil in Emberwatch."),
-            new GearItem("iron-buckler", "Heavy Iron Buckler", GearSlot.Armor, "Rare", 0, 8, 35, 24, "Shield", "Layered iron banding withstands ferocious monster strikes."),
-            new GearItem("truesilver-blade", "Truesilver Executioner", GearSlot.Weapon, "Epic", 24, 0, 30, 42, "Two-Hand Sword", "Forged from gleaming truesilver veins deep within the earth."),
+            new GearItem("copper-dagger", "Sharpened Copper Dagger", GearSlot.Weapon, "Common", 4, 0, 0, 5, "Dagger", "Carefully ground copper edge, ideal for novice adventurers."),
+            new GearItem("bronze-broadsword", "Tempered Bronze Broadsword", GearSlot.Weapon, "Uncommon", 9, 0, 10, 16, "Two-Hand Sword", "Alloyed bronze forged over an anvil in Emberwatch."),
+            new GearItem("iron-buckler", "Heavy Iron Buckler", GearSlot.Armor, "Rare", 0, 6, 35, 24, "Shield", "Layered iron banding withstands ferocious monster strikes."),
+            new GearItem("truesilver-blade", "Truesilver Executioner", GearSlot.Weapon, "Epic", 21, 0, 30, 42, "Two-Hand Sword", "Forged from gleaming truesilver veins deep within the earth."),
             // World Boss Gorgonax Epic Drops
-            new GearItem("worldbreaker-maul", "Worldbreaker's War-Maul", GearSlot.Weapon, "Epic", 26, 0, 50, 48, "Two-Hand Mace", "Smashes the ground with the seismic force of a mountain."),
-            new GearItem("crown-of-molten-ruin", "Crown of Molten Ruin", GearSlot.Armor, "Epic", 0, 12, 70, 46, "Plate Helm", "Encrusted with glowing magma embers from the sulfur rift."),
-            new GearItem("cinderfury-signet", "Cinderfury Signet", GearSlot.Trinket, "Epic", 6, 4, 65, 45, "Finger Ring", "Radiates intense heat, empowering all melee and spell attacks."),
+            new GearItem("worldbreaker-maul", "Worldbreaker's War-Maul", GearSlot.Weapon, "Epic", 25, 0, 50, 48, "Two-Hand Mace", "Smashes the ground with the seismic force of a mountain."),
+            new GearItem("crown-of-molten-ruin", "Crown of Molten Ruin", GearSlot.Armor, "Epic", 0, 13, 75, 48, "Plate Helm", "Encrusted with glowing magma embers from the sulfur rift."),
+            new GearItem("cinderfury-signet", "Cinderfury Signet", GearSlot.Trinket, "Epic", 6, 4, 65, 46, "Finger Ring", "Radiates intense heat, empowering all melee and spell attacks."),
             // Frontier Questline Boss Rewards
-            new GearItem("pinewatch-warden-crest", "Pinewatch Warden's Crest", GearSlot.Trinket, "Rare", 4, 2, 45, 28, "Insignia", "Carved cedar-and-iron crest awarded by Watchkeeper Halen for breaking Warchief Grimgnaw's Timberfang raids."),
-            new GearItem("ursolak-spirit-pelt", "Mantle of Ursolak", GearSlot.Armor, "Epic", 5, 10, 65, 42, "Spirit Leather", "Woven with glowing jade spirit-runes from the Ancient Bear Guardian of Ashenmaw Cavern."),
-            new GearItem("sunstone-reliquary-staff", "Sunstone Reliquary Staff", GearSlot.Weapon, "Epic", 20, 2, 45, 40, "Two-Hand Staff", "Recovered from Arch-Inquisitor Malrik's high altar; hums with reclaimed solar fire."),
-            new GearItem("ironmaw-cleaver", "Ironjaw's Quarry Cleaver", GearSlot.Weapon, "Epic", 22, 0, 40, 44, "Two-Hand Axe", "Forged from raw Ironmaw pig-iron and wrested from Ironjaw Krag in the eastern pit.")
+            new GearItem("pinewatch-warden-crest", "Pinewatch Warden's Crest", GearSlot.Trinket, "Rare", 3, 2, 50, 28, "Insignia", "Carved cedar-and-iron crest awarded by Watchkeeper Halen for breaking Warchief Grimgnaw's Timberfang raids."),
+            new GearItem("ursolak-spirit-pelt", "Mantle of Ursolak", GearSlot.Armor, "Epic", 4, 10, 60, 42, "Spirit Leather", "Woven with glowing jade spirit-runes from the Ancient Bear Guardian of Ashenmaw Cavern."),
+            new GearItem("sunstone-reliquary-staff", "Sunstone Reliquary Staff", GearSlot.Weapon, "Epic", 20, 2, 35, 40, "Two-Hand Staff", "Recovered from Arch-Inquisitor Malrik's high altar; hums with reclaimed solar fire."),
+            new GearItem("sunforged-breastplate", "Sunforged Breastplate", GearSlot.Armor, "Epic", 0, 11, 65, 44, "Plate Chest", "Heavy epic plate forged with radiant solar wards."),
+            new GearItem("ironmaw-cleaver", "Ironjaw's Quarry Cleaver", GearSlot.Weapon, "Epic", 23, 0, 40, 44, "Two-Hand Axe", "Forged from raw Ironmaw pig-iron and wrested from Ironjaw Krag in the eastern pit.")
         };
 
         public static GearItem Get(string id)

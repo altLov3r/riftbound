@@ -96,7 +96,7 @@ namespace Riftbound
                 subject = "Arcane Inquiries & Supplies",
                 body = "Salutations.\n\nThe ley-lines beneath Duskwood and the Cathedral ruins are stirring with volatile energies. I require competent adventurers to probe the outer rifts. Accept these supplies from the Kirin Tor archives to bolster your mana reserves.\n\nArchmage Karen\nRoyal Arcanist",
                 goldAttachment = 25,
-                itemAttachment = "crypt-signet",
+                itemAttachment = "",
                 isRead = false,
                 goldCollected = false,
                 itemCollected = false,

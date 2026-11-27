@@ -11,6 +11,7 @@ namespace Riftbound
         public class LootCorpse
         {
             public string id;
+            public string sourceEnemyKey = "";
             public string name;
             public Vector3 position;
             public int gold;
@@ -79,7 +80,12 @@ namespace Riftbound
             player = GetComponent<PlayerController>();
         }
 
-        public static void SpawnLoot(Vector3 pos, string enemyName, int gold, int boneShards, string itemId)
+        public static void SpawnLoot(Vector3 pos, string enemyName, int gold, int boneShards, string itemId, string sourceEnemyKey = "")
+        {
+            SpawnLootItems(pos, enemyName, gold, boneShards, string.IsNullOrEmpty(itemId) ? null : new[] { itemId }, sourceEnemyKey);
+        }
+
+        public static void SpawnLootItems(Vector3 pos, string enemyName, int gold, int boneShards, IReadOnlyList<string> itemIds, string sourceEnemyKey = "")
         {
             if (!Instance)
             {
@@ -87,9 +93,19 @@ namespace Riftbound
                 Instance = go.AddComponent<LootDropSystem>();
             }
 
+            if (Network.CoopSessionConfig.IsMultiplayer && !string.IsNullOrEmpty(sourceEnemyKey))
+            {
+                for (int i = 0; i < Instance.activeCorpses.Count; i++)
+                {
+                    if (string.Equals(Instance.activeCorpses[i].sourceEnemyKey, sourceEnemyKey, System.StringComparison.Ordinal))
+                        return;
+                }
+            }
+
             var corpse = new LootCorpse
             {
                 id = System.Guid.NewGuid().ToString(),
+                sourceEnemyKey = sourceEnemyKey ?? "",
                 name = enemyName,
                 position = pos,
                 gold = gold,
@@ -97,9 +113,13 @@ namespace Riftbound
                 spawnTime = Time.time
             };
 
-            if (!string.IsNullOrEmpty(itemId))
+            if (itemIds != null)
             {
-                corpse.items.Add(itemId);
+                for (int i = 0; i < itemIds.Count; i++)
+                {
+                    if (!string.IsNullOrEmpty(itemIds[i]) && !corpse.items.Contains(itemIds[i]))
+                        corpse.items.Add(itemIds[i]);
+                }
             }
 
             // Create sparkling visual diamond beacon
@@ -201,11 +221,28 @@ namespace Riftbound
             CurrentLooting = null;
         }
 
+        public LootCorpse FindCorpseByEnemyKey(string enemyKey)
+        {
+            if (string.IsNullOrEmpty(enemyKey)) return null;
+            for (int i = 0; i < activeCorpses.Count; i++)
+            {
+                if (string.Equals(activeCorpses[i].sourceEnemyKey, enemyKey, System.StringComparison.Ordinal))
+                    return activeCorpses[i];
+            }
+            return null;
+        }
+
         public void LootAll(LootCorpse corpse)
         {
             if (corpse == null || !activeCorpses.Contains(corpse)) return;
             if (!player) player = GetComponent<PlayerController>() ?? FindFirstObjectByType<PlayerController>();
             if (!player) return;
+
+            if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner != null && !string.IsNullOrEmpty(corpse.sourceEnemyKey))
+            {
+                Network.RiftboundCoopPlayer.LocalOwner.RequestLootCorpse(corpse.sourceEnemyKey, "", true, false);
+                return;
+            }
 
             string summary = "";
             if (corpse.gold > 0)
@@ -272,6 +309,11 @@ namespace Riftbound
         public void LootItem(LootCorpse corpse, string itemId)
         {
             if (corpse == null || !player || !activeCorpses.Contains(corpse) || !corpse.items.Contains(itemId)) return;
+            if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner != null && !string.IsNullOrEmpty(corpse.sourceEnemyKey))
+            {
+                Network.RiftboundCoopPlayer.LocalOwner.RequestLootCorpse(corpse.sourceEnemyKey, itemId, false, false);
+                return;
+            }
             corpse.items.Remove(itemId);
             AwardItem(itemId);
             player.SaveAdventure(false);
@@ -288,6 +330,11 @@ namespace Riftbound
         public void LootCoins(LootCorpse corpse)
         {
             if (corpse == null || !player || !activeCorpses.Contains(corpse) || corpse.gold <= 0) return;
+            if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner != null && !string.IsNullOrEmpty(corpse.sourceEnemyKey))
+            {
+                Network.RiftboundCoopPlayer.LocalOwner.RequestLootCorpse(corpse.sourceEnemyKey, "", false, true);
+                return;
+            }
             int g = corpse.gold;
             if (player.CharacterRace == "Human") g = Mathf.RoundToInt(g * 1.25f);
             corpse.gold = 0;
@@ -303,6 +350,68 @@ namespace Riftbound
             }
         }
 
+        public void ApplyAuthorizedLootCorpse(string enemyKey, string[] grantedItems, int goldDelta, int shardDelta, int newGold, int newBoneShards, bool corpseCleared)
+        {
+            if (!player) player = GetComponent<PlayerController>() ?? FindFirstObjectByType<PlayerController>();
+            if (!player) return;
+
+            player.SetAuthoritativeGold(newGold);
+            player.SetAuthoritativeBoneShards(newBoneShards);
+
+            string summary = "";
+            if (goldDelta > 0)
+            {
+                ChatSystem.LogLoot($"{goldDelta} Gold", "common");
+                CombatTextManager.Spawn(player.transform.position + Vector3.up * 1.8f, $"+{goldDelta} Gold", new Color(1f, 0.88f, 0.25f), false);
+                summary += $"{goldDelta} Gold";
+            }
+            if (shardDelta > 0)
+            {
+                ChatSystem.LogLoot($"{shardDelta} Bone Shards", "common");
+                CombatTextManager.Spawn(player.transform.position + Vector3.up * 2.1f, $"+{shardDelta} Bone Shards", new Color(0.85f, 0.85f, 0.8f), false);
+                if (summary.Length > 0) summary += ", ";
+                summary += $"{shardDelta} Bone Shards";
+            }
+
+            var corpse = FindCorpseByEnemyKey(enemyKey);
+            if (corpse != null)
+            {
+                if (goldDelta > 0) corpse.gold = 0;
+                if (shardDelta > 0) corpse.boneShards = 0;
+            }
+
+            if (grantedItems != null)
+            {
+                for (int i = 0; i < grantedItems.Length; i++)
+                {
+                    string id = grantedItems[i];
+                    if (string.IsNullOrWhiteSpace(id)) continue;
+                    string clean = id.Trim();
+                    corpse?.items.Remove(clean);
+                    player.GrantItem(clean);
+                    var gear = ItemCatalog.Get(clean);
+                    if (gear != null)
+                    {
+                        ChatSystem.LogLoot(gear.name, gear.rarity.ToLowerInvariant());
+                        CombatTextManager.Spawn(player.transform.position + Vector3.up * 2.4f, $"★ {gear.name} ★", gear.color, true);
+                        if (summary.Length > 0) summary += ", ";
+                        summary += gear.name;
+                    }
+                }
+            }
+
+            if (!string.IsNullOrEmpty(summary))
+                player.Message = $"Looted: {summary}";
+            AudioEffects.PlayLootCoin();
+
+            if (corpse != null && (corpseCleared || (corpse.gold <= 0 && corpse.boneShards <= 0 && corpse.items.Count == 0)))
+            {
+                if (corpse.markerObject) Destroy(corpse.markerObject);
+                activeCorpses.Remove(corpse);
+                if (CurrentLooting == corpse) CurrentLooting = null;
+            }
+        }
+
         public void DrawLootGUI(float screenW, float screenH)
         {
             if (CurrentLooting == null || FrontendMenu.IsOpen) return;
@@ -310,7 +419,8 @@ namespace Riftbound
             InitStyles();
 
             float winW = 280f;
-            float winH = 200f;
+            int rowCount = (CurrentLooting.gold > 0 ? 1 : 0) + (CurrentLooting.boneShards > 0 ? 1 : 0) + CurrentLooting.items.Count;
+            float winH = Mathf.Max(200f, 84f + rowCount * 28f);
             float x = screenW / 2f - winW / 2f;
             float y = screenH / 2f - winH / 2f;
 

@@ -738,22 +738,59 @@ namespace Riftbound
             if (!DialogueOpen || !CanTalk() || !QuestReady || QuestComplete || !ActiveQuestGiver) return;
             if (Network.CoopSessionConfig.IsMultiplayer && Network.RiftboundCoopPlayer.LocalOwner != null)
             {
-                if (!Network.RiftboundCoopPlayer.LocalOwner.RequestCompleteQuestServerValidated(QuestIndex)) return;
+                Network.RiftboundCoopPlayer.LocalOwner.RequestCompleteQuestServerValidated(QuestIndex);
+                return;
             }
             ApplyAuthorizedCompleteQuest(QuestIndex);
         }
 
-        public void ApplyAuthorizedCompleteQuest(int expectedIndex)
+        public void ApplyAuthorizedCompleteQuest(int expectedIndex) =>
+            ApplyAuthorizedCompleteQuest(expectedIndex, 0, 0, 0, 0, false);
+
+        public void ApplyAuthorizedCompleteQuest(int expectedIndex, int serverGold, int serverLevel, int serverRemainderXp, int serverPotions, bool fromServer)
         {
             if (QuestComplete || QuestIndex != expectedIndex) return;
             int goldGain = QuestGold;
             int questExperience = QuestExperience;
             string completedQuest = QuestName;
             if (CharacterRace == "Human") goldGain = Mathf.RoundToInt(goldGain * 1.25f);
-            Gold += goldGain; AddExperience(questExperience); Potions = Mathf.Min(10, Potions + 1);
+            if (fromServer)
+            {
+                SetAuthoritativeGold(serverGold);
+                Potions = Mathf.Clamp(serverPotions, 0, 10);
+                if (Network.CoopSessionConfig.IsRealmClient)
+                    SetAuthoritativeServerProgress(serverLevel, serverRemainderXp);
+                else
+                    AddExperience(questExperience);
+            }
+            else
+            {
+                Gold += goldGain;
+                AddExperience(questExperience);
+                Potions = Mathf.Min(10, Potions + 1);
+            }
             QuestIndex++; QuestAccepted = false; QuestComplete = QuestIndex >= 3;
-            if (QuestComplete) { WeaponUpgraded = true; GrantItem("emberwatch-axe", true); GrantItem("emberwatch-sigil", true); }
-            Stats.Heal(Stats.maxHealth);
+            if (QuestComplete)
+            {
+                WeaponUpgraded = true;
+                GrantItem("emberwatch-axe", !fromServer);
+                GrantItem("emberwatch-sigil", !fromServer);
+            }
+            if (fromServer && Stats)
+            {
+                if (Network.CoopSessionConfig.IsMultiplayer &&
+                    Network.RiftboundCoopPlayer.LocalOwner != null &&
+                    Network.RiftboundCoopPlayer.LocalOwner.MaxHealth.Value > 0)
+                {
+                    int authMax = Network.RiftboundCoopPlayer.LocalOwner.MaxHealth.Value;
+                    Stats.SetReplicatedHealth(authMax, authMax);
+                }
+                else
+                {
+                    Stats.SetReplicatedHealth(Stats.maxHealth, Stats.maxHealth);
+                }
+            }
+            else if (Stats) Stats.Heal(Stats.maxHealth);
             AudioEffects.PlayQuestComplete();
             ChatSystem.LogQuest($"Quest Completed: {completedQuest}! Rewards: {goldGain} Gold, {questExperience} XP.");
             Message = QuestComplete ? "Emberwatch is safe! Rewards: Emberwatch Axe and Sigil. [I]" : "Quest complete! Speak to Abe for your next mission.";

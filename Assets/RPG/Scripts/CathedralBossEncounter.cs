@@ -26,6 +26,63 @@ namespace Riftbound
         {
             if (Instance == null) Instance = this;
             player = FindFirstObjectByType<PlayerController>();
+            FindBossReferences();
+        }
+
+        void OnDestroy()
+        {
+            if (Instance == this) Instance = null;
+        }
+
+        static bool IsAuthoritativeRuntime =>
+            !Network.CoopSessionConfig.IsMultiplayer ||
+            (Unity.Netcode.NetworkManager.Singleton != null && Unity.Netcode.NetworkManager.Singleton.IsServer);
+
+        static bool IsInsideCathedral(Vector3 pos) => pos.x < -350f && pos.y < -20f;
+
+        bool TryGetCathedralTarget(Vector3 referencePos, float maxRange, out Network.RiftboundCoopPlayer coopTarget, out Vector3 targetPos)
+        {
+            coopTarget = null;
+            targetPos = Vector3.zero;
+            if (Network.CoopSessionConfig.IsMultiplayer)
+            {
+                float bestDist = maxRange;
+                foreach (var cp in Network.RiftboundCoopPlayer.AllPlayers)
+                {
+                    if (!cp || !cp.IsSpawned || cp.Health.Value <= 0) continue;
+                    if (!IsInsideCathedral(cp.transform.position)) continue;
+                    float d = Vector3.Distance(cp.transform.position, referencePos);
+                    if (d <= bestDist)
+                    {
+                        bestDist = d;
+                        coopTarget = cp;
+                        targetPos = cp.transform.position;
+                    }
+                }
+                return coopTarget != null;
+            }
+
+            if (!player) player = FindFirstObjectByType<PlayerController>();
+            if (!player || !player.Stats || !player.Stats.Alive) return false;
+            if (!IsInsideCathedral(player.transform.position)) return false;
+            if (Vector3.Distance(player.transform.position, referencePos) > maxRange) return false;
+            targetPos = player.transform.position;
+            return true;
+        }
+
+        bool AnyAlivePlayerInCathedral()
+        {
+            if (Network.CoopSessionConfig.IsMultiplayer)
+            {
+                foreach (var cp in Network.RiftboundCoopPlayer.AllPlayers)
+                {
+                    if (cp && cp.IsSpawned && cp.Health.Value > 0 && IsInsideCathedral(cp.transform.position))
+                        return true;
+                }
+                return false;
+            }
+            if (!player) player = FindFirstObjectByType<PlayerController>();
+            return player != null && player.Stats != null && player.Stats.Alive && IsInsideCathedral(player.transform.position);
         }
 
         void Start()
@@ -44,6 +101,9 @@ namespace Riftbound
                 }
             }
 
+            if (malakar) malakar.skipDefaultLootDrop = true;
+            if (abbotVael) abbotVael.skipDefaultLootDrop = true;
+
             if (!altarChest)
             {
                 foreach (var chest in FindObjectsByType<LootChest>(FindObjectsSortMode.None))
@@ -60,21 +120,36 @@ namespace Riftbound
             }
         }
 
+        public void ResetEncounter()
+        {
+            EncounterStarted = false;
+            EncounterCompleted = false;
+            EncounterPhase = 1;
+            vaelActivated = false;
+            nextSpecialAbilityTime = 0f;
+            FindBossReferences();
+            if (malakar)
+            {
+                var mStats = malakar.GetComponent<Combatant>();
+                if (mStats) mStats.incomingDamageMultiplier = 1f;
+            }
+        }
+
         void Update()
         {
             if (EncounterCompleted) return;
-            if (!player) player = FindFirstObjectByType<PlayerController>();
-            if (!player) return;
+            if (!IsAuthoritativeRuntime) return;
+            if (!malakar || !abbotVael)
+            {
+                if (Time.frameCount % 90 == 0) FindBossReferences();
+            }
 
-            // Check if player is inside Cathedral Dungeon (Z > 190, X < -370, Y < -20)
-            bool inCathedral = player.transform.position.x < -350f && player.transform.position.y < -20f;
-            if (!inCathedral) return;
+            if (!AnyAlivePlayerInCathedral()) return;
 
             if (!EncounterStarted)
             {
                 // Player approaches altar
-                float distToMalakar = malakar ? Vector3.Distance(player.transform.position, malakar.transform.position) : 999f;
-                if (distToMalakar < 18f)
+                if (malakar && TryGetCathedralTarget(malakar.transform.position, 18f, out _, out _))
                 {
                     StartEncounter();
                 }
@@ -124,9 +199,12 @@ namespace Riftbound
             EncounterStarted = true;
             nextSpecialAbilityTime = Time.time + 4f;
 
-            ChatSystem.LogSystem("High Inquisitor Malakar shouts: \"Intruders! You shall not desecrate the sacred halls of the Scarlet Crusade!\"");
-            AudioEffects.PlayClick();
-            ZoneBanner.Show("The Scarlet Crypts", "Boss Encounter: High Inquisitor Malakar");
+            if (!Network.CoopSessionConfig.IsDedicatedServer)
+            {
+                ChatSystem.LogSystem("High Inquisitor Malakar shouts: \"Intruders! You shall not desecrate the sacred halls of the Scarlet Crusade!\"");
+                AudioEffects.PlayClick();
+                ZoneBanner.Show("The Scarlet Crypts", "Boss Encounter: High Inquisitor Malakar");
+            }
         }
 
         void TransitionToPhase2()
@@ -139,18 +217,26 @@ namespace Riftbound
                 var mStats = malakar.GetComponent<Combatant>();
                 if (mStats) mStats.incomingDamageMultiplier = 0f;
                 // Golden shield VFX
-                SpellFX.CreateConsecration(malakar.transform.position, 2.5f);
+                if (!Network.CoopSessionConfig.IsDedicatedServer)
+                    SpellFX.CreateConsecration(malakar.transform.position, 2.5f);
+                if (Network.CoopSessionConfig.IsMultiplayer)
+                    Network.RealmWorldChannel.DispatchEnemyState(malakar);
             }
 
             if (abbotVael)
             {
                 var vStats = abbotVael.GetComponent<Combatant>();
                 if (vStats) vStats.incomingDamageMultiplier = 1f;
+                if (Network.CoopSessionConfig.IsMultiplayer)
+                    Network.RealmWorldChannel.DispatchEnemyState(abbotVael);
             }
 
-            ChatSystem.LogSystem("Dread Abbot Vael shouts: \"Arise, my champion! Cleanse the infidels with the sacred flame!\"");
-            ZoneBanner.Show("The Scarlet Crypts", "Phase 2: Dread Abbot Vael Awakens!");
-            AudioEffects.PlaySpellCast();
+            if (!Network.CoopSessionConfig.IsDedicatedServer)
+            {
+                ChatSystem.LogSystem("Dread Abbot Vael shouts: \"Arise, my champion! Cleanse the infidels with the sacred flame!\"");
+                ZoneBanner.Show("The Scarlet Crypts", "Phase 2: Dread Abbot Vael Awakens!");
+                AudioEffects.PlaySpellCast();
+            }
             nextSpecialAbilityTime = Time.time + 3f;
         }
 
@@ -163,15 +249,25 @@ namespace Riftbound
             {
                 var mStats = malakar.GetComponent<Combatant>();
                 if (mStats) { mStats.incomingDamageMultiplier = 1f; mStats.Damage(9999f); }
+                if (Network.CoopSessionConfig.IsMultiplayer)
+                    Network.RealmWorldChannel.DispatchEnemyState(malakar);
             }
 
-            AudioEffects.PlayBossVictory();
-            ChatSystem.LogSystem("*** DUNGEON COMPLETE: High Inquisitor Malakar & Dread Abbot Vael have been defeated! ***");
-            ZoneBanner.Show("Cathedral Purged!", "Dungeon Victory! Claim your rewards from the Altar Chest.");
+            if (!Network.CoopSessionConfig.IsDedicatedServer)
+            {
+                AudioEffects.PlayBossVictory();
+                ChatSystem.LogSystem("*** DUNGEON COMPLETE: High Inquisitor Malakar & Dread Abbot Vael have been defeated! ***");
+                ZoneBanner.Show("Cathedral Purged!", "Dungeon Victory! Claim your rewards from the Altar Chest.");
+            }
 
-            // Spawn boss loot drops
-            if (abbotVael) LootDropSystem.SpawnLoot(abbotVael.transform.position, "Dread Abbot Vael", 45, 8, "scarlet-aegis");
-            if (malakar) LootDropSystem.SpawnLoot(malakar.transform.position, "High Inquisitor Malakar", 35, 6, "cathedral-relic");
+            // Spawn boss loot drops (single corpse per boss)
+            if (!Network.CoopSessionConfig.IsDedicatedServer)
+            {
+                if (abbotVael)
+                    LootDropSystem.SpawnLootItems(abbotVael.transform.position, "Dread Abbot Vael", 45, 8, SharedRewardCatalog.GetEnemyDropItemIds("boss-abbot-vael"), "boss-abbot-vael");
+                if (malakar)
+                    LootDropSystem.SpawnLootItems(malakar.transform.position, "High Inquisitor Malakar", 35, 6, SharedRewardCatalog.GetEnemyDropItemIds("boss-malakar"), "boss-malakar");
+            }
 
             if (player && !Network.CoopSessionConfig.IsMultiplayer)
             {
@@ -188,13 +284,29 @@ namespace Riftbound
 
         void CastMalakarHolyWrath()
         {
-            if (!malakar || !player || !player.Stats.Alive || EncounterPhase != 1) return;
+            if (!malakar || EncounterPhase != 1) return;
             var mStats = malakar.GetComponent<Combatant>();
             if (!mStats || !mStats.Alive) return;
+            if (!TryGetCathedralTarget(malakar.transform.position, 35f, out _, out _)) return;
             ChatSystem.LogCombat("High Inquisitor Malakar begins casting [Holy Wrath]...");
             CastBarSystem.StartTargetCast(mStats, "Holy Wrath", "☼", 2.2f, () =>
             {
-                if (malakar && mStats && mStats.Alive && EncounterPhase == 1 && player && player.Stats.Alive)
+                if (!malakar || !mStats || !mStats.Alive || EncounterPhase != 1) return;
+                if (Network.CoopSessionConfig.IsMultiplayer)
+                {
+                    if (TryGetCathedralTarget(malakar.transform.position, 35f, out var targetCp, out var targetPos) && targetCp != null)
+                    {
+                        Network.RiftboundCoopPlayer.DispatchEnemyHitToPlayer(targetCp.OwnerClientId, 24f, "boss-malakar");
+                        if (!Network.CoopSessionConfig.IsDedicatedServer)
+                        {
+                            CombatTextManager.Spawn(targetPos, "-24 HOLY", new Color(1f, 0.85f, 0.3f), false);
+                            SpellFX.CreateConsecration(targetPos, 1.5f);
+                            AudioEffects.PlayBladeHit();
+                        }
+                    }
+                    return;
+                }
+                if (player && player.Stats.Alive)
                 {
                     player.Stats.Damage(24f);
                     CombatTextManager.Spawn(player.transform.position, "-24 HOLY", new Color(1f, 0.85f, 0.3f), false);
@@ -206,13 +318,31 @@ namespace Riftbound
 
         void CastVaelShadowVolley()
         {
-            if (!abbotVael || !player || !player.Stats.Alive || EncounterPhase != 2) return;
+            if (!abbotVael || EncounterPhase != 2) return;
             var vStats = abbotVael.GetComponent<Combatant>();
             if (!vStats || !vStats.Alive) return;
+            if (!TryGetCathedralTarget(abbotVael.transform.position, 35f, out _, out _)) return;
             ChatSystem.LogCombat("Dread Abbot Vael begins casting [Shadow Bolt Volley]...");
             CastBarSystem.StartTargetCast(vStats, "Shadow Bolt Volley", "💀", 2.4f, () =>
             {
-                if (abbotVael && vStats && vStats.Alive && EncounterPhase == 2 && player && player.Stats.Alive)
+                if (!abbotVael || !vStats || !vStats.Alive || EncounterPhase != 2) return;
+                if (Network.CoopSessionConfig.IsMultiplayer)
+                {
+                    foreach (var cp in Network.RiftboundCoopPlayer.AllPlayers)
+                    {
+                        if (!cp || !cp.IsSpawned || cp.Health.Value <= 0 || !IsInsideCathedral(cp.transform.position)) continue;
+                        if (Vector3.Distance(cp.transform.position, abbotVael.transform.position) <= 35f)
+                        {
+                            Network.RiftboundCoopPlayer.DispatchEnemyHitToPlayer(cp.OwnerClientId, 28f, "boss-abbot-vael");
+                            if (!Network.CoopSessionConfig.IsDedicatedServer)
+                                CombatTextManager.Spawn(cp.transform.position, "-28 SHADOW", new Color(0.7f, 0.2f, 0.95f), false);
+                        }
+                    }
+                    if (!Network.CoopSessionConfig.IsDedicatedServer)
+                        AudioEffects.PlaySpellCast();
+                    return;
+                }
+                if (player && player.Stats.Alive)
                 {
                     player.Stats.Damage(28f);
                     CombatTextManager.Spawn(player.transform.position, "-28 SHADOW", new Color(0.7f, 0.2f, 0.95f), false);

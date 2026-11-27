@@ -57,6 +57,7 @@ namespace Riftbound
 
             public void Copy()
             {
+                if (!forearm.from || !forearm.to || !hand) return;
                 var current = Quaternion.Inverse(forearm.from.rotation) * forearm.to.rotation;
                 var movement = current * Quaternion.Inverse(driverRest);
                 hand.localRotation = driverToKit * movement * Quaternion.Inverse(driverToKit) * handRest;

@@ -71,6 +71,24 @@ namespace Riftbound.Network
         public List<string> claimedBossKills = new List<string>();
         public List<string> claimedQuests = new List<string>();
         public string lastSavedUtc = "";
+        public List<string> ownedItems = new List<string> { "starter-axe" };
+        public string equippedWeaponId = "starter-axe";
+        public string equippedArmorId = "";
+        public string equippedTrinketId = "";
+        public int potions = 3;
+        public bool temperedWeapon;
+        public int boneShards;
+        public int questIndex;
+        public bool questAccepted;
+        public int questKills;
+        public List<string> discoveredLandmarks = new List<string>();
+        public List<string> defeatedEnemies = new List<string>();
+        public string activeTitle = "";
+        public int alchemySkill = ProfessionSystem.DefaultAlchemySkill;
+        public int blacksmithingSkill = ProfessionSystem.DefaultBlacksmithingSkill;
+        public int engineeringSkill = ProfessionSystem.DefaultEngineeringSkill;
+        public bool professionInitialized;
+        public List<string> reagents = new List<string>();
     }
 
     [Serializable]
@@ -227,10 +245,10 @@ namespace Riftbound.Network
                 var loaded = JsonUtility.FromJson<ServerCharacterSave>(json);
                 if (loaded != null)
                 {
-                    loaded.claimedChests ??= new List<string>();
-                    loaded.claimedBossKills ??= new List<string>();
-                    loaded.claimedQuests ??= new List<string>();
+                    bool migrated = NormalizeCharacterSave(loaded);
                     CharacterCache[key] = loaded;
+                    if (migrated)
+                        SaveCharacter(loaded);
                     return loaded;
                 }
             }
@@ -247,12 +265,377 @@ namespace Riftbound.Network
                 gold = 0,
                 health = 100,
                 maxHealth = 100,
+                alchemySkill = ProfessionSystem.DefaultAlchemySkill,
+                blacksmithingSkill = ProfessionSystem.DefaultBlacksmithingSkill,
+                engineeringSkill = ProfessionSystem.DefaultEngineeringSkill,
+                professionInitialized = true,
+                reagents = ProfessionSystem.BuildDefaultReagentSaveList(),
                 lastSavedUtc = DateTime.UtcNow.ToString("O")
             };
+            NormalizeCharacterSave(created);
             CharacterCache[key] = created;
             SaveCharacter(created);
             return created;
         }
+
+        public static bool TryGetAccount(string accountId, out RealmAccountRecord account)
+        {
+            EnsureInitialized();
+            string cleanId = SanitizeKey(accountId);
+            if (string.IsNullOrEmpty(cleanId))
+            {
+                account = null;
+                return false;
+            }
+            return Accounts.TryGetValue(cleanId, out account);
+        }
+
+        public static bool TryLoadExistingCharacter(string accountId, string characterName, out ServerCharacterSave save)
+        {
+            EnsureInitialized();
+            string key = CharacterKey(accountId, characterName);
+            if (CharacterCache.TryGetValue(key, out save) && save != null)
+                return true;
+
+            string path = CharacterFilePath(accountId, characterName);
+            if (File.Exists(path))
+            {
+                string json = File.ReadAllText(path, Encoding.UTF8);
+                var loaded = JsonUtility.FromJson<ServerCharacterSave>(json);
+                if (loaded != null)
+                {
+                    bool migrated = NormalizeCharacterSave(loaded);
+                    CharacterCache[key] = loaded;
+                    if (migrated)
+                        SaveCharacter(loaded);
+                    save = loaded;
+                    return true;
+                }
+            }
+            save = null;
+            return false;
+        }
+
+        public static bool GrantItem(string accountId, string characterName, string itemId, bool saveNow = true)
+        {
+            if (string.IsNullOrWhiteSpace(itemId)) return false;
+            string cleanId = itemId.Trim();
+            if (ItemCatalog.Get(cleanId) == null) return false;
+
+            var save = LoadOrCreateCharacter(accountId, characterName);
+            NormalizeCharacterSave(save);
+            if (save.ownedItems.Contains(cleanId)) return false;
+
+            save.ownedItems.Add(cleanId);
+            if (saveNow) SaveCharacter(save);
+            return true;
+        }
+
+        public static bool TryEquipItem(string accountId, string characterName, string itemId, out GearSlot slot, out string error)
+        {
+            slot = GearSlot.Weapon;
+            error = "";
+            if (string.IsNullOrWhiteSpace(itemId))
+            {
+                error = "Empty item ID.";
+                return false;
+            }
+            string cleanId = itemId.Trim();
+            var item = ItemCatalog.Get(cleanId);
+            if (item == null)
+            {
+                error = $"Unknown item '{cleanId}'.";
+                return false;
+            }
+            slot = item.slot;
+
+            var save = LoadOrCreateCharacter(accountId, characterName);
+            NormalizeCharacterSave(save);
+            if (!save.ownedItems.Contains(cleanId))
+            {
+                error = $"Character does not own '{cleanId}'.";
+                return false;
+            }
+
+            switch (item.slot)
+            {
+                case GearSlot.Weapon:
+                    save.equippedWeaponId = cleanId;
+                    break;
+                case GearSlot.Armor:
+                    save.equippedArmorId = cleanId;
+                    break;
+                case GearSlot.Trinket:
+                    save.equippedTrinketId = cleanId;
+                    break;
+            }
+            SaveCharacter(save);
+            return true;
+        }
+
+        public static bool NormalizeCharacterSave(ServerCharacterSave save)
+        {
+            if (save == null) return false;
+            bool migrated = false;
+
+            string prevAcct = save.accountId;
+            string prevName = save.characterName;
+            string prevRace = save.race;
+            string prevCls = save.className;
+            string prevFaction = save.faction;
+            string prevWeapon = save.equippedWeaponId;
+            string prevArmor = save.equippedArmorId;
+            string prevTrinket = save.equippedTrinketId;
+
+            save.accountId = SanitizeKey(save.accountId);
+            save.characterName = string.IsNullOrWhiteSpace(save.characterName) ? "Adventurer" : save.characterName.Trim();
+            save.race = string.IsNullOrWhiteSpace(save.race) ? "Human" : save.race.Trim();
+            save.className = string.IsNullOrWhiteSpace(save.className) ? "Warrior" : save.className.Trim();
+            save.faction = string.IsNullOrWhiteSpace(save.faction) ? "Alliance" : save.faction.Trim();
+            save.lastSavedUtc = string.IsNullOrWhiteSpace(save.lastSavedUtc) ? "" : save.lastSavedUtc.Trim();
+            save.activeTitle = string.IsNullOrWhiteSpace(save.activeTitle) ? "" : save.activeTitle.Trim();
+            save.equippedWeaponId = string.IsNullOrWhiteSpace(save.equippedWeaponId) ? "starter-axe" : save.equippedWeaponId.Trim();
+            save.equippedArmorId = string.IsNullOrWhiteSpace(save.equippedArmorId) ? "" : save.equippedArmorId.Trim();
+            save.equippedTrinketId = string.IsNullOrWhiteSpace(save.equippedTrinketId) ? "" : save.equippedTrinketId.Trim();
+
+            if (!string.Equals(prevAcct ?? "", save.accountId, StringComparison.Ordinal) ||
+                !string.Equals(prevName ?? "", save.characterName, StringComparison.Ordinal) ||
+                !string.Equals(prevRace ?? "", save.race, StringComparison.Ordinal) ||
+                !string.Equals(prevCls ?? "", save.className, StringComparison.Ordinal) ||
+                !string.Equals(prevFaction ?? "", save.faction, StringComparison.Ordinal) ||
+                !string.Equals(prevWeapon ?? "", save.equippedWeaponId, StringComparison.Ordinal) ||
+                !string.Equals(prevArmor ?? "", save.equippedArmorId, StringComparison.Ordinal) ||
+                !string.Equals(prevTrinket ?? "", save.equippedTrinketId, StringComparison.Ordinal))
+                migrated = true;
+
+            save.claimedChests = DedupeList(save.claimedChests, false, ref migrated);
+            save.claimedBossKills = DedupeList(save.claimedBossKills, false, ref migrated);
+            save.claimedQuests = DedupeList(save.claimedQuests, false, ref migrated);
+            save.ownedItems = DedupeList(save.ownedItems, true, ref migrated);
+            save.discoveredLandmarks = DedupeList(save.discoveredLandmarks, false, ref migrated);
+            save.defeatedEnemies = DedupeList(save.defeatedEnemies, false, ref migrated);
+
+            if (!save.ownedItems.Contains("starter-axe"))
+            {
+                save.ownedItems.Insert(0, "starter-axe");
+                migrated = true;
+            }
+
+            int clampedLevel = Mathf.Max(1, save.level);
+            if (clampedLevel != save.level) { save.level = clampedLevel; migrated = true; }
+            int clampedXp = Mathf.Max(0, save.experience);
+            if (clampedXp != save.experience) { save.experience = clampedXp; migrated = true; }
+            int clampedGold = Mathf.Max(0, save.gold);
+            if (clampedGold != save.gold) { save.gold = clampedGold; migrated = true; }
+            int clampedMaxHp = Mathf.Max(100, save.maxHealth);
+            if (clampedMaxHp != save.maxHealth) { save.maxHealth = clampedMaxHp; migrated = true; }
+            int clampedHp = Mathf.Clamp(save.health, 0, save.maxHealth);
+            if (clampedHp != save.health) { save.health = clampedHp; migrated = true; }
+            int clampedPotions = Mathf.Clamp(save.potions, 0, 10);
+            if (clampedPotions != save.potions) { save.potions = clampedPotions; migrated = true; }
+            int clampedShards = Mathf.Max(0, save.boneShards);
+            if (clampedShards != save.boneShards) { save.boneShards = clampedShards; migrated = true; }
+            int clampedQuestIdx = Mathf.Clamp(save.questIndex, 0, 3);
+            if (clampedQuestIdx != save.questIndex) { save.questIndex = clampedQuestIdx; migrated = true; }
+            int clampedQuestKills = Mathf.Max(0, save.questKills);
+            if (clampedQuestKills != save.questKills) { save.questKills = clampedQuestKills; migrated = true; }
+            if (save.questIndex >= 3 && save.questAccepted) { save.questAccepted = false; migrated = true; }
+
+            if (!save.professionInitialized)
+            {
+                save.professionInitialized = true;
+                if (save.alchemySkill <= 0 && save.blacksmithingSkill <= 0 && save.engineeringSkill <= 0)
+                {
+                    save.alchemySkill = ProfessionSystem.DefaultAlchemySkill;
+                    save.blacksmithingSkill = ProfessionSystem.DefaultBlacksmithingSkill;
+                    save.engineeringSkill = ProfessionSystem.DefaultEngineeringSkill;
+                }
+                if (save.reagents == null || save.reagents.Count == 0)
+                    save.reagents = ProfessionSystem.BuildDefaultReagentSaveList();
+                migrated = true;
+            }
+
+            int clampedAlchemy = Mathf.Clamp(save.alchemySkill, 0, ProfessionSystem.MaxSkill);
+            if (clampedAlchemy != save.alchemySkill) { save.alchemySkill = clampedAlchemy; migrated = true; }
+            int clampedBlacksmith = Mathf.Clamp(save.blacksmithingSkill, 0, ProfessionSystem.MaxSkill);
+            if (clampedBlacksmith != save.blacksmithingSkill) { save.blacksmithingSkill = clampedBlacksmith; migrated = true; }
+            int clampedEng = Mathf.Clamp(save.engineeringSkill, 0, ProfessionSystem.MaxSkill);
+            if (clampedEng != save.engineeringSkill) { save.engineeringSkill = clampedEng; migrated = true; }
+
+            var normalizedReagents = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            bool reagentsDirty = save.reagents == null;
+            if (save.reagents != null)
+            {
+                for (int i = 0; i < save.reagents.Count; i++)
+                {
+                    string rawEntry = save.reagents[i];
+                    if (!ProfessionSystem.TryParseReagentEntry(rawEntry, out string rName, out int rCount) || rCount <= 0)
+                    {
+                        reagentsDirty = true;
+                        continue;
+                    }
+                    string canonical = $"{rName}={rCount}";
+                    if (!string.Equals(rawEntry, canonical, StringComparison.Ordinal))
+                        reagentsDirty = true;
+                    if (normalizedReagents.ContainsKey(rName))
+                    {
+                        normalizedReagents[rName] = Mathf.Clamp(normalizedReagents[rName] + rCount, 0, 9999);
+                        reagentsDirty = true;
+                    }
+                    else
+                    {
+                        normalizedReagents[rName] = rCount;
+                    }
+                }
+            }
+            if (reagentsDirty)
+            {
+                var rebuilt = new List<string>(normalizedReagents.Count);
+                foreach (var kv in normalizedReagents)
+                    rebuilt.Add($"{kv.Key}={kv.Value}");
+                save.reagents = rebuilt;
+                migrated = true;
+            }
+
+            if (float.IsNaN(save.posX) || float.IsInfinity(save.posX) ||
+                float.IsNaN(save.posY) || float.IsInfinity(save.posY) ||
+                float.IsNaN(save.posZ) || float.IsInfinity(save.posZ))
+            {
+                save.posX = 0f;
+                save.posY = 0f;
+                save.posZ = 0f;
+                migrated = true;
+            }
+
+            if (save.ownedItems.Count == 1 && save.ownedItems[0] == "starter-axe" &&
+                (save.claimedChests.Count > 0 || save.claimedBossKills.Count > 0 || save.claimedQuests.Count > 0))
+            {
+                void AddIfCatalog(string itemId)
+                {
+                    if (string.IsNullOrWhiteSpace(itemId)) return;
+                    string clean = itemId.Trim();
+                    if (ItemCatalog.Get(clean) != null && !save.ownedItems.Contains(clean))
+                    {
+                        save.ownedItems.Add(clean);
+                        migrated = true;
+                    }
+                }
+
+                for (int i = 0; i < save.claimedChests.Count; i++)
+                {
+                    string chestId = save.claimedChests[i];
+                    var chestItems = SharedRewardCatalog.GetChestItemIds(chestId);
+                    for (int j = 0; j < chestItems.Count; j++)
+                        AddIfCatalog(chestItems[j]);
+                    if (chestId == "worldboss-gorgonax-chest")
+                        AddIfCatalog("worldbreaker-maul");
+                }
+
+                for (int i = 0; i < save.claimedBossKills.Count; i++)
+                {
+                    string bossId = save.claimedBossKills[i];
+                    if (bossId == "worldboss-gorgonax")
+                    {
+                        AddIfCatalog("worldbreaker-maul");
+                        if (string.IsNullOrEmpty(save.activeTitle))
+                        {
+                            save.activeTitle = "Titanbreaker";
+                            migrated = true;
+                        }
+                    }
+                    else
+                    {
+                        var dropItems = SharedRewardCatalog.GetEnemyDropItemIds(bossId);
+                        for (int j = 0; j < dropItems.Count; j++)
+                            AddIfCatalog(dropItems[j]);
+                    }
+                }
+
+                for (int i = 0; i < save.claimedQuests.Count; i++)
+                {
+                    string qId = save.claimedQuests[i];
+                    if (qId == "main_quest_2")
+                    {
+                        AddIfCatalog("emberwatch-axe");
+                        AddIfCatalog("emberwatch-sigil");
+                    }
+                    else
+                    {
+                        string normQ = qId.StartsWith("faction_quest_", StringComparison.Ordinal)
+                            ? qId.Substring("faction_quest_".Length)
+                            : qId;
+                        string factionReward = ResolveLegacyFactionQuestRewardItem(normQ);
+                        if (!string.IsNullOrEmpty(factionReward))
+                            AddIfCatalog(factionReward);
+                    }
+                }
+            }
+
+            if (string.IsNullOrEmpty(save.equippedWeaponId) ||
+                !save.ownedItems.Contains(save.equippedWeaponId) ||
+                ItemCatalog.Get(save.equippedWeaponId)?.slot != GearSlot.Weapon)
+            {
+                if (!string.Equals(save.equippedWeaponId, "starter-axe", StringComparison.Ordinal))
+                    migrated = true;
+                save.equippedWeaponId = "starter-axe";
+            }
+
+            if (!string.IsNullOrEmpty(save.equippedArmorId) &&
+                (!save.ownedItems.Contains(save.equippedArmorId) || ItemCatalog.Get(save.equippedArmorId)?.slot != GearSlot.Armor))
+            {
+                save.equippedArmorId = "";
+                migrated = true;
+            }
+
+            if (!string.IsNullOrEmpty(save.equippedTrinketId) &&
+                (!save.ownedItems.Contains(save.equippedTrinketId) || ItemCatalog.Get(save.equippedTrinketId)?.slot != GearSlot.Trinket))
+            {
+                save.equippedTrinketId = "";
+                migrated = true;
+            }
+
+            return migrated;
+        }
+
+        static List<string> DedupeList(List<string> source, bool requireCatalogItem, ref bool changed)
+        {
+            if (source == null)
+            {
+                changed = true;
+                return new List<string>(0);
+            }
+            var result = new List<string>(source.Count);
+            for (int i = 0; i < source.Count; i++)
+            {
+                string raw = source[i];
+                if (string.IsNullOrWhiteSpace(raw))
+                {
+                    changed = true;
+                    continue;
+                }
+                string clean = raw.Trim();
+                if (!string.Equals(raw, clean, StringComparison.Ordinal))
+                    changed = true;
+                if (requireCatalogItem && ItemCatalog.Get(clean) == null)
+                {
+                    changed = true;
+                    continue;
+                }
+                if (!result.Contains(clean))
+                    result.Add(clean);
+                else
+                    changed = true;
+            }
+            return result;
+        }
+
+        static string ResolveLegacyFactionQuestRewardItem(string questId) => questId switch
+        {
+            "sunstone_inquisitor_boss" => "sunstone-reliquary-staff",
+            "gorkresh_war_forge" => "horde-war-banner",
+            "highspire_royal_council" => "alliance-war-banner",
+            _ => ""
+        };
 
         public static void SaveCharacter(ServerCharacterSave save)
         {

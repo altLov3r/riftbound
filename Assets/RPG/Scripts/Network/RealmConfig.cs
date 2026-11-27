@@ -30,6 +30,9 @@ namespace Riftbound.Network
         public string smokeRole = "";
         public string smokeOutPath = "";
         public float smokeSeconds;
+        public string clientAccountId = "";
+        public string clientAuthToken = "";
+        public bool hasExplicitAccountId;
     }
 
     public static class RealmConfig
@@ -141,6 +144,15 @@ namespace Riftbound.Network
                     runtime.smokeOutPath = smokeOut.Trim();
                 else if (arg == "-realmSmokeSeconds" && TryNextValue(args, ref i, out string secStr) && float.TryParse(secStr, out float sec))
                     runtime.smokeSeconds = Mathf.Max(2f, sec);
+                else if (arg == "-realmAccount" && TryNextValue(args, ref i, out string acct))
+                {
+                    runtime.clientAccountId = acct.Trim();
+                    runtime.hasExplicitAccountId = !string.IsNullOrWhiteSpace(runtime.clientAccountId);
+                }
+                else if (arg == "-realmToken" && TryNextValue(args, ref i, out string tok))
+                {
+                    runtime.clientAuthToken = tok.Trim();
+                }
             }
 
             current.realmId = SanitizeRealmId(current.realmId);
@@ -169,6 +181,14 @@ namespace Riftbound.Network
             if (!string.IsNullOrWhiteSpace(dir)) current.dataDir = dir.Trim();
             string log = env("RIFTBOUND_REALM_LOG_PATH");
             if (!string.IsNullOrWhiteSpace(log)) current.logPath = log.Trim();
+            string acct = env("RIFTBOUND_REALM_ACCOUNT");
+            if (!string.IsNullOrWhiteSpace(acct))
+            {
+                runtime.clientAccountId = acct.Trim();
+                runtime.hasExplicitAccountId = true;
+            }
+            string token = env("RIFTBOUND_REALM_TOKEN");
+            if (!string.IsNullOrWhiteSpace(token)) runtime.clientAuthToken = token.Trim();
         }
 
         static void TryApplyJsonFile(string path)

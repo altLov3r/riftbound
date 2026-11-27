@@ -42,7 +42,8 @@ namespace Riftbound
         {
             if (!ValidLandmark(id) || !landmarks.Add(id)) return;
             SetAuthoritativeGold(newGold);
-            AddExperience(xpGranted);
+            if (!Network.CoopSessionConfig.IsRealmClient)
+                AddExperience(xpGranted);
             ApplyDiscoveryPresentation(id, false);
         }
 

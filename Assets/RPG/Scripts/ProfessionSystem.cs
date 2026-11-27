@@ -31,10 +31,23 @@ namespace Riftbound
 
         public static bool IsOpen { get; set; } = false;
 
-        public int alchemySkill = 15;
-        public int blacksmithingSkill = 12;
-        public int engineeringSkill = 8;
+        public int alchemySkill = DefaultAlchemySkill;
+        public int blacksmithingSkill = DefaultBlacksmithingSkill;
+        public int engineeringSkill = DefaultEngineeringSkill;
+        public const int DefaultAlchemySkill = 15;
+        public const int DefaultBlacksmithingSkill = 12;
+        public const int DefaultEngineeringSkill = 8;
         public const int MaxSkill = 75; // Apprentice tier
+
+        public static readonly (string name, int initialCount)[] StarterReagents =
+        {
+            ("Peacebloom", 6),
+            ("Silverleaf", 4),
+            ("Kingsblood", 2),
+            ("Copper Ore", 6),
+            ("Tin Ore", 4),
+            ("Silver Ore", 2)
+        };
 
         // Reagents inventory
         [NonSerialized] public Dictionary<string, int> reagents = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
@@ -46,6 +59,8 @@ namespace Riftbound
             { "Tin Ore", 4 },
             { "Silver Ore", 2 }
         };
+
+        static Dictionary<string, CraftRecipe> sharedRecipeLookup;
 
         CraftCategory selectedCategory = CraftCategory.Alchemy;
         CraftRecipe selectedRecipe = null;
@@ -74,9 +89,15 @@ namespace Riftbound
         void BuildRecipeDatabase()
         {
             allRecipes.Clear();
+            allRecipes.AddRange(BuildDefaultRecipes());
+        }
+
+        public static List<CraftRecipe> BuildDefaultRecipes()
+        {
+            var list = new List<CraftRecipe>();
 
             // ALCHEMY RECIPES
-            allRecipes.Add(new CraftRecipe
+            list.Add(new CraftRecipe
             {
                 id = "minor-healing-potion",
                 displayName = "Minor Healing Potion",
@@ -89,7 +110,7 @@ namespace Riftbound
                 rarityColor = new Color(0.9f, 0.9f, 0.9f)
             });
 
-            allRecipes.Add(new CraftRecipe
+            list.Add(new CraftRecipe
             {
                 id = "elixir-lions-strength",
                 displayName = "Elixir of Lion's Strength",
@@ -102,7 +123,7 @@ namespace Riftbound
                 rarityColor = new Color(0.12f, 1.0f, 0.0f) // Uncommon
             });
 
-            allRecipes.Add(new CraftRecipe
+            list.Add(new CraftRecipe
             {
                 id = "draught-of-swiftness",
                 displayName = "Draught of Swiftness",
@@ -115,7 +136,7 @@ namespace Riftbound
                 rarityColor = new Color(0.0f, 0.44f, 0.87f) // Rare
             });
 
-            allRecipes.Add(new CraftRecipe
+            list.Add(new CraftRecipe
             {
                 id = "flask-of-the-titans",
                 displayName = "Flask of the Titans",
@@ -129,52 +150,52 @@ namespace Riftbound
             });
 
             // BLACKSMITHING RECIPES
-            allRecipes.Add(new CraftRecipe
+            list.Add(new CraftRecipe
             {
                 id = "sharpened-copper-dagger",
                 displayName = "Sharpened Copper Dagger",
                 category = CraftCategory.Blacksmithing,
                 requiredSkill = 1,
-                description = "Forged from smelted copper bars. Fast blade granting +8 Weapon Damage.",
+                description = "Forged from smelted copper bars. Fast blade granting +4 Weapon Damage.",
                 outputItemId = "copper-dagger",
                 outputCount = 1,
                 reagents = new[] { ("Copper Ore", 2) },
                 rarityColor = new Color(0.9f, 0.9f, 0.9f)
             });
 
-            allRecipes.Add(new CraftRecipe
+            list.Add(new CraftRecipe
             {
                 id = "tempered-bronze-broadsword",
                 displayName = "Tempered Bronze Broadsword",
                 category = CraftCategory.Blacksmithing,
                 requiredSkill = 15,
-                description = "Heavy martial blade folded at the forge. Grants +16 Weapon Damage and +15 Maximum Health.",
+                description = "Heavy martial blade folded at the forge. Grants +9 Weapon Damage and +10 Maximum Health.",
                 outputItemId = "bronze-broadsword",
                 outputCount = 1,
                 reagents = new[] { ("Copper Ore", 3), ("Tin Ore", 2) },
                 rarityColor = new Color(0.12f, 1.0f, 0.0f)
             });
 
-            allRecipes.Add(new CraftRecipe
+            list.Add(new CraftRecipe
             {
                 id = "heavy-iron-buckler",
                 displayName = "Heavy Iron Buckler",
                 category = CraftCategory.Blacksmithing,
                 requiredSkill = 25,
-                description = "Reinforced shield with hardened boss. Grants +8 Armor and +35 Maximum Health.",
+                description = "Reinforced shield with hardened boss. Grants +6 Armor and +35 Maximum Health.",
                 outputItemId = "iron-buckler",
                 outputCount = 1,
                 reagents = new[] { ("Tin Ore", 2), ("Silver Ore", 1) },
                 rarityColor = new Color(0.0f, 0.44f, 0.87f)
             });
 
-            allRecipes.Add(new CraftRecipe
+            list.Add(new CraftRecipe
             {
                 id = "truesilver-executioner",
                 displayName = "Truesilver Executioner",
                 category = CraftCategory.Blacksmithing,
                 requiredSkill = 40,
-                description = "Masterwork 2H Greatsword gleaming with truesilver sheen. Grants +24 Weapon Damage and +5% Crit Chance.",
+                description = "Masterwork 2H Greatsword gleaming with truesilver sheen. Grants +21 Weapon Damage and +30 Maximum Health.",
                 outputItemId = "truesilver-blade",
                 outputCount = 1,
                 reagents = new[] { ("Tin Ore", 3), ("Silver Ore", 3) },
@@ -182,7 +203,7 @@ namespace Riftbound
             });
 
             // ENGINEERING RECIPES
-            allRecipes.Add(new CraftRecipe
+            list.Add(new CraftRecipe
             {
                 id = "goblin-boom-powder-bomb",
                 displayName = "Goblin Boom Powder Bomb",
@@ -195,7 +216,7 @@ namespace Riftbound
                 rarityColor = new Color(0.9f, 0.9f, 0.9f)
             });
 
-            allRecipes.Add(new CraftRecipe
+            list.Add(new CraftRecipe
             {
                 id = "gnomish-target-dummy",
                 displayName = "Gnomish Target Dummy",
@@ -208,7 +229,7 @@ namespace Riftbound
                 rarityColor = new Color(0.12f, 1.0f, 0.0f)
             });
 
-            allRecipes.Add(new CraftRecipe
+            list.Add(new CraftRecipe
             {
                 id = "rocket-boots-xtreme",
                 displayName = "Rocket Boots Xtreme",
@@ -220,25 +241,152 @@ namespace Riftbound
                 reagents = new[] { ("Copper Ore", 2), ("Tin Ore", 2), ("Silver Ore", 1) },
                 rarityColor = new Color(0.0f, 0.44f, 0.87f)
             });
+
+            return list;
+        }
+
+        public static bool TryGetRecipeSpec(string recipeId, out CraftRecipe recipe)
+        {
+            recipe = null;
+            if (string.IsNullOrWhiteSpace(recipeId)) return false;
+            if (sharedRecipeLookup == null)
+            {
+                var map = new Dictionary<string, CraftRecipe>(StringComparer.OrdinalIgnoreCase);
+                foreach (var r in BuildDefaultRecipes())
+                    map[r.id] = r;
+                sharedRecipeLookup = map;
+            }
+            return sharedRecipeLookup.TryGetValue(recipeId.Trim(), out recipe);
+        }
+
+        public static string NormalizeReagentName(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name)) return "";
+            string clean = name.Replace(" Leaf", "").Replace(" Ore", "").Replace(" Vein", "").Trim();
+            if (clean.StartsWith("Peacebloom", StringComparison.OrdinalIgnoreCase)) return "Peacebloom";
+            if (clean.StartsWith("Silverleaf", StringComparison.OrdinalIgnoreCase)) return "Silverleaf";
+            if (clean.StartsWith("Kingsblood", StringComparison.OrdinalIgnoreCase)) return "Kingsblood";
+            if (clean.StartsWith("Copper", StringComparison.OrdinalIgnoreCase) || clean.Equals("copper-ore", StringComparison.OrdinalIgnoreCase)) return "Copper Ore";
+            if (clean.StartsWith("Tin", StringComparison.OrdinalIgnoreCase) || clean.Equals("tin-ore", StringComparison.OrdinalIgnoreCase)) return "Tin Ore";
+            if (clean.StartsWith("Silver", StringComparison.OrdinalIgnoreCase) || clean.Equals("truesilver-ingot", StringComparison.OrdinalIgnoreCase)) return "Silver Ore";
+            return clean;
+        }
+
+        public static void PopulateDefaultReagents(IDictionary<string, int> bag)
+        {
+            if (bag == null) return;
+            bag.Clear();
+            for (int i = 0; i < StarterReagents.Length; i++)
+                bag[StarterReagents[i].name] = StarterReagents[i].initialCount;
+        }
+
+        public static List<string> BuildDefaultReagentSaveList()
+        {
+            var list = new List<string>(StarterReagents.Length);
+            for (int i = 0; i < StarterReagents.Length; i++)
+                list.Add($"{StarterReagents[i].name}={StarterReagents[i].initialCount}");
+            return list;
+        }
+
+        public static bool TryParseReagentEntry(string entry, out string reagentName, out int count)
+        {
+            reagentName = "";
+            count = 0;
+            if (string.IsNullOrWhiteSpace(entry)) return false;
+            int eq = entry.IndexOf('=');
+            if (eq <= 0) return false;
+            reagentName = NormalizeReagentName(entry.Substring(0, eq));
+            if (string.IsNullOrEmpty(reagentName)) return false;
+            if (!int.TryParse(entry.Substring(eq + 1).Trim(), out count)) return false;
+            count = Mathf.Clamp(count, 0, 9999);
+            return true;
+        }
+
+        public static string EncodeReagentsCsv(IDictionary<string, int> bag)
+        {
+            if (bag == null || bag.Count == 0) return "";
+            var parts = new List<string>(bag.Count);
+            foreach (var kv in bag)
+            {
+                string clean = NormalizeReagentName(kv.Key);
+                if (!string.IsNullOrEmpty(clean) && kv.Value > 0)
+                    parts.Add($"{clean}={Mathf.Clamp(kv.Value, 0, 9999)}");
+            }
+            return string.Join(",", parts);
         }
 
         public void AddReagent(string name, int count)
         {
             if (string.IsNullOrEmpty(name) || count <= 0) return;
-            // Normalize herb and ore names
-            string clean = name.Replace(" Leaf", "").Replace(" Ore", "").Replace(" Vein", "").Trim();
-            if (clean.StartsWith("Peacebloom")) clean = "Peacebloom";
-            else if (clean.StartsWith("Silverleaf")) clean = "Silverleaf";
-            else if (clean.StartsWith("Kingsblood")) clean = "Kingsblood";
-            else if (clean.StartsWith("Copper")) clean = "Copper Ore";
-            else if (clean.StartsWith("Tin")) clean = "Tin Ore";
-            else if (clean.StartsWith("Silver")) clean = "Silver Ore";
+            string clean = NormalizeReagentName(name);
+            if (string.IsNullOrEmpty(clean)) return;
 
             if (!reagents.ContainsKey(clean)) reagents[clean] = 0;
             reagents[clean] += count;
 
             CombatTextManager.Spawn(transform.position + Vector3.up * 1.5f, $"+{count} {clean}", new Color(0.5f, 1f, 0.5f), false);
             ChatSystem.LogLoot($"Received reagent: [{clean}] x{count}.");
+        }
+
+        public void ApplyServerRealmHydration(int serverAlchemy, int serverBlacksmithing, int serverEngineering, IReadOnlyList<string> serverReagentEntries)
+        {
+            alchemySkill = Mathf.Clamp(serverAlchemy, 0, MaxSkill);
+            blacksmithingSkill = Mathf.Clamp(serverBlacksmithing, 0, MaxSkill);
+            engineeringSkill = Mathf.Clamp(serverEngineering, 0, MaxSkill);
+
+            for (int i = 0; i < StarterReagents.Length; i++)
+                reagents[StarterReagents[i].name] = 0;
+
+            if (serverReagentEntries != null)
+            {
+                for (int i = 0; i < serverReagentEntries.Count; i++)
+                {
+                    if (TryParseReagentEntry(serverReagentEntries[i], out string rName, out int rCount))
+                        reagents[rName] = rCount;
+                }
+            }
+        }
+
+        public void ApplyAuthoritativeReagentsCsv(string reagentsCsv)
+        {
+            for (int i = 0; i < StarterReagents.Length; i++)
+                reagents[StarterReagents[i].name] = 0;
+            if (string.IsNullOrWhiteSpace(reagentsCsv)) return;
+            string[] parts = reagentsCsv.Split(',');
+            for (int i = 0; i < parts.Length; i++)
+            {
+                if (TryParseReagentEntry(parts[i], out string rName, out int rCount))
+                    reagents[rName] = rCount;
+            }
+        }
+
+        public void ApplyAuthoritativeCraftResult(string recipeId, int serverAlchemy, int serverBlacksmithing, int serverEngineering, string reagentsCsv)
+        {
+            int prevAlchemy = alchemySkill;
+            int prevBlacksmithing = blacksmithingSkill;
+            int prevEngineering = engineeringSkill;
+
+            alchemySkill = Mathf.Clamp(serverAlchemy, 0, MaxSkill);
+            blacksmithingSkill = Mathf.Clamp(serverBlacksmithing, 0, MaxSkill);
+            engineeringSkill = Mathf.Clamp(serverEngineering, 0, MaxSkill);
+            ApplyAuthoritativeReagentsCsv(reagentsCsv);
+
+            if (!TryGetRecipeSpec(recipeId, out var recipe))
+            {
+                if (allRecipes != null)
+                    recipe = allRecipes.Find(r => string.Equals(r.id, recipeId, StringComparison.OrdinalIgnoreCase));
+            }
+            if (recipe == null) return;
+
+            int gain = recipe.category == CraftCategory.Alchemy ? alchemySkill - prevAlchemy
+                : recipe.category == CraftCategory.Blacksmithing ? blacksmithingSkill - prevBlacksmithing
+                : engineeringSkill - prevEngineering;
+            if (gain > 0)
+                CombatTextManager.Spawn(transform.position + Vector3.up * 2.2f, $"+{gain} {recipe.category} Skill ({GetSkill(recipe.category)}/{MaxSkill})!", new Color(1f, 0.85f, 0.2f), true);
+
+            ApplyLocalNonGearRecipePresentation(recipe, allowMaxHealthStatMutation: !Network.CoopSessionConfig.IsMultiplayer);
+            CombatTextManager.Spawn(transform.position + Vector3.up * 1.8f, $"Created {recipe.displayName}!", recipe.rarityColor, false);
+            ChatSystem.LogSystem($"Crafting Complete: [{recipe.displayName}].");
         }
 
         public int GetReagentCount(string name)
@@ -273,6 +421,10 @@ namespace Riftbound
         public void StartCraft(CraftRecipe recipe)
         {
             if (!CanCraft(recipe) || !player || !player.Stats.Alive) return;
+            if (Network.CoopSessionConfig.IsMultiplayer &&
+                (Network.RiftboundCoopPlayer.LocalOwner == null ||
+                 (Network.CoopSessionConfig.IsRealmClient && !player.IsRealmHydrated)))
+                return;
 
             string action = recipe.category == CraftCategory.Alchemy ? "Brewing" :
                             recipe.category == CraftCategory.Blacksmithing ? "Forging" : "Tinkering";
@@ -288,7 +440,16 @@ namespace Riftbound
         {
             if (recipe == null || !player) return;
 
-            // Consume reagents
+            if (Network.CoopSessionConfig.IsMultiplayer)
+            {
+                if (Network.RiftboundCoopPlayer.LocalOwner == null ||
+                    (Network.CoopSessionConfig.IsRealmClient && !player.IsRealmHydrated))
+                    return;
+                Network.RiftboundCoopPlayer.LocalOwner.RequestCraftRecipe(recipe.id);
+                return;
+            }
+
+            // Consume reagents (offline solo)
             foreach (var r in recipe.reagents)
             {
                 if (reagents.ContainsKey(r.matId))
@@ -304,12 +465,44 @@ namespace Riftbound
                 CombatTextManager.Spawn(transform.position + Vector3.up * 2.2f, $"+{gain} {recipe.category} Skill ({GetSkill(recipe.category)}/{MaxSkill})!", new Color(1f, 0.85f, 0.2f), true);
             }
 
-            // Grant rewards
+            // Grant rewards (offline solo)
             if (recipe.outputItemId == "potion")
             {
                 player.AddPotionsDirect(recipe.outputCount);
             }
-            else if (recipe.outputItemId == "buff-strength")
+            else if (recipe.outputItemId == "copper-dagger")
+            {
+                player.GrantItem("copper-dagger");
+                ChatSystem.LogLoot($"You forged: [Sharpened Copper Dagger]! Open Equipment [I] to equip.");
+            }
+            else if (recipe.outputItemId == "bronze-broadsword")
+            {
+                player.GrantItem("bronze-broadsword");
+                ChatSystem.LogLoot($"You forged: [Tempered Bronze Broadsword]! Open Equipment [I] to equip.");
+            }
+            else if (recipe.outputItemId == "iron-buckler")
+            {
+                player.GrantItem("iron-buckler");
+                ChatSystem.LogLoot($"You forged: [Heavy Iron Buckler]! Open Equipment [I] to equip.");
+            }
+            else if (recipe.outputItemId == "truesilver-blade")
+            {
+                player.GrantItem("truesilver-blade");
+                ChatSystem.LogLoot($"You forged: [Truesilver Executioner]! Open Equipment [I] to equip.");
+            }
+            else
+            {
+                ApplyLocalNonGearRecipePresentation(recipe, allowMaxHealthStatMutation: true);
+            }
+
+            CombatTextManager.Spawn(transform.position + Vector3.up * 1.8f, $"Created {recipe.displayName}!", recipe.rarityColor, false);
+            ChatSystem.LogSystem($"Crafting Complete: [{recipe.displayName}].");
+        }
+
+        void ApplyLocalNonGearRecipePresentation(CraftRecipe recipe, bool allowMaxHealthStatMutation)
+        {
+            if (recipe == null || !player) return;
+            if (recipe.outputItemId == "buff-strength")
             {
                 BuffSystem.ApplyBuff(new BuffSystem.AuraBuff
                 {
@@ -346,8 +539,11 @@ namespace Riftbound
                     iconColor = new Color(0.65f, 0.25f, 0.95f),
                     duration = 300f
                 });
-                player.Stats.maxHealth += 80;
-                player.Stats.Heal(80);
+                if (allowMaxHealthStatMutation && player.Stats)
+                {
+                    player.Stats.maxHealth += 80;
+                    player.Stats.Heal(80);
+                }
             }
             else if (recipe.outputItemId == "buff-rocket")
             {
@@ -362,33 +558,14 @@ namespace Riftbound
                     bonusSpeedMultiplier = 1.80f
                 });
             }
-            else if (recipe.outputItemId == "copper-dagger")
-            {
-                player.GrantItem("copper-dagger");
-                ChatSystem.LogLoot($"You forged: [Sharpened Copper Dagger]! Open Equipment [I] to equip.");
-            }
-            else if (recipe.outputItemId == "bronze-broadsword")
-            {
-                player.GrantItem("bronze-broadsword");
-                ChatSystem.LogLoot($"You forged: [Tempered Bronze Broadsword]! Open Equipment [I] to equip.");
-            }
-            else if (recipe.outputItemId == "iron-buckler")
-            {
-                player.GrantItem("iron-buckler");
-                ChatSystem.LogLoot($"You forged: [Heavy Iron Buckler]! Open Equipment [I] to equip.");
-            }
-            else if (recipe.outputItemId == "truesilver-blade")
-            {
-                player.GrantItem("truesilver-blade");
-                ChatSystem.LogLoot($"You forged: [Truesilver Executioner]! Open Equipment [I] to equip.");
-            }
-            else
+            else if (recipe.outputItemId != "potion" &&
+                     recipe.outputItemId != "copper-dagger" &&
+                     recipe.outputItemId != "bronze-broadsword" &&
+                     recipe.outputItemId != "iron-buckler" &&
+                     recipe.outputItemId != "truesilver-blade")
             {
                 ChatSystem.LogLoot($"Created: [{recipe.displayName}] x{recipe.outputCount}!");
             }
-
-            CombatTextManager.Spawn(transform.position + Vector3.up * 1.8f, $"Created {recipe.displayName}!", recipe.rarityColor, false);
-            ChatSystem.LogSystem($"Crafting Complete: [{recipe.displayName}].");
         }
 
         void SetSkill(CraftCategory cat, int val)

@@ -10,10 +10,21 @@ namespace Riftbound
         public bool requiresWardenDefeated;
         public Transform lid;
         Quaternion closed = Quaternion.identity;
-        void Start() { if (lid) closed = lid.localRotation; Refresh(); }
+        bool closedCaptured;
+        void CaptureClosed()
+        {
+            if (!closedCaptured && lid)
+            {
+                closed = lid.localRotation;
+                closedCaptured = true;
+            }
+        }
+        void Awake() { CaptureClosed(); }
+        void Start() { CaptureClosed(); Refresh(); }
         public void Open(PlayerController player) { if (player.OpenChest(this)) Refresh(); }
         public void Refresh()
         {
+            CaptureClosed();
             var player = FindFirstObjectByType<PlayerController>();
             if (lid && player) lid.localRotation = closed * Quaternion.Euler(player.HasOpenedChest(chestId) ? 70 : 0, 0, 0);
         }

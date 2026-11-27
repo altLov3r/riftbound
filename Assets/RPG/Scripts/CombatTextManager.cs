@@ -37,7 +37,7 @@ namespace Riftbound
             if (!Instance)
             {
                 var go = new GameObject("CombatTextManager");
-                go.AddComponent<CombatTextManager>();
+                Instance = go.AddComponent<CombatTextManager>();
             }
 
             Vector3 vel = new Vector3(

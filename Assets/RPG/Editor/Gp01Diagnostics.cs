@@ -492,7 +492,7 @@ namespace Riftbound.Editor
                     UnityEngine.Object.Destroy(liveGo);
                     UnityEngine.Object.Destroy(deadGo);
 
-                    // GP11: Shop purchase & Leather Vest equip
+                    // GP11: Shop purchase (Potion + Temper Weapon)
                     var merchant = UnityEngine.Object.FindFirstObjectByType<Merchant>();
                     Assert(merchant != null, "GP11 Scene Merchant present");
                     Vector3 savedPos = pc.transform.position;
@@ -503,15 +503,12 @@ namespace Riftbound.Editor
                     bool gotMerch = pc.TryGetBestInteraction(out var merchCand, out _);
                     Assert(gotMerch && merchCand.text.Contains("Trade with"), $"GP11 Merchant prompt resolved ('{merchCand.text}')");
                     merchCand.execute?.Invoke();
-                    pc.AddGoldDirect(50);
+                    pc.AddGoldDirect(60);
                     int potBefore = pc.Potions;
                     pc.BuyPotion();
-                    pc.BuyVest();
+                    pc.TemperWeapon();
                     pc.CloseShop();
-                    pc.InventoryOpen = true;
-                    pc.EquipItem("leather-vest");
-                    pc.InventoryOpen = false;
-                    Assert(pc.Potions == Mathf.Min(10, potBefore + 1) && pc.ArmorRating >= 2, $"GP11 Merchant buy + equip succeeded (pot={pc.Potions}, armor={pc.ArmorRating})");
+                    Assert(pc.Potions == Mathf.Min(10, potBefore + 1) && pc.TemperedWeapon && pc.WeaponBonus >= 4, $"GP11 Merchant buy + temper succeeded (pot={pc.Potions}, tempered={pc.TemperedWeapon}, weaponBonus={pc.WeaponBonus})");
                     if (cc11) cc11.enabled = false;
                     pc.transform.position = savedPos;
                     if (cc11) cc11.enabled = true;

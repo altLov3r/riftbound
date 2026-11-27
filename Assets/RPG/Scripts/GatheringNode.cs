@@ -22,6 +22,7 @@ namespace Riftbound
         public string ActionPrompt => gatheringType == GatheringType.Herbalism ? $"Gather {nodeName}" : $"Mine {nodeName}";
 
         bool gathered = false;
+        float pendingRequestUntil;
         Renderer[] renderers;
         Collider[] colliders;
 
@@ -29,6 +30,33 @@ namespace Riftbound
         {
             renderers = GetComponentsInChildren<Renderer>();
             colliders = GetComponentsInChildren<Collider>();
+        }
+
+        public static void CompleteAuthorizedGather(Vector3 nodePos)
+        {
+            GatheringNode best = null;
+            float bestDist = 1.5f;
+            foreach (var node in FindObjectsByType<GatheringNode>(FindObjectsSortMode.None))
+            {
+                if (!node || node.gathered || !node.gameObject.activeInHierarchy) continue;
+                float d = Vector3.Distance(node.transform.position, nodePos);
+                if (d <= bestDist)
+                {
+                    bestDist = d;
+                    best = node;
+                }
+            }
+            if (best != null)
+                best.CompleteLocalVisualRespawn();
+        }
+
+        void CompleteLocalVisualRespawn()
+        {
+            if (gathered) return;
+            gathered = true;
+            pendingRequestUntil = 0f;
+            AudioEffects.PlayLootCoin();
+            StartCoroutine(RespawnRoutine());
         }
 
         public static GatheringNode GetNearby(Vector3 pos, float radius = 3.2f)
@@ -50,7 +78,11 @@ namespace Riftbound
 
         public void StartGather(PlayerController player)
         {
-            if (gathered || !player || !player.Stats.Alive) return;
+            if (gathered || Time.time < pendingRequestUntil || !player || !player.Stats.Alive) return;
+            if (Network.CoopSessionConfig.IsMultiplayer &&
+                (Network.RiftboundCoopPlayer.LocalOwner == null ||
+                 (Network.CoopSessionConfig.IsRealmClient && !player.IsRealmHydrated)))
+                return;
 
             string verb = gatheringType == GatheringType.Herbalism ? "Gathering" : "Mining";
             CastBarSystem.StartCast($"{verb} {nodeName}...", 2.2f, () =>
@@ -62,6 +94,17 @@ namespace Riftbound
         void FinishGather(PlayerController player)
         {
             if (gathered || !player) return;
+
+            if (Network.CoopSessionConfig.IsMultiplayer)
+            {
+                if (Network.RiftboundCoopPlayer.LocalOwner == null ||
+                    (Network.CoopSessionConfig.IsRealmClient && !player.IsRealmHydrated))
+                    return;
+                pendingRequestUntil = Time.time + 2.0f;
+                Network.RiftboundCoopPlayer.LocalOwner.RequestGatherNode(nodeName, transform.position);
+                return;
+            }
+
             gathered = true;
 
             player.AddExperience(rewardXp);

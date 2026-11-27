@@ -154,10 +154,17 @@ namespace Riftbound.Network
                 servicesGo.AddComponent<CastBarSystem>();
                 servicesGo.AddComponent<FactionQuestSystem>();
                 servicesGo.AddComponent<WorldBossEncounter>();
+                servicesGo.AddComponent<CathedralBossEncounter>();
+                servicesGo.AddComponent<ApexBossEncounter>();
             }
-            else if (!servicesGo.GetComponent<WorldBossEncounter>())
+            else
             {
-                servicesGo.AddComponent<WorldBossEncounter>();
+                if (!servicesGo.GetComponent<WorldBossEncounter>())
+                    servicesGo.AddComponent<WorldBossEncounter>();
+                if (!CathedralBossEncounter.Instance && !servicesGo.GetComponent<CathedralBossEncounter>())
+                    servicesGo.AddComponent<CathedralBossEncounter>();
+                if (!ApexBossEncounter.Instance && !servicesGo.GetComponent<ApexBossEncounter>())
+                    servicesGo.AddComponent<ApexBossEncounter>();
             }
 
             RealmPersistenceService.Initialize(RealmConfig.ResolveServerDataDirectory());

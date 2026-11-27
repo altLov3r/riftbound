@@ -76,6 +76,8 @@ namespace Riftbound
                 player.ResetDungeonEncounters();
             }
 
+            CathedralBossEncounter.Instance?.ResetEncounter();
+
             // Reactivate all dungeon entities in scene
             var allEnemies = FindObjectsByType<EnemyController>(FindObjectsInactive.Include, FindObjectsSortMode.None);
             foreach (var enemy in allEnemies)

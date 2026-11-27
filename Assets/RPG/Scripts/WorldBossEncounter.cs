@@ -23,6 +23,8 @@ namespace Riftbound
         public const float EnrageHealthFraction = 0.35f;
         public const int DefeatXp = 150;
         public const int DefeatGold = 65;
+        public const int HoardGold = 150;
+        public const int HoardXp = 250;
 
         public const byte EventStomp = 1;
         public const byte EventMeteorWarn = 2;
@@ -90,6 +92,23 @@ namespace Riftbound
         void Start()
         {
             FindBossReference();
+            TryRecoverOfflineHoardChest();
+        }
+
+        void TryRecoverOfflineHoardChest()
+        {
+            if (Network.CoopSessionConfig.IsMultiplayer || lootSpawned) return;
+            if (!player) player = FindFirstObjectByType<PlayerController>();
+            if (player != null && player.HasDefeated(BossEnemyId))
+            {
+                lootSpawned = true;
+                IsBossDefeatedAuthoritative = true;
+                if (!player.HasOpenedChest(HoardChestId))
+                {
+                    hoardChestPosition = ComputeHoardChestPosition();
+                    EnsureHoardChestSpawned(hoardChestPosition);
+                }
+            }
         }
 
         void OnDestroy()
@@ -103,7 +122,7 @@ namespace Riftbound
         public void FindBossReference()
         {
             if (bossCombatant != null && bossController != null) return;
-            foreach (var enemy in FindObjectsByType<EnemyController>(FindObjectsSortMode.None))
+            foreach (var enemy in FindObjectsByType<EnemyController>(FindObjectsInactive.Include, FindObjectsSortMode.None))
             {
                 if (enemy.enemyId == BossEnemyId)
                 {
@@ -189,6 +208,12 @@ namespace Riftbound
 
         void Update()
         {
+            if (!Network.CoopSessionConfig.IsMultiplayer && !lootSpawned)
+            {
+                TryRecoverOfflineHoardChest();
+                if (lootSpawned) return;
+            }
+
             if (bossCombatant == null || bossController == null)
             {
                 if (Time.frameCount % 90 == 0) FindBossReference();
@@ -197,6 +222,9 @@ namespace Riftbound
 
             // Multiplayer non-server clients only render replicated boss events & HUD; server owns all timers, damage, and loot.
             if (!IsAuthoritativeRuntime) return;
+
+            if (!Network.CoopSessionConfig.IsMultiplayer && lootSpawned && !bossController.gameObject.activeInHierarchy)
+                return;
 
             if (!bossCombatant.Alive)
             {
@@ -360,8 +388,6 @@ namespace Riftbound
             hoardChestPosition = ComputeHoardChestPosition();
             EnsureHoardChestSpawned(hoardChestPosition);
 
-            string[] epicDrops = { "worldbreaker-maul", "crown-of-molten-ruin", "cinderfury-signet" };
-
             if (Network.CoopSessionConfig.IsMultiplayer)
             {
                 Network.RealmWorldChannel.DispatchWorldBossEvent(EventDefeated, hoardChestPosition, 0f, 0f);
@@ -370,7 +396,7 @@ namespace Riftbound
                     if (!cp || !cp.IsSpawned || cp.Health.Value <= 0) continue;
                     if (Vector3.Distance(cp.transform.position, spawnPosition) <= 45f)
                     {
-                        string chosen = epicDrops[UnityEngine.Random.Range(0, epicDrops.Length)];
+                        string chosen = cp.ResolveNextGorgonaxKillItem();
                         cp.GrantServerWorldBossKillReward(DefeatXp, DefeatGold, chosen, "Titanbreaker");
                     }
                 }
@@ -385,7 +411,7 @@ namespace Riftbound
             {
                 player.AddExperience(DefeatXp);
                 player.AddGoldDirect(DefeatGold);
-                string chosen = epicDrops[UnityEngine.Random.Range(0, epicDrops.Length)];
+                string chosen = SharedRewardCatalog.ResolveGorgonaxKillItem(id => player.OwnsItem(id));
                 player.GrantItem(chosen);
                 var item = ItemCatalog.Get(chosen);
                 if (item != null)
@@ -396,6 +422,7 @@ namespace Riftbound
             }
             PlayerTitleSystem.SetActiveTitle("Titanbreaker");
             ChatSystem.LogSystem("<color=#e0b034>★ Title Unlocked: 'Titanbreaker'!</color>");
+            if (player) player.SaveAdventure(false);
         }
 
         void EnsureHoardChestSpawned(Vector3 chestPos)
@@ -405,6 +432,8 @@ namespace Riftbound
             {
                 if (existing && existing.chestId == HoardChestId)
                 {
+                    existing.gold = HoardGold;
+                    existing.experience = HoardXp;
                     spawnedHoardChest = existing;
                     return;
                 }
@@ -437,6 +466,8 @@ namespace Riftbound
 
             var chest = chestObj.GetComponent<LootChest>() ?? chestObj.AddComponent<LootChest>();
             chest.chestId = HoardChestId;
+            chest.gold = HoardGold;
+            chest.experience = HoardXp;
             spawnedHoardChest = chest;
 
             if (!Network.CoopSessionConfig.IsDedicatedServer)
