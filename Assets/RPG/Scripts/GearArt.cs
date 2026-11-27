@@ -11,8 +11,6 @@ namespace Riftbound
         {
             "pinewatch-warden-crest" => "emberwatch-sigil",
             "ursolak-spirit-pelt" => "ember-drake-scale",
-            "alliance-war-banner" => "emberwatch-sigil",
-            "sunforged-breastplate" => "watchtower-cuirass",
             _ => id
         };
 

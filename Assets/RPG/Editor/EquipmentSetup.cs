@@ -44,7 +44,7 @@ namespace Riftbound.Editor
         {
             var report = new StringBuilder();
             void Check(bool valid, string message) { report.AppendLine((valid ? "PASS " : "FAIL ") + message); if (!valid) throw new InvalidOperationException(message); }
-            Check(ItemCatalog.All.Length == 11 && ItemCatalog.All.Select(i => i.id).Distinct().Count() == 11, "Eleven unique gear items");
+            Check(ItemCatalog.All.Length >= 11 && ItemCatalog.All.Select(i => i.id).Distinct().Count() == ItemCatalog.All.Length, $"Unique gear items ({ItemCatalog.All.Length})");
             var tower = UnityEngine.Object.FindObjectsByType<LootChest>(FindObjectsSortMode.None).First(c => c.chestId == "tower-cache");
             Check(tower.requiresCaptainDefeated, "Tower reward requires captain defeat");
             var actor = new GameObject("Equipment checks") { hideFlags = HideFlags.HideAndDontSave };

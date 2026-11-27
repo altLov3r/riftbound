@@ -2723,6 +2723,124 @@ namespace Riftbound.Network
                 yield break;
             }
 
+            if (role == "gear_server")
+            {
+                bool sawOne = false;
+                bool teleported = false;
+                bool cleanExit = false;
+                LootChest villageChest = null;
+                foreach (var c in FindObjectsByType<LootChest>(FindObjectsSortMode.None))
+                    if (c && c.chestId == "village-cache") { villageChest = c; break; }
+
+                while (Time.realtimeSinceStartup < deadline)
+                {
+                    int activeCount = CountSpawnedPeers();
+                    if (activeCount >= 1)
+                    {
+                        sawOne = true;
+                        if (!teleported && villageChest && RiftboundCoopPlayer.AllPlayers.Count > 0)
+                        {
+                            var p0 = RiftboundCoopPlayer.AllPlayers[0];
+                            if (p0 && p0.IsSpawned)
+                            {
+                                teleported = true;
+                                p0.AuthorizeHostTeleport(villageChest.transform.position + new Vector3(0f, 0f, -1.5f));
+                            }
+                        }
+                    }
+                    else if (sawOne && activeCount == 0)
+                    {
+                        cleanExit = true;
+                        break;
+                    }
+                    yield return new WaitForSeconds(0.15f);
+                }
+
+                bool pass = sawOne && teleported && cleanExit;
+                WriteResult(pass, $"sawOne={sawOne}, teleported={teleported}, cleanExit={cleanExit}");
+                if (nm != null && nm.IsListening) nm.Shutdown();
+                yield return new WaitForSeconds(0.25f);
+                Application.Quit(pass ? 0 : 1);
+                yield break;
+            }
+
+            if (role == "gear_seed" || role == "gear_verify")
+            {
+                while (Time.realtimeSinceStartup < deadline && (nm == null || !nm.IsConnectedClient || RiftboundCoopPlayer.LocalOwner == null))
+                    yield return new WaitForSeconds(0.15f);
+
+                var gMe = RiftboundCoopPlayer.LocalOwner;
+                var gLp = FindFirstObjectByType<PlayerController>();
+                LootChest villageChest = null;
+                foreach (var c in FindObjectsByType<LootChest>(FindObjectsSortMode.None))
+                    if (c && c.chestId == "village-cache") { villageChest = c; break; }
+
+                if (gMe == null || gLp == null || villageChest == null)
+                {
+                    WriteResult(false, $"missingEntities me={(gMe != null)} lp={(gLp != null)} chest={(villageChest != null)}");
+                    if (nm != null && nm.IsListening) nm.Shutdown();
+                    Application.Quit(1);
+                    yield break;
+                }
+
+                // Wait for server placement next to village-cache
+                float waitTp = Time.realtimeSinceStartup;
+                while (Time.realtimeSinceStartup - waitTp < 10f && Vector3.Distance(gLp.transform.position, villageChest.transform.position) > 4.0f)
+                    yield return new WaitForSeconds(0.1f);
+
+                if (role == "gear_seed")
+                {
+                    gMe.RequestOpenChestServerValidated(villageChest);
+                    float waitOwn = Time.realtimeSinceStartup;
+                    while (Time.realtimeSinceStartup - waitOwn < 8f && !gLp.OwnsItem("leather-vest"))
+                        yield return new WaitForSeconds(0.15f);
+
+                    bool owns = gLp.OwnsItem("leather-vest");
+                    if (owns) gMe.RequestEquipItem("leather-vest");
+
+                    float waitEq = Time.realtimeSinceStartup;
+                    while (Time.realtimeSinceStartup - waitEq < 8f && gMe.EquippedArmorId.Value.ToString() != "leather-vest")
+                        yield return new WaitForSeconds(0.15f);
+
+                    yield return new WaitForSeconds(0.6f);
+                    bool equipped = gMe.EquippedArmorId.Value.ToString() == "leather-vest" && gLp.EquippedArmorId == "leather-vest";
+                    bool pass = owns && equipped;
+                    WriteResult(pass, $"owns={owns}, equippedNet={gMe.EquippedArmorId.Value}, equippedLocal={gLp.EquippedArmorId}, gold={gLp.Gold}");
+                    if (nm != null && nm.IsListening) nm.Shutdown();
+                    yield return new WaitForSeconds(0.25f);
+                    Application.Quit(pass ? 0 : 1);
+                    yield break;
+                }
+                else
+                {
+                    float waitHydrate = Time.realtimeSinceStartup;
+                    while (Time.realtimeSinceStartup - waitHydrate < 10f)
+                    {
+                        if (gLp.OwnsItem("leather-vest") &&
+                            gLp.EquippedArmorId == "leather-vest" &&
+                            gMe.EquippedArmorId.Value.ToString() == "leather-vest")
+                            break;
+                        yield return new WaitForSeconds(0.15f);
+                    }
+
+                    bool hydratedOwns = gLp.OwnsItem("leather-vest");
+                    bool hydratedEquipLocal = gLp.EquippedArmorId == "leather-vest";
+                    bool hydratedEquipNet = gMe.EquippedArmorId.Value.ToString() == "leather-vest";
+
+                    int goldBeforeDup = gLp.Gold;
+                    gMe.RequestOpenChestServerValidated(villageChest);
+                    yield return new WaitForSeconds(0.9f);
+                    bool dupBlocked = gLp.Gold == goldBeforeDup;
+
+                    bool pass = hydratedOwns && hydratedEquipLocal && hydratedEquipNet && dupBlocked;
+                    WriteResult(pass, $"hydratedOwns={hydratedOwns}, equipLocal={gLp.EquippedArmorId}, equipNet={gMe.EquippedArmorId.Value}, dupBlocked={dupBlocked}(gold={goldBeforeDup}->{gLp.Gold})");
+                    if (nm != null && nm.IsListening) nm.Shutdown();
+                    yield return new WaitForSeconds(0.25f);
+                    Application.Quit(pass ? 0 : 1);
+                    yield break;
+                }
+            }
+
             // Client smoke roles: c1, c2, c1_rejoin
             while (Time.realtimeSinceStartup < deadline && (nm == null || !nm.IsConnectedClient || RiftboundCoopPlayer.LocalOwner == null || CountSpawnedPeers() < 2))
                 yield return new WaitForSeconds(0.15f);

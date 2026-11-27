@@ -1312,7 +1312,7 @@ namespace Riftbound.Editor
                 var terrainCheck = Terrain.activeTerrain ?? UnityEngine.Object.FindAnyObjectByType<Terrain>();
                 if (terrainCheck != null && player != null)
                 {
-                    float SampleTy(Vector3 p) => terrainCheck.SampleHeight(p) + terrainCheck.transform.position.y;
+                    float SampleTy(Vector3 p) => WorldRegions.Expanded ? WorldRegions.GroundHeight(p) : terrainCheck.SampleHeight(p) + terrainCheck.transform.position.y;
                     string savedRace = player.CharacterRace, savedFac = player.CharacterFaction;
 
                     player.CharacterRace = "Brute"; player.CharacterFaction = "Horde";

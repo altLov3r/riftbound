@@ -23,6 +23,12 @@ namespace Riftbound.Editor
             "mage-arcane-staff"
         };
 
+        static readonly string[] ExtraIconIds =
+        {
+            "alliance-war-banner",
+            "sunforged-breastplate"
+        };
+
         static readonly string[] UnarmedActorNames =
         {
             "Emberwatch_Knight", "Emberwatch_Mage", "Emberwatch_Rogue", "Emberwatch_Paladin",
@@ -45,6 +51,8 @@ namespace Riftbound.Editor
                     BuildWeaponPrefab(id);
                     weaponsBuilt++;
                 }
+                foreach (string id in ExtraIconIds)
+                    ConfigureIcon(id);
 
                 int actorsBuilt = 0;
                 foreach (string actorName in UnarmedActorNames)
